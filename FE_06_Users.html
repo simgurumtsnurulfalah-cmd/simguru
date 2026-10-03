@@ -1,0 +1,349 @@
+<script>
+              }
+              html += `<tr class="border-b hover:bg-slate-50 transition-colors"${rowHighlight}>
+                  <td class="px-3 sm:px-6 py-3 sm:py-4 font-mono text-xs text-slate-500 whitespace-nowrap">${escapeHtml(s.time)}</td>
+                  <td class="px-3 sm:px-6 py-3 sm:py-4 font-semibold text-blue-700 text-xs sm:text-sm" title="${escapeHtml(s.guru_name)}"><span class="db-marquee-wrap"><span class="db-marquee-inner">${escapeHtml(s.guru_name)}</span></span></td>
+                  <td class="col-hide-xs px-3 sm:px-6 py-3 sm:py-4 text-xs font-bold text-slate-600"><span class="bg-slate-100 px-2 py-1 rounded-lg">${escapeHtml(s.class_name)}</span></td>
+                  <td class="px-3 sm:px-6 py-3 sm:py-4 text-slate-600 text-xs sm:text-sm" title="${escapeHtml(s.subject)}"><span class="db-marquee-wrap"><span class="db-marquee-inner">${escapeHtml(s.subject)}</span></span></td>
+                  <td class="px-3 sm:px-6 py-3 sm:py-4 text-center" style="overflow:visible;white-space:normal;">${badge}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            // Aktifkan marquee setelah browser selesai layout (double-rAF
+            // memastikan frame paint pertama sudah selesai sebelum pengukuran)
+            requestAnimationFrame(function() {
+              requestAnimationFrame(function() {
+                _initDashboardMarquees(tbody.closest('.db-panel') || document);
+              });
+            });
+          }
+        } else {
+          if (tbody) tbody.innerHTML = errorTableRows(5, res.message || 'Gagal memuat jadwal.', 'loadAdminDashboardData(localStorage.getItem(\'auth_token\'))');
+        }
+      }).withFailureHandler((err) => {
+        if (tbody) tbody.innerHTML = errorTableRows(5, 'Koneksi gagal: ' + err, 'loadAdminDashboardData(localStorage.getItem(\'auth_token\'))');
+      }).getAdminDashboardData_V2(token);
+    }
+    function loadGuruDashboardData(token) {
+      if (localStorage.getItem('hide_honor_dashboard') === null) {
+        localStorage.setItem('hide_honor_dashboard', 'true');
+      }
+      if (localStorage.getItem('hide_transport_dashboard') === null) {
+        localStorage.setItem('hide_transport_dashboard', 'true');
+      }
+      if (typeof updateHonorVisibilityUI === 'function') {
+        updateHonorVisibilityUI();
+      }
+      if (typeof updateTransportVisibilityUI === 'function') {
+        updateTransportVisibilityUI();
+      }
+      var cachedStats = _readGuruStatsCache();
+      if (cachedStats) {
+        _applyGuruDashboardStats(cachedStats, false);
+      } else {
+        ['valJtmTotal', 'valJtmBonus', 'valEstHonor', 'valJtmToday'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<div class="skeleton h-7 w-16 rounded inline-block"></div>';
+        });
+      }
+      const schedTbody = document.getElementById('scheduleTableBody');
+      if (schedTbody) schedTbody.innerHTML = skeletonTableRows(5, 4);
+      checkAndDisplayHolidayBonus(token);
+      google.script.run.withSuccessHandler((res) => {
+        if (res && res.status === 'success') {
+          _writeGuruStatsCache(res);
+          _applyGuruDashboardStats(res, !cachedStats);
+        } else {
+          ['valJtmTotal', 'valJtmBonus', 'valJtmToday', 'valGuruTransport'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<span class="text-red-400 text-sm">—</span>';
+          });
+        }
+      }).withFailureHandler((err) => {
+        if (cachedStats) return;
+        ['valJtmTotal', 'valJtmBonus', 'valJtmToday', 'valGuruTransport'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<span class="text-red-400 text-sm">—</span>';
+        });
+      }).getDashboardStats(token);
+      loadGuruTodayProgress(token);
+      google.script.run
+        .withSuccessHandler(renderScheduleTable)
+        .withFailureHandler((err) => {
+          const tb = document.getElementById('scheduleTableBody');
+          if (tb) tb.innerHTML = errorTableRows(5, 'Gagal memuat jadwal: ' + err, 'loadGuruDashboardData(localStorage.getItem(\'auth_token\'))');
+        })
+        .getTodaySchedule(token);
+      // Aktifkan marquee pada elemen statis (quick-action label, panel title)
+      // setelah konten guru selesai dirender ke DOM
+      setTimeout(_initDashboardMarquees, 400);
+    }
+    var _GURU_STATS_CACHE_TTL = 90 * 1000;
+    function _guruStatsCacheKey() {
+      var uid = String(localStorage.getItem('user_id') || 'me');
+      return 'sim_guru_stats:' + uid;
+    }
+    function _readGuruStatsCache() {
+      try {
+        var raw = localStorage.getItem(_guruStatsCacheKey());
+        if (!raw) return null;
+        var obj = JSON.parse(raw);
+        if (!obj || !obj._ts || (Date.now() - obj._ts) > _GURU_STATS_CACHE_TTL) return null;
+        return obj.data;
+      } catch (e) { return null; }
+    }
+    function _writeGuruStatsCache(data) {
+      try {
+        localStorage.setItem(_guruStatsCacheKey(), JSON.stringify({ _ts: Date.now(), data: data }));
+      } catch (e) { }
+    }
+    function refreshGuruDashboardCards() {
+      try { localStorage.removeItem(_guruStatsCacheKey()); } catch (_) { }
+      var token = localStorage.getItem('auth_token');
+      if (!token) return;
+      var hasCardsOnPage = !!document.getElementById('valJtmTotal');
+      if (hasCardsOnPage) {
+        ['valJtmTotal', 'valJtmBonus', 'valEstHonor', 'valJtmToday', 'valGuruTransport'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          if (id === 'valEstHonor' && localStorage.getItem('hide_honor_dashboard') === 'true') return;
+          if (id === 'valGuruTransport' && localStorage.getItem('hide_transport_dashboard') === 'true') return;
+          el.innerHTML = '<div class="skeleton h-7 w-16 rounded inline-block"></div>';
+        });
+      }
+      if (typeof checkAndDisplayHolidayBonus === 'function') {
+        try { checkAndDisplayHolidayBonus(token); } catch (_) { }
+      }
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res && res.status === 'success') {
+            _writeGuruStatsCache(res);
+            if (hasCardsOnPage && typeof _applyGuruDashboardStats === 'function') {
+              _applyGuruDashboardStats(res, true);
+            }
+          }
+        })
+        .withFailureHandler(function () {
+        })
+        .getDashboardStats(token);
+      setTimeout(() => {
+        if (typeof checkExamBannerForDashboard === 'function') {
+          checkExamBannerForDashboard();
+        }
+      }, 300);
+    }
+    function _applyGuruDashboardStats(res, animate) {
+      const elJtm = document.getElementById('valJtmTotal');
+      const elBonus = document.getElementById('valJtmBonus');
+      const elToday = document.getElementById('valJtmToday');
+      var totalJtm = Number(res.total_jtm || 0);
+      var bonusJtm = Number(res.bonus_jtm || 0);
+      var todayJtm = Number(res.jtm_hari_ini || 0);
+      if (animate) {
+        if (elJtm) animateValue(elJtm, 0, totalJtm, 800);
+        if (elBonus) animateValue(elBonus, 0, bonusJtm, 800);
+        if (elToday) animateValue(elToday, 0, todayJtm, 700);
+      } else {
+        if (elJtm) elJtm.textContent = totalJtm;
+        if (elBonus) elBonus.textContent = bonusJtm;
+        if (elToday) elToday.textContent = todayJtm;
+      }
+      if (res.breakdown) {
+        const detailDiv = document.getElementById('detailBonusJtm');
+        const autoSpan = document.getElementById('valAutoLiburJtm');
+        const estSpan = document.getElementById('valEstLiburJtm');
+        if (detailDiv && (res.breakdown.auto_libur_jtm > 0 || res.breakdown.estimated_remaining > 0)) {
+          detailDiv.classList.remove('hidden');
+          if (autoSpan) autoSpan.textContent = res.breakdown.auto_libur_jtm;
+          if (estSpan) estSpan.textContent = res.breakdown.estimated_remaining;
+        } else if (detailDiv) {
+          detailDiv.classList.add('hidden');
+        }
+        const eventJtmDiv = document.getElementById('detailEventJtm');
+        const eventJtmSpan = document.getElementById('valEventJtm');
+        const eventJtmVal = Number(res.breakdown.event_jtm || 0);
+        if (eventJtmDiv) {
+          if (eventJtmVal > 0) {
+            eventJtmDiv.classList.remove('hidden');
+            if (eventJtmSpan) eventJtmSpan.textContent = eventJtmVal;
+          } else {
+            eventJtmDiv.classList.add('hidden');
+          }
+        }
+      }
+      const elTransport = document.getElementById('valGuruTransport');
+      const elTransportSub = document.getElementById('valGuruTransportSub');
+      const transportCard = document.getElementById('guruTransportCard');
+      if (elTransport) {
+        if (!res.transport_enabled) {
+          if (transportCard) transportCard.style.display = 'none';
+        } else {
+          if (transportCard) transportCard.style.display = '';
+          const transportVal = Number(res.transport_monthly || 0);
+          const transportFmt = res.transport_monthly_formatted || 'Rp 0';
+          elTransport.setAttribute('data-value', transportFmt);
+          updateTransportVisibilityUI();
+          const isHiddenTransport = localStorage.getItem('hide_transport_dashboard') === 'true';
+          if (!isHiddenTransport && animate) {
+            animateRupiah(elTransport, transportFmt, 800);
+          }
+          if (elTransportSub) {
+            elTransportSub.textContent = transportVal > 0 ? 'Tgl 1 s/d hari ini' : 'Belum ada data absensi';
+          }
+        }
+      }
+      const elHonor = document.getElementById('valEstHonor');
+      if (elHonor) {
+        elHonor.setAttribute('data-value', res.est_honor_formatted || '');
+        updateHonorVisibilityUI();
+        const isHidden = localStorage.getItem('hide_honor_dashboard') === 'true';
+        if (!isHidden) {
+          if (animate) {
+            animateRupiah(elHonor, res.est_honor_formatted, 900);
+          } else {
+            elHonor.textContent = res.est_honor_formatted || '';
+          }
+        }
+      }
+    }
+    function checkAndDisplayHolidayBonus(token) {
+      google.script.run.withSuccessHandler((res) => {
+        const banner = document.getElementById('bannerAutoJurnalLibur');
+        const txtInfo = document.getElementById('txtLiburInfo');
+        const valBonus = document.getElementById('valBonusJtmLibur');
+        if (!banner || !txtInfo || !valBonus) return;
+        const oldDetail = banner.querySelector('[data-libur-detail]');
+        if (oldDetail) oldDetail.remove();
+        if (res && res.status === 'success' && res.is_holiday) {
+          banner.classList.remove('hidden');
+          const today = new Date();
+          const dateStr = formatDateID(today);
+          txtInfo.innerText = `${dateStr} — ${res.my_schedule_count || 0} jadwal terhitung sebagai bonus libur`;
+          animateValue(valBonus, 0, Number(res.my_bonus_jtm || 0), 900);
+          if (res.has_auto_jurnal && res.my_auto_logs && res.my_auto_logs.length > 0) {
+            const detail = document.createElement('div');
+            detail.setAttribute('data-libur-detail', '1');
+            detail.className = 'mt-3 bg-white/10 rounded-lg p-3 text-xs backdrop-blur-sm border border-white/10';
+            detail.innerHTML = `
+            <p class="font-bold mb-1.5 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+              Jurnal Otomatis Sudah Dibuat
+            </p>
+            <ul class="space-y-1 text-purple-100">
+              ${res.my_auto_logs.map(log => {
+              const parts = String(log.materi || '').split(' - ');
+              const label = parts.length > 1 ? parts.slice(1).join(' - ') : (log.materi || 'Materi');
+              return `<li class="flex items-center justify-between gap-2"><span>• ${escapeHtml(label)}</span><span class="font-mono font-bold">+${log.jtm_val} JTM</span></li>`;
+            }).join('')}
+            </ul>
+          `;
+            const inner = banner.querySelector('.relative.z-10');
+            if (inner) inner.appendChild(detail);
+          }
+        } else {
+          banner.classList.add('hidden');
+        }
+      }).withFailureHandler(() => {
+        const banner = document.getElementById('bannerAutoJurnalLibur');
+        if (banner) banner.classList.add('hidden');
+      }).checkAutoJurnalStatus(token);
+    }
+    function animateValue(element, start, end, duration) {
+      if (!element) return;
+      const safeEnd = Number(end) || 0;
+      const safeStart = Number(start) || 0;
+      if (safeEnd === safeStart) {
+        element.innerHTML = String(safeEnd);
+        return;
+      }
+      let startTimestamp = null;
+      const ease = (t) => 1 - Math.pow(1 - t, 3);
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const linear = Math.min((timestamp - startTimestamp) / duration, 1);
+        const progress = ease(linear);
+        element.innerHTML = Math.floor(progress * (safeEnd - safeStart) + safeStart);
+        if (linear < 1) {
+          window.requestAnimationFrame(step);
+        } else {
+          element.innerHTML = String(safeEnd);
+        }
+      };
+      window.requestAnimationFrame(step);
+    }
+    function animateRupiah(element, endText, duration) {
+      if (!element) return;
+      duration = duration || 800;
+      const numStr = String(endText || '').replace(/[^\d-]/g, '');
+      const endVal = parseInt(numStr, 10) || 0;
+      if (endVal === 0) {
+        element.innerText = endText || 'Rp 0';
+        return;
+      }
+      let startTimestamp = null;
+      const ease = (t) => 1 - Math.pow(1 - t, 3);
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const linear = Math.min((timestamp - startTimestamp) / duration, 1);
+        const progress = ease(linear);
+        const v = Math.floor(progress * endVal);
+        element.innerText = 'Rp ' + v.toLocaleString('id-ID');
+        if (linear < 1) {
+          window.requestAnimationFrame(step);
+        } else {
+          element.innerText = endText;
+        }
+      };
+      window.requestAnimationFrame(step);
+    }
+    function renderScheduleTable(schedules) {
+      const tbody = document.getElementById('scheduleTableBody');
+      if (!tbody) return;
+      if (!schedules || schedules.length === 0) {
+        tbody.innerHTML = `
+        <tr><td colspan="5" class="py-2">
+          <div class="error-state-container">
+            <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 mx-auto">
+              <svg class="w-7 h-7 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <p class="text-slate-500 font-semibold text-sm">Tidak ada jadwal hari ini</p>
+            <p class="text-slate-400 text-xs mt-1">Nikmati waktu luang Anda 😊</p>
+          </div>
+        </td></tr>`;
+        return;
+      }
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const toMin = (t) => {
+        const parts = String(t || '00:00').split(':').map(Number);
+        return (parts[0] || 0) * 60 + (parts[1] || 0);
+      };
+      const _attrEsc = (str) => String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, "\\'")
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      let html = '';
+      schedules.forEach((s, idx) => {
+        const tStart = formatTimeID(s.time_start);
+        const tEnd = formatTimeID(s.time_end);
+        const sMin = toMin(tStart);
+        const eMin = toMin(tEnd);
+        const isActive = nowMin >= sMin && nowMin <= eMin;
+        const isUpcoming = nowMin < sMin && idx === schedules.findIndex(x => toMin(formatTimeID(x.time_start)) > nowMin);
+        const rowStyle = isActive
+          ? ' style="background:linear-gradient(90deg,#FEFCE8,#FFFBEB);box-shadow:inset 3px 0 0 #F59E0B;"'
+          : (isUpcoming ? ' style="background:linear-gradient(90deg,#EFF6FF,#F0F9FF);box-shadow:inset 3px 0 0 #3B82F6;"' : '');
+        const liveBadge = isActive
+          ? '<span class="inline-flex items-center gap-1 ml-1.5 text-[9px] font-extrabold bg-amber-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block"></span>Live</span>'
+          : (isUpcoming ? '<span class="inline-flex items-center gap-1 ml-1.5 text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Berikutnya</span>' : '');
+        const safeSubject = _attrEsc(s.subject);
+        const safeClass = _attrEsc(s.class_name);
+        const safeId = _attrEsc(s.id);
+        let btnHtml = s.has_log
+          ? `<button disabled class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-not-allowed opacity-80">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+</script>
