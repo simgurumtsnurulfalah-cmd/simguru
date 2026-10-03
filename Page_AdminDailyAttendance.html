@@ -1,0 +1,46 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-3 sm:p-6" id="menuAdminDailyAttendance">
+      <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Riwayat Kehadiran Harian</h1>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1" id="adminDailyAttendanceDateLabel">Memuat tanggal...</p>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative grow sm:grow-0">
+            <input type="text" id="inpAdminDailyAttendanceSearch" placeholder="Cari nama guru..." class="w-full sm:w-64 pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" onkeyup="filterAdminDailyAttendance()">
+            <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <input type="date" id="inpAdminDailyAttendanceDate" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shrink-0" onchange="loadAdminDailyAttendance()">
+          <button onclick="loadAdminDailyAttendance()" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition shadow-sm shrink-0" title="Refresh">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span class="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="overflow-auto max-h-[calc(100vh-12rem)] custom-scrollbar">
+          <table class="w-full text-left border-collapse min-w-[900px]">
+            <thead class="sticky top-0 z-10 bg-slate-50/95 backdrop-blur shadow-sm">
+              <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+                <th class="py-3.5 px-4 font-semibold w-14 text-center">No</th>
+                <th class="py-3.5 px-4 font-semibold">Nama Guru</th>
+                <th class="py-3.5 px-4 font-semibold text-center">Status</th>
+                <th class="py-3.5 px-4 font-semibold text-center">Jadwal</th>
+                <th class="py-3.5 px-4 font-semibold text-center">Waktu Aktual</th>
+                <th class="py-3.5 px-4 font-semibold text-center">Durasi</th>
+                <th class="py-3.5 px-4 font-semibold text-center">Persentase</th>
+                <th class="py-3.5 px-4 font-semibold text-center whitespace-nowrap">Nominal Transport</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyAdminDailyAttendance" class="divide-y divide-slate-100">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

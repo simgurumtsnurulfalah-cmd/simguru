@@ -1,0 +1,54 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-3 sm:p-6" id="menuKehadiranHarian">
+      <!-- Header -->
+      <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">📋 Daftar Kehadiran</h1>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1" id="attendanceDateLabel">Memuat tanggal...</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="date" id="inpAttendanceDate" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="onAttendanceDateChange()">
+          <button onclick="refreshActiveAttendanceTab()" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+      <!-- Daftar Kehadiran -->
+      <div id="tabPanelKehadiran">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div class="overflow-auto max-h-[calc(100vh-14rem)] custom-scrollbar">
+            <table class="w-full text-left border-collapse min-w-[800px]">
+              <thead class="sticky top-0 z-10 bg-slate-50/95 backdrop-blur shadow-sm">
+                <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
+                  <th class="py-3.5 px-4 font-semibold w-14 text-center">No</th>
+                  <th class="py-3.5 px-4 font-semibold">Nama Guru</th>
+                  <th class="py-3.5 px-4 font-semibold text-center">Status</th>
+                  <th class="py-3.5 px-4 font-semibold text-center">Waktu Masuk</th>
+                  <th class="py-3.5 px-4 font-semibold text-center">Waktu Pulang</th>
+                  <th class="py-3.5 px-4 font-semibold text-center w-40">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyAttendanceList" class="divide-y divide-slate-100">
+              </tbody>
+            </table>
+          </div>
+          <!-- Tombol Tambah Guru — ditampilkan/disembunyikan via JS sesuai otorisasi -->
+          <div id="addAttendeeBar" class="hidden px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3">
+            <p class="text-xs text-slate-500">Guru tidak terjadwal hari ini dapat ditambahkan secara manual.</p>
+            <button onclick="openAddAttendeeModal()"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition active:scale-95 flex-shrink-0">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Tambah Guru
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

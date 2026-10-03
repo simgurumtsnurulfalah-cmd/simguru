@@ -1,0 +1,722 @@
+<div class="flex h-screen overflow-hidden bg-slate-100">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <style>
+      .profile-hero {
+        background: linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 40%, #0f2038 100%);
+        position: relative;
+        overflow: hidden;
+      }
+      .profile-tab-nav {
+        display: flex;
+        background: white;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        padding: 5px;
+        gap: 4px;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.05);
+        margin-bottom: 20px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+      }
+      .profile-tab-nav::-webkit-scrollbar { display: none; }
+      .profile-tab-btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 9px 16px;
+        border-radius: 10px;
+        font-size: 0.8125rem; font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        border: none; background: transparent;
+        font-family: inherit;
+        white-space: nowrap;
+        flex: 1 1 auto;
+        justify-content: center;
+        min-width: 0;
+      }
+      .profile-tab-btn:hover { background: #f8fafc; color: #334155; }
+      .profile-tab-btn.active {
+        background: linear-gradient(135deg, #2563eb, #4f46e5);
+        color: white;
+        box-shadow: 0 3px 10px rgba(37,99,235,0.28);
+      }
+      .profile-tab-btn.active svg { color: white !important; }
+      .profile-tab-btn svg { flex-shrink: 0; }
+      .profile-tab-btn .ptab-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      @media (max-width: 640px) {
+        .profile-tab-nav {
+          gap: 2px;
+          padding: 4px;
+          border-radius: 12px;
+        }
+        .profile-tab-btn {
+          padding: 8px 10px;
+          font-size: 0.75rem;
+          gap: 5px;
+        }
+      }
+      @media (max-width: 420px) {
+        .profile-tab-btn {
+          padding: 8px 8px;
+          flex: 1 1 0;
+        }
+        .profile-tab-btn:not(.active) .ptab-label { display: none; }
+        .profile-tab-btn.active .ptab-label {
+          font-size: 0.72rem;
+          letter-spacing: -0.01em;
+        }
+      }
+      .profile-tab-panel { display: none; }
+      .profile-tab-panel.active { display: block; }
+      .profile-hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 60% 80% at 80% 50%, rgba(59,130,246,0.18) 0%, transparent 60%),
+          radial-gradient(ellipse 40% 60% at 10% 80%, rgba(99,102,241,0.12) 0%, transparent 50%);
+        pointer-events: none;
+      }
+      .profile-hero::after {
+        content: '';
+        position: absolute;
+        top: -60px; right: -60px;
+        width: 260px; height: 260px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.05);
+        pointer-events: none;
+      }
+      .profile-avatar-ring {
+        background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+        padding: 3px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 4px rgba(59,130,246,0.2), 0 8px 24px rgba(0,0,0,0.3);
+      }
+      .profile-avatar-inner {
+        background: linear-gradient(135deg, #1d4ed8, #4338ca);
+        border-radius: 50%;
+        width: 72px; height: 72px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.75rem; font-weight: 800; color: white;
+        letter-spacing: -0.02em;
+      }
+      .profile-card {
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.05), 0 4px 16px rgba(15,23,42,0.04);
+        transition: box-shadow 0.2s ease;
+        overflow: hidden;
+      }
+      .profile-card:hover {
+        box-shadow: 0 2px 8px rgba(15,23,42,0.08), 0 8px 24px rgba(15,23,42,0.06);
+      }
+      .pwd-strength-wrap {
+        margin-top: 10px;
+      }
+      .pwd-strength-bar {
+        position: relative;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .pwd-strength-fill {
+        position: absolute;
+        inset: 0;
+        width: 0%;
+        background: #ef4444;
+        border-radius: 999px;
+        transition: width 0.25s ease, background 0.25s ease;
+      }
+      .pwd-strength-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 6px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .pwd-strength-text {
+        color: #94a3b8;
+        transition: color 0.25s;
+      }
+      .pwd-strength-fill.s1 { background: #ef4444; }
+      .pwd-strength-fill.s2 { background: #f97316; }
+      .pwd-strength-fill.s3 { background: #eab308; }
+      .pwd-strength-fill.s4 { background: #22c55e; }
+      .pwd-strength-fill.s5 { background: #16a34a; }
+      .username-copy-btn {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #e2e8f0;
+        color: #64748b;
+        border: none;
+        border-radius: 6px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .username-copy-btn:hover {
+        background: #cbd5e1;
+        color: #334155;
+      }
+      .username-copy-btn.copied {
+        background: #d1fae5;
+        color: #047857;
+      }
+      .profile-card-header {
+        padding: 18px 24px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .profile-card-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      .profile-card-body {
+        padding: 20px 24px 24px;
+      }
+      .profile-field-label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+        margin-bottom: 6px;
+      }
+      .profile-input {
+        width: 100%;
+        padding: 10px 16px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        color: #1e293b;
+        background: #f8fafc;
+        outline: none;
+        transition: all 0.15s ease;
+        font-family: inherit;
+      }
+      .profile-input:focus {
+        border-color: #3b82f6;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+      }
+      .profile-input::placeholder { color: #94a3b8; }
+      .profile-input-wrap {
+        position: relative;
+      }
+      .profile-input-wrap .profile-input {
+        padding-right: 44px;
+      }
+      .profile-eye-btn {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 2px;
+        display: flex;
+        align-items: center;
+        transition: color 0.15s;
+      }
+      .profile-eye-btn:hover { color: #475569; }
+      .profile-btn-primary {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: white;
+        padding: 10px 22px;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        box-shadow: 0 4px 12px rgba(37,99,235,0.3);
+        letter-spacing: 0.01em;
+      }
+      .profile-btn-primary:hover {
+        background: linear-gradient(135deg, #1d4ed8, #1e40af);
+        box-shadow: 0 6px 16px rgba(37,99,235,0.4);
+        transform: translateY(-1px);
+      }
+      .profile-btn-primary:active { transform: translateY(0); }
+      .profile-btn-secondary {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #1e293b;
+        color: white;
+        padding: 10px 22px;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        box-shadow: 0 4px 12px rgba(15,23,42,0.2);
+        letter-spacing: 0.01em;
+      }
+      .profile-btn-secondary:hover {
+        background: #0f172a;
+        box-shadow: 0 6px 16px rgba(15,23,42,0.3);
+        transform: translateY(-1px);
+      }
+      .profile-btn-secondary:active { transform: translateY(0); }
+      .profile-role-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .profile-role-badge.admin {
+        background: rgba(251,191,36,0.15);
+        color: #f59e0b;
+        border: 1px solid rgba(251,191,36,0.25);
+      }
+      .profile-role-badge.guru {
+        background: rgba(52,211,153,0.15);
+        color: #10b981;
+        border: 1px solid rgba(52,211,153,0.25);
+      }
+      .val-rule-item {
+        display: flex; align-items: center; gap: 8px;
+        padding: 4px 0;
+        font-size: 0.775rem;
+        color: #94a3b8;
+        transition: color 0.2s;
+      }
+      .val-rule-item .rule-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: #cbd5e1;
+        flex-shrink: 0;
+        transition: background 0.2s;
+      }
+      .val-rule-item.text-green-600 { color: #16a34a; font-weight: 600; }
+      .val-rule-item.text-green-600 .rule-dot { background: #16a34a; }
+      .profile-page-enter {
+        animation: profileEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      @keyframes profileEnter {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .stat-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 5px 12px;
+        font-size: 0.72rem;
+        color: rgba(255,255,255,0.7);
+        font-weight: 500;
+      }
+      .stat-chip svg { opacity: 0.6; }
+    </style>
+    <main class="w-full grow pb-6">
+      <div class="profile-hero px-6 pt-8 pb-10 profile-page-enter" style="animation-delay:0s">
+        <div class="max-w-2xl mx-auto">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-5">
+            <div class="profile-avatar-ring flex-shrink-0 self-start sm:self-auto">
+              <div class="profile-avatar-inner" id="divProfileInit">U</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight truncate" id="navUserName_Big">Nama Pengguna</h1>
+              <div class="flex flex-wrap items-center gap-2 mt-2">
+                <span class="profile-role-badge guru" id="navUserRole_Big">Role</span>
+                <span class="stat-chip">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                  Akun Aktif
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="max-w-2xl mx-auto px-4 sm:px-6 -mt-4">
+        <div class="profile-tab-nav">
+          <button class="profile-tab-btn active" id="ptab-diri" onclick="switchProfileTab('diri')">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <span class="ptab-label">Data Diri</span>
+          </button>
+          <button class="profile-tab-btn" id="ptab-guru" onclick="switchProfileTab('guru')" style="display:none;">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <span class="ptab-label">Profil Guru</span>
+          </button>
+          <button class="profile-tab-btn" id="ptab-keamanan" onclick="switchProfileTab('keamanan')">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <span class="ptab-label">Ganti Password</span>
+          </button>
+          <button class="profile-tab-btn" id="ptab-security-q" onclick="switchProfileTab('security-q')">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <span class="ptab-label">Pertanyaan Keamanan</span>
+            <span id="sqTabBadge" class="hidden w-2 h-2 rounded-full bg-amber-400 inline-block flex-shrink-0"></span>
+          </button>
+        </div>
+        <div id="ppanel-diri" class="profile-tab-panel active profile-page-enter">
+          <div id="profileEmailVerifyBanner" class="hidden mb-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 overflow-hidden shadow-sm">
+            <div class="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="font-bold text-amber-900 text-sm">Email Belum Diverifikasi</p>
+                <p class="text-amber-700 text-xs mt-1 leading-relaxed">
+                  Untuk meningkatkan keamanan akun Anda, silakan tambahkan dan verifikasi email Anda terlebih dahulu. Setelah email terverifikasi, Anda dapat mengakses semua halaman lain dengan normal.
+                </p>
+              </div>
+              <button type="button" onclick="profile_focusEmailField()"
+                class="self-start sm:self-center inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition shadow-sm shadow-amber-200 flex-shrink-0">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                Isi Email Sekarang
+              </button>
+            </div>
+          </div>
+          <div class="profile-card">
+            <div class="profile-card-header">
+              <div class="profile-card-icon" style="background:#eff6ff;">
+                <svg style="width:18px;height:18px;color:#2563eb;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-slate-800 leading-tight">Data Diri</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Perbarui nama tampilan akun Anda</p>
+              </div>
+            </div>
+            <div class="profile-card-body">
+              <div class="mb-5">
+                <label class="profile-field-label" for="inpProfileName">Nama Lengkap</label>
+                <input type="text" id="inpProfileName" class="profile-input" placeholder="Masukkan nama lengkap Anda">
+              </div>
+              <div class="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                  <label class="profile-field-label">Username</label>
+                  <div class="relative">
+                    <input type="text" id="inpProfileUsername" class="profile-input" readonly style="background:#f1f5f9;color:#64748b;cursor:default;padding-right:42px;">
+                    <button type="button" id="btnCopyUsername" onclick="copyUsernameAction()" class="username-copy-btn" title="Salin username">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label class="profile-field-label">Role</label>
+                  <input type="text" id="inpProfileRole" class="profile-input capitalize" readonly style="background:#f1f5f9;color:#64748b;cursor:default;">
+                </div>
+              </div>
+              <div class="mb-5">
+                <label class="profile-field-label" for="inpProfilePhone">
+                  Nomor HP / WhatsApp
+                  <span class="text-[10px] text-slate-400 font-normal ml-1">(Nomor harus berawalan 62)</span>
+                </label>
+                <div class="profile-input-wrap">
+                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">+</span>
+                  <input type="tel" id="inpProfilePhone"
+                    inputmode="tel" pattern="[0-9+]*"
+                    class="profile-input"
+                    style="padding-left:24px;font-family:'JetBrains Mono',monospace;letter-spacing:0.02em;"
+                    placeholder="62812345678"
+                    oninput="profile_normalizePhoneOnInput(this)">
+                </div>
+                <p id="profilePhoneHint" class="text-[10px] text-slate-400 mt-1.5">Sistem akan menyimpan dengan kode negara <strong>62</strong> di awal.</p>
+              </div>
+              <div class="mb-5">
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="profile-field-label" for="inpProfileEmail" style="margin-bottom:0;">
+                    Email
+                    <span id="profileEmailVerifiedBadge" class="hidden ml-1 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      Terverifikasi
+                    </span>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <button type="button" id="btnChangeEmail" onclick="profile_startChangeEmail()"
+                      class="hidden inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 active:scale-95 border border-indigo-200 px-2 py-1 rounded-md transition">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                      Ganti Email
+                    </button>
+                    <button type="button" id="btnCancelChangeEmail" onclick="profile_cancelChangeEmail()"
+                      class="hidden inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 active:scale-95 border border-slate-200 px-2 py-1 rounded-md transition">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                      Batal
+                    </button>
+                  </div>
+                </div>
+                <div class="profile-input-wrap">
+                  <input type="email" id="inpProfileEmail"
+                    class="profile-input"
+                    placeholder="email@anda.com"
+                    autocomplete="email"
+                    oninput="profile_validateEmailOnInput()">
+                </div>
+                <p id="profileEmailHint" class="text-[10px] text-slate-400 mt-1.5">Email akan diverifikasi via kode OTP sebelum disimpan.</p>
+                <p id="profileEmailError" class="hidden text-[11px] text-rose-600 mt-1.5 font-medium"></p>
+                <div id="profileEmailOtpWrap" class="hidden mt-3 p-3 rounded-xl border border-indigo-200 bg-indigo-50/40">
+                  <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/></svg>
+                    <span class="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Verifikasi Email</span>
+                  </div>
+                  <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="inpProfileEmailOtp" maxlength="6"
+                      inputmode="numeric" pattern="\\d{6}"
+                      class="profile-input flex-1"
+                      style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;letter-spacing:0.4em;"
+                      placeholder="••••••"
+                      oninput="this.value = this.value.replace(/\\D/g,'').slice(0,6); profile_updateOtpVerifyButton();">
+                    <button type="button" id="btnVerifyEmailOtp" onclick="profile_verifyEmailOtp()" disabled
+                      class="profile-btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                      Verifikasi
+                    </button>
+                  </div>
+                  <div class="mt-2 flex items-center justify-between text-[11px] gap-2 flex-wrap">
+                    <p id="profileOtpInfo" class="text-indigo-700 font-medium">Kode dikirim ke <strong id="profileOtpTargetEmail">—</strong></p>
+                    <button type="button" id="btnResendOtp" onclick="profile_requestEmailOtp(true)"
+                      class="text-indigo-600 hover:text-indigo-800 font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled>
+                      Kirim ulang (<span id="profileOtpCooldown">60</span>s)
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="flex justify-end gap-2 flex-wrap">
+                <button type="button" id="btnRequestEmailOtp" onclick="profile_requestEmailOtp(false)" class="profile-btn-secondary hidden">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  Kirim Kode OTP ke Email
+                </button>
+                <button id="btnSaveProfile" onclick="saveProfileName()" class="profile-btn-primary">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="ppanel-guru" class="profile-tab-panel profile-page-enter">
+          <div class="profile-card">
+            <div class="profile-card-header">
+              <div class="profile-card-icon" style="background:#dcfce7;">
+                <svg style="width:18px;height:18px;color:#16a34a;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-slate-800 leading-tight">Detail Profil Guru</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Informasi khusus untuk Guru</p>
+              </div>
+            </div>
+            <div class="profile-card-body">
+              <!-- NIP & Status Kepegawaian -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+                <div>
+                  <label class="profile-field-label" for="inpGuruNIP">NIP / NPK</label>
+                  <input type="text" id="inpGuruNIP" class="profile-input" readonly style="background:#f1f5f9;color:#64748b;cursor:default;" placeholder="Data NIP/NPK (Dari Database)">
+                </div>
+                <div>
+                  <label class="profile-field-label" for="inpGuruStatus">Status Kepegawaian</label>
+                  <select id="inpGuruStatus" class="profile-input bg-white">
+                    <option value="" disabled selected>Pilih Status Kepegawaian</option>
+                    <option value="PNS">Pegawai Negeri Sipil (PNS)</option>
+                    <option value="PPPK">Pegawai Pemerintah (PPPK)</option>
+                    <option value="Honorer">Honorer / GTT</option>
+                    <option value="Tetap Yayasan">Guru Tetap Yayasan</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Jabatan & Pangkat -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+                <div>
+                  <label class="profile-field-label" for="listGuruJabatan">Jabatan / Tugas Tambahan</label>
+                  <div id="listGuruJabatan" class="profile-input custom-scrollbar overflow-y-auto max-h-32 p-3 cursor-default" style="background:#f1f5f9;color:#64748b;height:auto;min-height:42px;">
+                    <div class="text-slate-400 italic text-sm">Memuat data...</div>
+                  </div>
+                </div>
+                <div>
+                  <label class="profile-field-label" for="inpGuruGolongan">Pangkat / Golongan</label>
+                  <input type="text" id="inpGuruGolongan" class="profile-input" placeholder="Contoh: Penata Muda, III/a">
+                </div>
+              </div>
+              <!-- Mata Pelajaran & Kelas -->
+              <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label class="profile-field-label" for="listGuruMapel">Mata Pelajaran yang Diampu</label>
+                  <div id="listGuruMapel" class="profile-input custom-scrollbar overflow-y-auto max-h-32 p-3 cursor-default" style="background:#f1f5f9;color:#64748b;height:auto;min-height:42px;">
+                    <div class="text-slate-400 italic text-sm">Memuat data...</div>
+                  </div>
+                </div>
+                <div>
+                  <label class="profile-field-label" for="inpGuruJarak">Jarak Rumah ke Madrasah (km)</label>
+                  <input type="text" id="inpGuruJarak" class="profile-input" readonly style="background:#f1f5f9;color:#64748b;cursor:default;" placeholder="Jarak dalam km (Dari Database)">
+                </div>
+              </div>
+              <!-- Alamat Lengkap -->
+              <div class="mb-6">
+                <label class="profile-field-label" for="inpGuruAlamat">Alamat Lengkap Domisili</label>
+                <textarea id="inpGuruAlamat" class="profile-input custom-scrollbar" rows="3" placeholder="Masukkan alamat lengkap tempat tinggal Anda saat ini..."></textarea>
+              </div>
+              <!-- Action Buttons -->
+              <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-100 mt-2">
+                  <button type="button" class="profile-btn-secondary" onclick="document.getElementById('inpGuruGolongan').value=''; document.getElementById('inpGuruAlamat').value=''; showToast('Formulir direset', 'info'); document.getElementById('inpGuruGolongan').focus();">
+                    Reset
+                  </button>
+                  <button type="button" id="btnSaveGuruProfileDetails" class="profile-btn-primary" onclick="saveGuruProfileDetails()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    Simpan Profil Guru
+                  </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="ppanel-keamanan" class="profile-tab-panel profile-page-enter">
+          <div class="profile-card">
+            <div class="profile-card-header">
+              <div class="profile-card-icon" style="background:#fef9ec;">
+                <svg style="width:18px;height:18px;color:#d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-slate-800 leading-tight">Keamanan Akun</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Ganti password untuk menjaga keamanan akun</p>
+              </div>
+            </div>
+            <div class="profile-card-body">
+              <div class="mb-4">
+                <label class="profile-field-label">Password Saat Ini</label>
+                <div class="profile-input-wrap">
+                  <input type="password" id="inpOldPass" class="profile-input" placeholder="Masukkan password saat ini">
+                  <button type="button" onclick="togglePassword('inpOldPass', this)" class="profile-eye-btn" title="Tampilkan/Sembunyikan">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="profile-field-label">Password Baru</label>
+                <div class="profile-input-wrap">
+                  <input type="password" id="inpNewPass" class="profile-input" placeholder="Buat password baru (min. 8 karakter)">
+                  <button type="button" onclick="togglePassword('inpNewPass', this)" class="profile-eye-btn" title="Tampilkan/Sembunyikan">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                  </button>
+                </div>
+                <div id="pwdStrengthWrap" class="pwd-strength-wrap hidden">
+                  <div class="pwd-strength-bar">
+                    <div id="pwdStrengthFill" class="pwd-strength-fill"></div>
+                  </div>
+                  <div class="pwd-strength-label">
+                    <span class="pwd-strength-text" id="pwdStrengthText">Belum diisi</span>
+                    <span class="text-slate-300 text-[10px]" id="pwdStrengthScore">0/5</span>
+                  </div>
+                </div>
+                <div id="val-rules" class="hidden mt-3 rounded-xl border border-slate-100 overflow-hidden" style="background:#f8fafc;">
+                  <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Persyaratan Password</span>
+                  </div>
+                  <div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+                    <div id="rule-len" class="val-rule-item"><span class="rule-dot"></span> Minimal 8 karakter</div>
+                    <div id="rule-upper" class="val-rule-item"><span class="rule-dot"></span> Huruf besar (A–Z)</div>
+                    <div id="rule-lower" class="val-rule-item"><span class="rule-dot"></span> Huruf kecil (a–z)</div>
+                    <div id="rule-num" class="val-rule-item"><span class="rule-dot"></span> Angka (0–9)</div>
+                    <div id="rule-spec" class="val-rule-item"><span class="rule-dot"></span> Simbol (!@#\$%^&*)</div>
+                    <div id="rule-name" class="val-rule-item"><span class="rule-dot"></span> Tidak mengandung nama</div>
+                    <div id="rule-different" class="val-rule-item sm:col-span-2"><span class="rule-dot"></span> Berbeda dari password lama</div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex justify-end">
+                <button id="btnChangePass" onclick="changePasswordAction()" class="profile-btn-secondary">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                  Ganti Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="ppanel-security-q" class="profile-tab-panel profile-page-enter">
+          <div class="profile-card">
+            <div class="profile-card-header">
+              <div class="profile-card-icon" style="background:#f0fdf4;">
+                <svg style="width:18px;height:18px;color:#16a34a;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-slate-800 leading-tight">Pertanyaan Keamanan</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Wajib diisi — digunakan untuk memverifikasi identitas saat reset password</p>
+              </div>
+            </div>
+            <div class="profile-card-body">
+              <div id="sqWarningBanner" class="hidden mb-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                <p class="text-xs text-amber-700 leading-relaxed">Anda belum mengatur pertanyaan keamanan. Tanpa ini, permintaan reset password tidak dapat diproses secara otomatis.</p>
+              </div>
+              <div id="sqSetBanner" class="hidden mb-4 flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <svg class="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <p class="text-xs text-green-700 leading-relaxed">Pertanyaan keamanan sudah diatur. Anda dapat memperbaruinya kapan saja.</p>
+              </div>
+              <div class="mb-4">
+                <label class="profile-field-label" for="inpSecurityQuestion">Pilih Pertanyaan Keamanan</label>
+                <select id="inpSecurityQuestion" class="profile-input" style="cursor:pointer;">
+                  <option value="">-- Pilih Pertanyaan --</option>
+                  <option value="Siapa nama ibu kandung Anda?">Siapa nama ibu kandung Anda?</option>
+                  <option value="Apa nama hewan peliharaan pertama Anda?">Apa nama hewan peliharaan pertama Anda?</option>
+                  <option value="Di kota mana Anda dilahirkan?">Di kota mana Anda dilahirkan?</option>
+                  <option value="Apa nama sekolah dasar Anda?">Apa nama sekolah dasar Anda?</option>
+                  <option value="Siapa nama teman masa kecil terbaik Anda?">Siapa nama teman masa kecil terbaik Anda?</option>
+                  <option value="Apa makanan favorit Anda sejak kecil?">Apa makanan favorit Anda sejak kecil?</option>
+                  <option value="Apa nama jalan tempat Anda dibesarkan?">Apa nama jalan tempat Anda dibesarkan?</option>
+                  <option value="Siapa nama guru favorit Anda sewaktu SD?">Siapa nama guru favorit Anda sewaktu SD?</option>
+                </select>
+              </div>
+              <div class="mb-5">
+                <label class="profile-field-label" for="inpSecurityAnswer">Jawaban Anda</label>
+                <div class="profile-input-wrap">
+                  <input type="password" id="inpSecurityAnswer" class="profile-input" placeholder="Tulis jawaban (tidak peka huruf besar/kecil)" autocomplete="off">
+                  <button type="button" onclick="togglePassword('inpSecurityAnswer', this)" class="profile-eye-btn" title="Tampilkan/Sembunyikan jawaban">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                  </button>
+                </div>
+                <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Jawaban disimpan dalam huruf kecil. Pastikan Anda ingat jawaban ini karena akan digunakan saat lupa password.</p>
+              </div>
+              <div class="flex justify-end">
+                <button id="btnSaveSecurityQ" onclick="saveSecurityQuestionAction()" class="profile-btn-primary" style="background:linear-gradient(135deg,#16a34a,#15803d);">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  Simpan Pertanyaan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__
