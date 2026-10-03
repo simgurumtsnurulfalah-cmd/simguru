@@ -1,0 +1,561 @@
+<script>
+          '<span class="text-slate-500 font-medium">Memuat slip honorarium...</span>' +
+          '</div>';
+      }
+      currentSlipData = null;
+    }
+    function exportSlipToPDF() {
+      if (!currentSlipData) return showToast('Data slip tidak tersedia.', 'error');
+      const element = document.getElementById('printAreaSlipModal');
+      if (!element) return showToast('Elemen slip tidak ditemukan. Pastikan slip sudah dimuat.', 'error');
+      const rawName = (currentSlipData.guru_nama || 'Guru').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+      const rawPeriode = (currentSlipData.periode || 'Periode').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+      const filename = 'Slip_Honor_' + rawName + '_' + rawPeriode + '.pdf';
+      const btn = document.getElementById('btnExportSlipPDF');
+      const originalHTML = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg class=\"w-4 h-4 animate-spin\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" stroke-width=\"4\" class=\"opacity-25\"/><path d=\"M4 12a8 8 0 018-8\" stroke-width=\"4\" class=\"opacity-75\"/></svg> Memproses...';
+      }
+      showToast('Menyiapkan PDF berkualitas tinggi...', 'info');
+      var savedStyles = [];
+      var el = element.parentElement;
+      while (el && el !== document.body) {
+        var cs = window.getComputedStyle(el);
+        var ovf = cs.overflow + cs.overflowY + cs.overflowX;
+        var hasClip = ovf.indexOf('hidden') !== -1 || ovf.indexOf('auto') !== -1 || ovf.indexOf('scroll') !== -1;
+        var hasMaxH = el.style.maxHeight && el.style.maxHeight !== 'none' && el.style.maxHeight !== '';
+        if (hasClip || hasMaxH) {
+          savedStyles.push({
+            el: el,
+            overflow: el.style.overflow,
+            overflowY: el.style.overflowY,
+            overflowX: el.style.overflowX,
+            maxHeight: el.style.maxHeight
+          });
+          el.style.overflow = 'visible';
+          el.style.overflowY = 'visible';
+          el.style.overflowX = 'visible';
+          el.style.maxHeight = 'none';
+        }
+        el = el.parentElement;
+      }
+      function restoreStyles() {
+        savedStyles.forEach(function (s) {
+          s.el.style.overflow = s.overflow;
+          s.el.style.overflowY = s.overflowY;
+          s.el.style.overflowX = s.overflowX;
+          s.el.style.maxHeight = s.maxHeight;
+        });
+      }
+      var opt = {
+        margin: [12, 10, 12, 10],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2.5,
+          useCORS: true,
+          logging: false,
+          scrollY: -window.scrollY,
+          scrollX: -window.scrollX,
+          windowWidth: document.documentElement.scrollWidth,
+          windowHeight: document.documentElement.scrollHeight
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
+        }
+      };
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(function () {
+          restoreStyles();
+          showToast('PDF berhasil diunduh!', 'success');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+          }
+        })
+        .catch(function (err) {
+          restoreStyles();
+          showToast('Gagal membuat PDF: ' + String(err), 'error');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+          }
+        });
+    }
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>"']/g, function (m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        if (m === '"') return '&quot;';
+        if (m === "'") return '&#39;';
+        return m;
+      }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function (c) {
+        return c;
+      });
+    }
+    function formatHHmm(val) {
+      if (val === null || val === undefined || val === '') return '';
+      const s = String(val).trim();
+      if (!s) return '';
+      if (/^\d{2}:\d{2}/.test(s)) return s.substring(0, 5);
+      if (s.includes('T') || (s.includes('-') && s.length > 10)) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      }
+      return s;
+    }
+    function initHonorariumHistory() {
+      const token = localStorage.getItem('auth_token');
+      const role = localStorage.getItem('user_role');
+      const isAdmin = String(role).toLowerCase() === 'admin';
+      const viewGuru = document.getElementById('viewGuruHistory');
+      const viewAdmin = document.getElementById('viewAdminHistory');
+      if (isAdmin) {
+        if (viewGuru) viewGuru.classList.add('hidden');
+        if (viewAdmin) viewAdmin.classList.remove('hidden');
+        const tbody = document.getElementById('tbodyAdminHonorHistory');
+        if (tbody) tbody.innerHTML = skeletonTableRows(7, 5);
+        const countBadge = document.getElementById('admFilterCount');
+        if (countBadge) countBadge.textContent = 'Memuat...';
+        ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+          var el = document.getElementById(id);
+          if (el) el.innerHTML = '<div class="skeleton" style="height:18px;width:36px;border-radius:6px;display:inline-block;"></div>';
+        });
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (!res) {
+              console.error('Response null dari server');
+              if (tbody) tbody.innerHTML = errorTableRows(7, 'Server mengembalikan response kosong.', 'initHonorariumHistory()');
+              if (countBadge) countBadge.textContent = '0 Data';
+              ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+                var el = document.getElementById(id); if (el) el.textContent = '—';
+              });
+              showToast('Gagal memuat data arsip: response kosong', 'error');
+              return;
+            }
+            if (res.status === 'success') {
+              allAdminHistoryData = res.data || [];
+              adminHonorCurrentPage = 1;
+              adminHonorFilteredData = allAdminHistoryData;
+              const selFilter = document.getElementById('selAdminHistoryFilter');
+              if (selFilter && res.periods && Array.isArray(res.periods)) {
+                let opts = '<option value="">Semua Periode</option>';
+                res.periods.forEach(function (p) {
+                  opts += '<option value="' + String(p).replace(/"/g, '&quot;') + '">' + escapeHtml(String(p)) + '</option>';
+                });
+                selFilter.innerHTML = opts;
+              }
+              const admData = allAdminHistoryData;
+              const admPeriods = [...new Set(admData.map(d => d.periode))].length;
+              const admGurus = [...new Set(admData.map(d => d.user_id))].length;
+              const elAP = document.getElementById('admStatPeriods');
+              const elAG = document.getElementById('admStatGuru');
+              const elAT = document.getElementById('admStatTotal');
+              if (elAP) elAP.textContent = admPeriods;
+              if (elAG) elAG.textContent = admGurus;
+              if (elAT) elAT.textContent = admData.length + ' Entri';
+              renderAdminHonorHistoryTable(allAdminHistoryData);
+            } else {
+              const errMsg = res.message || 'Gagal memuat data arsip honorarium.';
+              if (tbody) tbody.innerHTML = errorTableRows(7, errMsg, 'initHonorariumHistory()');
+              if (countBadge) countBadge.textContent = '0 Data';
+              ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+                var el = document.getElementById(id); if (el) el.textContent = '—';
+              });
+              showToast(errMsg, 'error');
+            }
+          })
+          .withFailureHandler(function (err) {
+            console.error('getHonorariumHistoryAdmin error:', err);
+            if (tbody) tbody.innerHTML = errorTableRows(7, 'Koneksi ke server gagal: ' + String(err), 'initHonorariumHistory()');
+            if (countBadge) countBadge.textContent = '0 Data';
+            ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+              var el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            showToast('Gagal memuat arsip honorarium: ' + String(err), 'error');
+          })
+          .getHonorariumHistoryAdmin(token);
+        return;
+      }
+      if (viewGuru) viewGuru.classList.remove('hidden');
+      if (viewAdmin) viewAdmin.classList.add('hidden');
+      const tbodyGuru = document.getElementById('tbodyHonorHistory');
+      if (!tbodyGuru) return;
+      var badge = document.getElementById('guruHistoryBadge');
+      if (badge) badge.textContent = 'Memuat...';
+      ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="skeleton" style="height:18px;width:36px;border-radius:6px;display:inline-block;"></div>';
+      });
+      tbodyGuru.innerHTML = `
+      <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+        <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+      </div>
+      <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+        <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+      </div>`;
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (!res) {
+            tbodyGuru.innerHTML = `<div style="grid-column:1/-1;">${errorStateHTML('Server mengembalikan response kosong.', 'initHonorariumHistory()')}</div>`;
+            if (badge) badge.textContent = '0 Periode';
+            ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+              var el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            showToast('Gagal memuat riwayat honorarium: response kosong', 'error');
+            return;
+          }
+          if (res.status === 'success') {
+            const historyData = res.data || [];
+            allGuruHistoryData = historyData;
+            guruHonorSelectedYear = 'all';
+            guruHonorSelectedMonth = 'all';
+            const totalPeriods = historyData.length;
+            const totalJtm = historyData.reduce(function (s, x) { return s + Number(x.total_jtm || 0); }, 0);
+            var sumHonor = 0;
+            historyData.forEach(function (x) {
+              var n = String(x.nominal || '').replace(/[^0-9]/g, '');
+              if (n) sumHonor += Number(n) || 0;
+            });
+            const elPeriods = document.getElementById('guruStatPeriods');
+            const elJtm = document.getElementById('guruStatJtm');
+            const elTotalEl = document.getElementById('guruStatTotal');
+            if (elPeriods) elPeriods.textContent = totalPeriods;
+            if (elJtm) elJtm.textContent = totalJtm;
+            if (badge) badge.textContent = totalPeriods + ' Periode';
+            if (elTotalEl) {
+              if (totalPeriods === 0) {
+                elTotalEl.textContent = '—';
+              } else {
+                elTotalEl.textContent = 'Rp ' + sumHonor.toLocaleString('id-ID');
+              }
+            }
+            if (historyData.length === 0) {
+              tbodyGuru.innerHTML = `<div class="ah-empty" style="grid-column:1/-1;">
+              <div class="ah-empty-icon">
+                <svg style="width:24px;height:24px;color:#CBD5E1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586"/>
+                </svg>
+              </div>
+              <p style="font-size:.875rem;font-weight:700;color:#475569;">Belum ada riwayat honorarium</p>
+              <span style="font-size:.75rem;color:#94A3B8;margin-top:.25rem;">Riwayat akan muncul setelah finalisasi bulanan</span>
+            </div>`;
+              var fb = document.getElementById('guruHonorFilterBar');
+              if (fb) fb.style.display = 'none';
+              return;
+            }
+            _buildGuruHonorFilter(historyData);
+            _applyGuruHonorFilter();
+          } else {
+            var errMsg = res.message || 'Gagal memuat riwayat honorarium.';
+            tbodyGuru.innerHTML = `<div style="grid-column:1/-1;">${errorStateHTML(errMsg, 'initHonorariumHistory()')}</div>`;
+            if (badge) badge.textContent = '0 Periode';
+            ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+              var el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            showToast(errMsg, 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          console.error('getHonorariumHistoryGuru error:', err);
+          tbodyGuru.innerHTML = `<div style="grid-column:1/-1;">${errorStateHTML('Koneksi ke server gagal: ' + String(err), 'initHonorariumHistory()')}</div>`;
+          if (badge) badge.textContent = '0 Periode';
+          ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+            var el = document.getElementById(id); if (el) el.textContent = '—';
+          });
+          showToast('Gagal memuat riwayat honorarium: ' + String(err), 'error');
+        })
+        .getHonorariumHistoryGuru(token);
+    }
+    function viewSlipFromHistory(periode) {
+      window._pendingHonorPeriode = periode;
+      handleNav('Page_Honorarium');
+    }
+    function _buildGuruHonorFilter(data) {
+      _guruHonorYearMap = {};
+      data.forEach(function (h) {
+        var parts = String(h.periode || '').trim().split(' ');
+        if (parts.length === 2) {
+          var month = parts[0], year = parts[1];
+          if (!_guruHonorYearMap[year]) _guruHonorYearMap[year] = [];
+          if (_guruHonorYearMap[year].indexOf(month) === -1) {
+            _guruHonorYearMap[year].push(month);
+          }
+        }
+      });
+      var years = Object.keys(_guruHonorYearMap)
+        .sort(function (a, b) { return Number(b) - Number(a); });
+      var yearEl = document.getElementById('guruYearChips');
+      if (yearEl) {
+        var html = '<button class="ah-guru-year-chip ah-guru-year-active" data-year="all" onclick="selectGuruHonorYear(\'all\')">Semua Tahun</button>';
+        years.forEach(function (y) {
+          html += '<button class="ah-guru-year-chip" data-year="' + y + '" onclick="selectGuruHonorYear(\'' + y + '\')">' + y + '</button>';
+        });
+        yearEl.innerHTML = html;
+      }
+      var bar = document.getElementById('guruHonorFilterBar');
+      if (bar) bar.style.display = '';
+    }
+    function selectGuruHonorYear(year) {
+      guruHonorSelectedYear = year;
+      guruHonorSelectedMonth = 'all';
+      document.querySelectorAll('.ah-guru-year-chip').forEach(function (btn) {
+        btn.classList.toggle('ah-guru-year-active', btn.getAttribute('data-year') === String(year));
+      });
+      var monthRow = document.getElementById('guruMonthRow');
+      var monthChips = document.getElementById('guruMonthChips');
+      if (year === 'all' || !_guruHonorYearMap[year]) {
+        if (monthRow) { monthRow.classList.remove('visible'); }
+      } else {
+        var months = (_guruHonorYearMap[year] || []).slice().sort(function (a, b) {
+          return _MONTH_NAMES_ID.indexOf(a) - _MONTH_NAMES_ID.indexOf(b);
+        });
+        if (monthChips) {
+          var html = '<button class="ah-guru-month-chip ah-guru-month-active" data-month="all" onclick="selectGuruHonorMonth(\'all\')">Semua Bulan</button>';
+          months.forEach(function (m) {
+            var idx = _MONTH_NAMES_ID.indexOf(m);
+            var label = idx >= 0 ? _MONTH_SHORT_ID[idx] : m;
+            html += '<button class="ah-guru-month-chip" data-month="' + m + '" onclick="selectGuruHonorMonth(\'' + m + '\')">' + label + '</button>';
+          });
+          monthChips.innerHTML = html;
+        }
+        if (monthRow) { monthRow.classList.add('visible'); }
+      }
+      _applyGuruHonorFilter();
+    }
+    function selectGuruHonorMonth(month) {
+      guruHonorSelectedMonth = month;
+      document.querySelectorAll('.ah-guru-month-chip').forEach(function (btn) {
+        btn.classList.toggle('ah-guru-month-active', btn.getAttribute('data-month') === String(month));
+      });
+      _applyGuruHonorFilter();
+    }
+    function resetGuruHonorFilter() {
+      selectGuruHonorYear('all');
+    }
+    function _applyGuruHonorFilter() {
+      var isYearFiltered = guruHonorSelectedYear !== 'all';
+      var isMonthFiltered = guruHonorSelectedMonth !== 'all';
+      var isFiltered = isYearFiltered || isMonthFiltered;
+      var filtered = allGuruHistoryData;
+      if (isYearFiltered) {
+        filtered = filtered.filter(function (h) {
+          var parts = String(h.periode || '').split(' ');
+          return parts.length === 2 && parts[1] === guruHonorSelectedYear;
+        });
+      }
+      if (isMonthFiltered) {
+        filtered = filtered.filter(function (h) {
+          var parts = String(h.periode || '').split(' ');
+          return parts.length === 2 && parts[0] === guruHonorSelectedMonth;
+        });
+      }
+      var resultText = document.getElementById('guruFilterResultText');
+      var resultDot = document.getElementById('guruFilterDot');
+      var resetBtn = document.getElementById('guruFilterResetBtn');
+      var badge = document.getElementById('guruHistoryBadge');
+      var label = isFiltered
+        ? filtered.length + ' periode ditemukan'
+        : allGuruHistoryData.length + ' periode tersedia';
+      if (resultText) resultText.textContent = label;
+      if (resultDot) resultDot.classList.toggle('filtered', isFiltered);
+      if (resetBtn) resetBtn.style.display = isFiltered ? '' : 'none';
+      if (badge) badge.textContent = filtered.length + ' Periode' + (isFiltered ? ' ↑ difilter' : '');
+      // Update hero stat cards sesuai data yang sedang difilter
+      var filteredJtm = filtered.reduce(function (s, x) { return s + Number(x.total_jtm || 0); }, 0);
+      var filteredHonor = 0;
+      filtered.forEach(function (x) {
+        var n = String(x.nominal || '').replace(/[^0-9]/g, '');
+        if (n) filteredHonor += Number(n) || 0;
+      });
+      var elSP = document.getElementById('guruStatPeriods');
+      var elSJ = document.getElementById('guruStatJtm');
+      var elST = document.getElementById('guruStatTotal');
+      var elLbl = document.getElementById('guruStatPeriodsLbl');
+      if (elSP) elSP.textContent = filtered.length;
+      if (elSJ) elSJ.textContent = filteredJtm;
+      if (elST) elST.textContent = filtered.length === 0 ? '—' : 'Rp ' + filteredHonor.toLocaleString('id-ID');
+      if (elLbl) elLbl.textContent = isFiltered ? 'Periode Difilter' : 'Total Periode';
+      _renderGuruHonorCards(filtered);
+    }
+    function _renderGuruHonorCards(data) {
+      var tbodyGuru = document.getElementById('tbodyHonorHistory');
+      if (!tbodyGuru) return;
+      if (data.length === 0) {
+        tbodyGuru.innerHTML = `
+        <div class="ah-empty" style="grid-column:1/-1;">
+          <div class="ah-empty-icon">
+            <svg style="width:24px;height:24px;color:#CBD5E1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+          <p style="font-size:.875rem;font-weight:700;color:#475569;">Tidak ada data untuk filter ini</p>
+          <span style="font-size:.75rem;color:#94A3B8;margin-top:.25rem;">
+            Coba pilih tahun atau bulan yang berbeda
+          </span>
+          <button onclick="resetGuruHonorFilter()"
+            style="margin-top:.875rem;display:inline-flex;align-items:center;gap:6px;
+                   padding:.4rem 1rem;border-radius:8px;font-size:.78rem;font-weight:700;
+                   background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;cursor:pointer;">
+            <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Tampilkan Semua
+          </button>
+        </div>`;
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.length; i++) {
+        var h = data[i];
+        var safePeriode = escapeHtml(h.periode || '-');
+        var safePeriodeJs = String(h.periode || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var safeJtm = Number(h.total_jtm || 0);
+        var safeJtmAcara = Number(h.jtm_acara || 0);
+        var safeTugasTambahan = escapeHtml(h.nominal_tugas_tambahan || 'Rp 0');
+        var safeTransport = escapeHtml(h.nominal_transport || 'Rp 0');
+        var safeNominal = escapeHtml(h.nominal || 'Rp 0');
+        var safeTrx = escapeHtml(h.trx_id || '-');
+        var delay = Math.min(i, 8) * 35;
+        var tanggal = h.tanggal_simpan
+          ? '<span style="font-size:.68rem;color:#94A3B8;display:inline-flex;align-items:center;gap:4px;">' +
+          '<svg style="width:10px;height:10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+          'Final: ' + escapeHtml(_formatTanggalFinal(h.tanggal_simpan)) + '</span>'
+          : '';
+        html += `<div class="ah-honor-card ah-card-reveal" style="animation-delay:${delay}ms;">
+        <div class="ah-honor-card-top">
+          <span class="ah-honor-card-periode">${safePeriode}</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.65rem;font-weight:800;background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;">
+            <svg style="width:9px;height:9px;" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Final
+          </span>
+        </div>
+        <div class="ah-honor-card-body">
+          <div class="ah-honor-card-row">
+            <span class="ah-honor-card-lbl">Total JTM</span>
+            <span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:.72rem;font-weight:800;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;">${safeJtm} JTM</span>
+          </div>
+          ${safeJtmAcara > 0 ? `<div class="ah-honor-card-row" style="margin-top:.375rem;">
+            <span class="ah-honor-card-lbl">JTM Acara</span>
+            <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:999px;font-size:.72rem;font-weight:800;background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;"><svg style="width:9px;height:9px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>${safeJtmAcara} JTM</span>
+          </div>` : ''}
+          <div class="ah-honor-card-row" style="margin-top:.625rem;">
+            <span class="ah-honor-card-lbl">Tgs. Tambahan</span>
+            <span style="font-size:.875rem;font-weight:700;color:#475569;">${safeTugasTambahan}</span>
+          </div>
+          <div class="ah-honor-card-row" style="margin-top:.375rem;">
+            <span class="ah-honor-card-lbl">Transportasi</span>
+            <span style="font-size:.875rem;font-weight:700;color:#475569;">${safeTransport}</span>
+          </div>
+          <div class="ah-honor-card-row" style="margin-top:.625rem;border-top:1px dashed #E2E8F0;padding-top:.5rem;">
+            <span class="ah-honor-card-lbl">Nominal Diterima</span>
+            <span style="font-size:1rem;font-weight:800;color:#059669;">${safeNominal}</span>
+          </div>
+          ${tanggal ? '<div style="margin-top:.5rem;">' + tanggal + '</div>' : ''}
+        </div>
+        <div class="ah-honor-card-foot">
+          <button type="button" onclick="viewSlipFromHistory('${safePeriodeJs}')" class="ah-slip-btn" aria-label="Lihat slip ${safePeriode}">
+            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Lihat Detail Slip
+          </button>
+        </div>
+      </div>`;
+      }
+      tbodyGuru.innerHTML = html;
+    }
+    function initManageSchedule() {
+      populateGlobalClassSelects();
+      if (globalConfig) {
+        const tf = document.getElementById('filterTahunPelajaran');
+        if (tf && !tf.value) tf.value = globalConfig.tahun_pelajaran || '';
+        const sf = document.getElementById('filterSemester');
+        if (sf && !sf.value) sf.value = globalConfig.semester || '';
+      }
+      const token = localStorage.getItem('auth_token');
+      const tbody = document.getElementById('tbodyManageSchedule');
+      if (tbody) tbody.innerHTML = skeletonTableRows(7, 5);
+      cachedSchedules = cachedSchedules || [];
+      _updateFilterIndicators();
+      google.script.run.withSuccessHandler((data) => {
+        cachedSchedules = data || [];
+        applyScheduleFilters();
+      }).withFailureHandler((err) => {
+        if (tbody) tbody.innerHTML = errorTableRows(7, 'Gagal memuat jadwal: ' + (err && err.message ? err.message : err), 'initManageSchedule()');
+      }).getAllSchedulesAdmin(token);
+      if (Array.isArray(window._allUsersCache) && window._allUsersCache.length) {
+        _populateScheduleTeacherSelect(window._allUsersCache);
+      } else {
+        google.script.run.withSuccessHandler((users) => {
+          if (Array.isArray(users)) window._allUsersCache = users;
+          _populateScheduleTeacherSelect(users || []);
+        }).getAllUsers(token);
+      }
+      if (Array.isArray(window._subjectsCache) && window._subjectsCache.length) {
+        _populateScheduleSubjectSelect(window._subjectsCache);
+      } else {
+        google.script.run.withSuccessHandler((res) => {
+          if (res && res.status === 'success' && res.subjects) {
+            window._subjectsCache = res.subjects;
+            _populateScheduleSubjectSelect(res.subjects);
+          } else if (res && res.message) {
+            console.error("Gagal memuat mata pelajaran:", res.message);
+          }
+        }).getSettingsMasterData(token);
+      }
+    }
+    function _populateScheduleTeacherSelect(users) {
+      const sel = document.getElementById('inpSchedTeacher');
+      if (!sel) return;
+      let html = '<option value="">Pilih Guru...</option>';
+      (users || []).filter(u => u.role === 'guru').forEach(u => {
+        html += '<option value="' + escapeHtml(String(u.id)) + '">' + escapeHtml(u.full_name || '') + '</option>';
+      });
+      sel.innerHTML = html;
+    }
+    function _populateScheduleSubjectSelect(subjects) {
+      const sel = document.getElementById('inpSchedSubject');
+      if (!sel) return;
+      let html = '<option value="">Pilih Mapel...</option>';
+      (subjects || []).forEach(s => {
+        const v = escapeHtml(s.name || '');
+        html += '<option value="' + v + '">' + v + '</option>';
+      });
+      sel.innerHTML = html;
+    }
+    function _updateFilterIndicators() {
+      const search = (document.getElementById('filterSearch') || {}).value || '';
+      const day = (document.getElementById('filterDay') || {}).value || '';
+      const cls = (document.getElementById('filterClass') || {}).value || '';
+      const tp = ((document.getElementById('filterTahunPelajaran') || {}).value || '').trim().toLowerCase();
+      const sem = (document.getElementById('filterSemester') || {}).value || '';
+      const activeTP = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.tahun_pelajaran) ? globalConfig.tahun_pelajaran.toLowerCase() : '';
+      const activeSem = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.semester) ? globalConfig.semester : '';
+      let activeCount = 0;
+      if (search.trim()) activeCount++;
+      if (day) activeCount++;
+      if (cls) activeCount++;
+      if (tp && tp !== activeTP) activeCount++;
+      if (sem && sem !== activeSem) activeCount++;
+      const badge = document.getElementById('badgeFilterActive');
+      const badgeCount = document.getElementById('badgeFilterActiveCount');
+      const btnClearAll = document.getElementById('btnClearFilters');
+      const btnClearSearch = document.getElementById('btnClearSearch');
+      if (badge && badgeCount) {
+        if (activeCount > 0) {
+</script>

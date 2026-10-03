@@ -1,0 +1,844 @@
+<script>
+    function _wireEventNavItems() {
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      var evtMgmtBtn      = document.getElementById('nav-Page_EventManagement');
+      var evtAttBtn       = document.getElementById('nav-Page_EventAttendance');
+      var evtAttAdminBtn  = document.getElementById('nav-Page_EventAttendance_Admin');
+      var evtJrnBtn       = document.getElementById('nav-Page_EventJournal');
+      var evtJrnHistBtn   = document.getElementById('nav-Page_EventJournalHistory');
+      var evtJrnHistAdminBtn = document.getElementById('nav-Page_EventJournalHistory_Admin');
+      if (evtMgmtBtn)     evtMgmtBtn.classList.toggle('hidden', role !== 'admin');
+      if (evtAttBtn)      evtAttBtn.classList.toggle('hidden', role !== 'admin' && role !== 'guru');
+      if (evtAttAdminBtn) evtAttAdminBtn.classList.toggle('hidden', role !== 'admin');
+      if (evtJrnBtn)      evtJrnBtn.classList.toggle('hidden', role !== 'guru');
+      if (evtJrnHistBtn)  evtJrnHistBtn.classList.toggle('hidden', role !== 'guru');
+      if (evtJrnHistAdminBtn) evtJrnHistAdminBtn.classList.toggle('hidden', role !== 'admin');
+    }
+    function initEventManagementPage() {
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      if (role !== 'admin') {
+        showToast('Akses Ditolak: Halaman ini hanya untuk Admin.', 'error');
+        handleNav('Page_Dashboard');
+        return;
+      }
+      var token = localStorage.getItem('auth_token');
+      var container = document.getElementById('eventMgmtTableContainer');
+      if (!container) return;
+      container.innerHTML = '<div class="p-6 space-y-3">' +
+        '<div class="h-4 bg-slate-200 rounded animate-pulse w-3/4"></div>' +
+        '<div class="h-4 bg-slate-200 rounded animate-pulse w-1/2"></div>' +
+        '<div class="h-4 bg-slate-200 rounded animate-pulse w-2/3"></div>' +
+        '</div>';
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || res.status !== 'success') {
+            var msg = (res && res.message) || 'Gagal memuat data.';
+            showToast(msg, 'error');
+            if (msg.indexOf('Akses Ditolak') !== -1 || msg.indexOf('Unauthorized') !== -1) {
+              handleNav('Page_Dashboard');
+            } else {
+              container.innerHTML = '<div class="p-6 text-red-500 text-sm">' + escapeHtml(msg) + '</div>';
+            }
+            return;
+          }
+          renderEventMgmtTable(res.events || []);
+        })
+        .withFailureHandler(function(err) { showToast(String(err), 'error'); })
+        .getEventDefinitions(token);
+    }
+    var _evtDefsCache = [];
+    function renderEventMgmtTable(events) {
+      var container = document.getElementById('eventMgmtTableContainer');
+      if (!container) return;
+      _evtDefsCache = events || [];
+      var DAY_NAMES_EVT = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+      if (!_evtDefsCache.length) {
+        container.innerHTML = '<div class="p-12 flex flex-col items-center justify-center text-center"><div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4"><svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div><h3 class="text-lg font-bold text-slate-800 mb-1">Belum ada acara</h3><p class="text-slate-500 text-sm max-w-sm">Daftar acara masih kosong. Klik "Tambah Acara" di kanan atas untuk mulai membuat jadwal kegiatan sekolah.</p></div>';
+        return;
+      }
+      var rows = _evtDefsCache.map(function(ev) {
+        var jadwal = '';
+        if (String(ev.type||'').trim()==='rutin') {
+          jadwal = 'Setiap '+(DAY_NAMES_EVT[Number(ev.recurrence_day_index)]||'-');
+        } else {
+          try { jadwal = JSON.parse(ev.dates_json||'[]').join(', ') || '-'; } catch(_) { jadwal = ev.dates_json||'-'; }
+        }
+        var evTypeTrimmed = String(ev.type||'').trim();
+        var evIdSafe = escapeHtml(String(ev.id||''));
+        var badgeClass = evTypeTrimmed==='rutin' 
+          ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20' 
+          : 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20';
+        return '<tr class="hover:bg-indigo-50/40 transition-colors duration-200 group">' +
+          '<td class="py-4 px-5 font-semibold text-slate-800">'+escapeHtml(ev.name||'-')+'</td>' +
+          '<td class="py-4 px-5 text-center"><span class="text-xs font-bold px-2.5 py-1 rounded-full '+badgeClass+'">'+escapeHtml(evTypeTrimmed||'-')+'</span></td>' +
+          '<td class="py-4 px-5 text-sm text-slate-600 font-medium">'+escapeHtml(jadwal)+'</td>' +
+          '<td class="py-4 px-5 text-center text-sm font-medium text-slate-700 bg-slate-50/50 group-hover:bg-transparent transition-colors"><div class="inline-flex items-center gap-1.5"><svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'+escapeHtml((ev.time_start||'')+' \u2013 '+(ev.time_end||''))+'</div></td>' +
+          '<td class="py-4 px-5 text-center"><span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-bold text-sm">'+escapeHtml(String(ev.jtm_val||0))+'</span></td>' +
+          '<td class="py-4 px-5 text-center">' +
+            '<div class="flex items-center justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">' +
+              '<button onclick="_evtEdit(\''+evIdSafe+'\')" class="p-1.5 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 shadow-sm transition-all" title="Edit"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>' +
+              '<button onclick="deleteEventWithConfirm(\''+evIdSafe+'\')" class="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 shadow-sm transition-all" title="Hapus"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>' +
+            '</div>' +
+          '</td></tr>';
+      }).join('');
+      container.innerHTML = '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+        '<thead class="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">' +
+        '<tr><th class="py-4 px-5 text-left">Nama Acara</th><th class="py-4 px-5 text-center">Tipe</th>' +
+        '<th class="py-4 px-5 text-left">Jadwal/Tanggal</th><th class="py-4 px-5 text-center">Waktu</th>' +
+        '<th class="py-4 px-5 text-center">JTM</th><th class="py-4 px-5 text-center">Aksi</th></tr></thead>' +
+        '<tbody class="divide-y divide-slate-100 text-slate-700">'+rows+'</tbody></table></div>';
+    }
+    function _evtEdit(id) {
+      var ev = (_evtDefsCache||[]).find(function(e){return String(e.id)===String(id);});
+      openEventDefinitionModal(ev||null);
+    }
+    function toggleEventTypeFields() {
+      var type = (document.getElementById('evdType')||{}).value||'insidental';
+      var ins = document.getElementById('evdInsidentalSection');
+      var rut = document.getElementById('evdRutinSection');
+      if (ins) ins.classList.toggle('hidden', type!=='insidental');
+      if (rut) rut.classList.toggle('hidden', type!=='rutin');
+      var list = document.getElementById('evdDateList');
+      if (type === 'insidental' && list && list.children.length === 0) {
+        addEventDateRow('');
+      }
+    }
+    function addEventDateRow(val) {
+      var list = document.getElementById('evdDateList');
+      if (!list) return;
+      var row = document.createElement('div');
+      row.className = 'flex items-center gap-2.5';
+      var input = document.createElement('input');
+      input.type = 'date';
+      input.className = 'evd-date-input flex-1 bg-white border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all duration-200 shadow-sm';
+      if (val) input.value = val;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-rose-100';
+      btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+      btn.onclick = function() { row.remove(); };
+      row.appendChild(input);
+      row.appendChild(btn);
+      list.appendChild(row);
+    }
+    function openEventDefinitionModal(ev) {
+      var modal = document.getElementById('eventDefModal');
+      if (!modal) return;
+      var title = document.getElementById('eventDefModalTitle');
+      var list  = document.getElementById('evdDateList');
+      if (title) title.textContent = ev ? 'Edit Acara' : 'Tambah Acara';
+      if (document.getElementById('evdId')) document.getElementById('evdId').value = ev ? (ev.id||'') : '';
+      if (document.getElementById('evdName')) document.getElementById('evdName').value = ev ? (ev.name||'') : '';
+      if (document.getElementById('evdType')) document.getElementById('evdType').value = ev ? (String(ev.type||'').trim()||'insidental') : 'insidental';
+      if (document.getElementById('evdTimeStart')) document.getElementById('evdTimeStart').value = ev ? (String(ev.time_start||'').slice(0,5)) : '';
+      if (document.getElementById('evdTimeEnd')) document.getElementById('evdTimeEnd').value = ev ? (String(ev.time_end||'').slice(0,5)) : '';
+      if (document.getElementById('evdJtmVal')) document.getElementById('evdJtmVal').value = ev ? (ev.jtm_val||'') : '';
+      if (document.getElementById('evdDesc')) document.getElementById('evdDesc').value = ev ? (ev.description||'') : '';
+      if (document.getElementById('evdDayIndex')) document.getElementById('evdDayIndex').value = ev ? (ev.recurrence_day_index !== null && ev.recurrence_day_index !== undefined && ev.recurrence_day_index !== '' ? ev.recurrence_day_index : 0) : 0;
+      if (list) {
+        list.innerHTML = '';
+        var evTypeTrimmedModal = ev ? String(ev.type||'').trim() : 'insidental';
+        if (ev && evTypeTrimmedModal === 'insidental' && ev.dates_json) {
+          try {
+            var datesVal = ev.dates_json;
+            var parsedDates = Array.isArray(datesVal) ? datesVal : JSON.parse(String(datesVal));
+            parsedDates.forEach(function(d){ addEventDateRow(String(d||'')); });
+          } catch(_) {}
+        }
+        if (!list.children.length && (!ev || evTypeTrimmedModal === 'insidental')) addEventDateRow('');
+      }
+      toggleEventTypeFields();
+      modal.classList.remove('hidden');
+    }
+    function closeEventDefModal() {
+      var modal = document.getElementById('eventDefModal');
+      if (modal) modal.classList.add('hidden');
+    }
+    function submitEventDefForm(e) {
+      if (e) e.preventDefault();
+      var type = (document.getElementById('evdType')||{}).value||'insidental';
+      var name = ((document.getElementById('evdName')||{}).value||'').trim();
+      var ts   = ((document.getElementById('evdTimeStart')||{}).value||'').trim().slice(0,5);
+      var te   = ((document.getElementById('evdTimeEnd')||{}).value||'').trim().slice(0,5);
+      var jtm  = parseInt((document.getElementById('evdJtmVal')||{}).value||'0', 10);
+      if (!name)        { showToast('Nama acara tidak boleh kosong.','error'); return; }
+      if (!ts||!te||ts>=te){ showToast('Jam mulai harus lebih awal dari jam selesai.','error'); return; }
+      if (!jtm||jtm<1||jtm>99){ showToast('Nilai JTM harus bilangan bulat antara 1 dan 99.','error'); return; }
+      var datesJson = null;
+      var dayIdx    = null;
+      if (type==='insidental') {
+        var dateInputs = document.querySelectorAll('#evdDateList .evd-date-input');
+        var dates = [];
+        dateInputs.forEach(function(inp){ var v=(inp.value||'').trim(); if(v) dates.push(v); });
+        var uniqueDates = [];
+        dates.forEach(function(d){ if(uniqueDates.indexOf(d)===-1) uniqueDates.push(d); });
+        if (!uniqueDates.length){ showToast('Minimal satu tanggal wajib diisi.','error'); return; }
+        datesJson = JSON.stringify(uniqueDates);
+      } else {
+        dayIdx = parseInt((document.getElementById('evdDayIndex')||{}).value||'0',10);
+      }
+      var payload = {
+        id:   ((document.getElementById('evdId')||{}).value||'')||null,
+        name: name, type: type,
+        recurrence_day_index: dayIdx, dates_json: datesJson,
+        time_start: ts, time_end: te, jtm_val: jtm,
+        description: ((document.getElementById('evdDesc')||{}).value||'').trim()
+      };
+      var submitBtn = document.querySelector('#eventDefForm button[type="submit"]');
+      var restoreSubmit = submitBtn ? _busyButton(submitBtn, 'Menyimpan...') : function(){};
+      google.script.run
+        .withSuccessHandler(function(res){
+          restoreSubmit();
+          if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal menyimpan.','error'); return; }
+          closeEventDefModal();
+          showToast('Acara berhasil disimpan.','success');
+          initEventManagementPage();
+        })
+        .withFailureHandler(function(err){ restoreSubmit(); showToast((err&&err.message)||String(err),'error'); })
+        .saveEventDefinition(localStorage.getItem('auth_token'), payload);
+    }
+    function deleteEventWithConfirm(eventId) {
+      var ev = (_evtDefsCache||[]).find(function(e){return String(e.id)===String(eventId);});
+      var evName = ev ? ev.name : 'Acara ini';
+      showConfirm(
+        'Hapus Acara',
+        'Apakah Anda yakin ingin menghapus <b>"'+escapeHtml(evName)+'"</b>?<br><br><span class="text-red-500 text-sm font-medium">Peringatan: Semua data kehadiran dan jurnal yang terkait dengan acara ini akan ikut terhapus dan tidak dapat dikembalikan.</span>',
+        function(){
+          var token = localStorage.getItem('auth_token');
+          var btn = document.getElementById('confirmModalBtn');
+          if(btn) { btn.disabled = true; btn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Menghapus...'; }
+          google.script.run
+            .withSuccessHandler(function(res){
+              if(btn) { btn.disabled = false; btn.innerHTML = 'Ya, Lanjutkan'; }
+              if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal menghapus.','error'); return; }
+              showToast('Acara berhasil dihapus.','success');
+              initEventManagementPage();
+            })
+            .withFailureHandler(function(err){ 
+              if(btn) { btn.disabled = false; btn.innerHTML = 'Ya, Lanjutkan'; }
+              showToast(String(err),'error'); 
+            })
+            .deleteEventDefinition(token, eventId, true);
+        }
+      );
+    }
+    var _evtAttCurrentEvent = null;
+    var _evtAttCurrentDate  = '';
+    var _evtAttCurrentTimeEnd   = '';  // jam selesai acara yang sedang aktif
+    var _evtAttCurrentTimeStart = '';  // jam mulai acara yang sedang aktif
+    function initEventAttendancePage() {
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      if (role !== 'admin' && role !== 'guru') {
+        showToast('Akses Ditolak: Halaman ini untuk Admin atau Guru Piket.', 'error');
+        handleNav('Page_Dashboard');
+        return;
+      }
+      _loadEvtAttEventList();
+    }
+    function _loadEvtAttEventList() {
+      var token = localStorage.getItem('auth_token');
+      var listEl = document.getElementById('evtAttEventList');
+      var dateLabel = document.getElementById('evtAttDateLabel');
+      if (!listEl) return;
+      listEl.innerHTML = '<div class="p-6 space-y-4 bg-white rounded-2xl border border-slate-100 shadow-sm">' +
+        '<div class="h-14 bg-slate-100 rounded-xl animate-pulse"></div>' +
+        '<div class="h-14 bg-slate-100 rounded-xl animate-pulse w-3/4"></div></div>';
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res||res.status!=='success'){
+            var msg = (res&&res.message)||'Gagal memuat.';
+            showToast(msg, 'error');
+            if (msg.indexOf('Akses Ditolak') !== -1 || msg.indexOf('Unauthorized') !== -1 ||
+                msg.indexOf('Sesi habis') !== -1) {
+              handleNav('Page_Dashboard');
+            } else {
+              listEl.innerHTML = '<div class="p-6 text-red-500 text-sm bg-red-50 rounded-2xl border border-red-100">' + escapeHtml(msg) + '</div>';
+            }
+            return;
+          }
+          _evtAttCurrentDate = res.today||'';
+          var isAdmin = String(localStorage.getItem('user_role') || '').toLowerCase() === 'admin';
+          window.picketNeedsConfirmation = !isAdmin && (res.isPicketConfirmed === false);
+          if (dateLabel) dateLabel.textContent = 'Hari ini: '+_evtAttCurrentDate;
+          var events = res.events||[];
+          if (!events.length) {
+            listEl.innerHTML = '<div class="p-6 text-center text-slate-500 text-sm bg-white rounded-xl border border-slate-200">Tidak ada acara/kegiatan terjadwal hari ini.</div>';
+            return;
+          }
+          var html = '<div class="flex flex-wrap gap-3">';
+          events.forEach(function(ev){
+            html += '<button onclick="loadEventAttendance(\''+escapeHtml(String(ev.id))+'\',\''+escapeHtml(_evtAttCurrentDate)+'\',\''+escapeHtml(String(ev.time_end||''))+'\',\''+escapeHtml(String(ev.time_start||''))+'\')" ' +
+              'class="flex-1 min-w-[200px] bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 text-left transition shadow-sm">' +
+              '<p class="font-bold text-slate-800 text-sm">'+escapeHtml(ev.name||'-')+'</p>' +
+              '<p class="text-xs text-slate-500 mt-0.5">'+escapeHtml(ev.time_start||'')+' \u2013 '+escapeHtml(ev.time_end||'')+' &bull; '+escapeHtml(ev.type||'-')+'</p>' +
+              '</button>';
+          });
+          html += '</div>';
+          listEl.innerHTML = html;
+        })
+        .withFailureHandler(function(err){ showToast(String(err),'error'); })
+        .getTodayEvents(token);
+    }
+    function loadEventAttendance(eventId, date, timeEnd, timeStart) {
+      var token  = localStorage.getItem('auth_token');
+      var wrap   = document.getElementById('evtAttTableWrap');
+      var tbody  = document.getElementById('evtAttTableBody');
+      var title  = document.getElementById('evtAttTableTitle');
+      if (!wrap || !tbody) return;
+      _evtAttCurrentEvent     = eventId;
+      _evtAttCurrentTimeEnd   = timeEnd   || '';  // simpan jam selesai acara ke state
+      _evtAttCurrentTimeStart = timeStart || '';  // simpan jam mulai acara ke state
+      wrap.classList.remove('hidden');
+      if (title) title.textContent = 'Kehadiran Acara — ' + date;
+      tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center"><div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"></div></td></tr>';
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal memuat.','error'); return; }
+          renderEvtAttTable(res.rows||[], eventId, date, _evtAttCurrentTimeEnd, _evtAttCurrentTimeStart);
+        })
+        .withFailureHandler(function(err){ showToast(String(err),'error'); })
+        .getEventAttendance(token, eventId, date);
+    }
+    function renderEvtAttTable(rows, eventId, date, timeEnd, timeStart) {
+      var tbody = document.getElementById('evtAttTableBody');
+      if (!tbody) return;
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-12 text-center text-slate-400 text-sm">Belum ada data guru untuk acara ini.</td></tr>';
+        return;
+      }
+      var HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+      // Atribut min: jam masuk tidak boleh kurang dari jam mulai acara
+      var minAttr = (timeStart && HH_MM_RE.test(timeStart))
+        ? 'min="' + escapeHtml(timeStart) + '"'
+        : '';
+      // Atribut max: jam masuk tidak boleh melebihi jam selesai acara
+      var maxAttr = (timeEnd && HH_MM_RE.test(timeEnd))
+        ? 'max="' + escapeHtml(timeEnd) + '"'
+        : '';
+      // Title gabungan untuk tooltip input
+      var timeRangeTitle = '';
+      if (timeStart && timeEnd) timeRangeTitle = 'title="Jam masuk harus antara ' + escapeHtml(timeStart) + ' s.d. ' + escapeHtml(timeEnd) + '"';
+      else if (timeStart)       timeRangeTitle = 'title="Jam masuk tidak boleh kurang dari jam mulai acara (' + escapeHtml(timeStart) + ')"';
+      else if (timeEnd)         timeRangeTitle = 'title="Jam masuk tidak boleh melebihi jam selesai acara (' + escapeHtml(timeEnd) + ')"';
+      var html = rows.map(function(r){
+        var js = r.journal_submitted===true||String(r.journal_submitted).toUpperCase()==='TRUE';
+        var hasAtt = r.attendance_id!=='';
+        var badge = !hasAtt
+          ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-500/20">Belum Hadir</span>'
+          : (!js
+            ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">Hadir &ndash; Belum Isi Jurnal</span>'
+            : '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Hadir</span>');
+        var uid   = escapeHtml(String(r.user_id||''));
+        var evtId = escapeHtml(String(eventId||''));
+        var dateE = escapeHtml(String(date||''));
+        var wrapClassBtn = hasAtt ? 'flex' : 'hidden';
+        var wrapClassSave = hasAtt ? 'hidden' : 'flex';
+        var btnCancelClass = hasAtt ? 'block' : 'hidden';
+        var inpAttrs = hasAtt ? 'disabled' : '';
+        var isBlocked = window.picketNeedsConfirmation === true;
+        var blockedAttr = isBlocked ? 'disabled title="Tunggu konfirmasi kehadiran Anda terlebih dahulu"' : '';
+        var editHover = isBlocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 shadow-sm hover:shadow';
+        var cancelHover = isBlocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-rose-500 hover:text-white shadow-sm hover:shadow hover:border-rose-500';
+        var saveHover = isBlocked ? 'opacity-50 cursor-not-allowed' : 'hover:from-blue-700 hover:to-indigo-700 shadow-sm hover:shadow hover:-translate-y-0.5';
+        var batalHover = isBlocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 shadow-sm';
+        var acts = 
+          '<div id="evtbtnwrap-'+uid+'" class="'+wrapClassBtn+' items-center gap-2 justify-center">' +
+            '<button onclick="editAttendanceRow(\''+uid+'\')" '+blockedAttr+' class="text-xs bg-white text-slate-700 font-semibold px-3 py-1.5 rounded-lg transition-all border border-slate-200 '+editHover+'">Edit</button>' +
+            '<button id="evtcancelattbtn-'+uid+'" onclick="cancelAttendanceRow(\''+evtId+'\',\''+uid+'\',\''+dateE+'\',\''+uid+'\')" '+blockedAttr+' class="text-xs bg-rose-50 text-rose-600 font-semibold px-3 py-1.5 rounded-lg transition-all border border-rose-200 '+cancelHover+'">Batalkan Kehadiran</button>' +
+          '</div>' +
+          '<div id="evtsavewrap-'+uid+'" class="'+wrapClassSave+' items-center gap-2 justify-center">' +
+            '<button onclick="saveAttendanceRow(\''+evtId+'\',\''+uid+'\',\''+dateE+'\',\''+uid+'\')" '+blockedAttr+' class="text-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-3 py-1.5 rounded-lg transition-all '+saveHover+'">Simpan</button>' +
+            '<button id="evtcancelbtn-'+uid+'" onclick="cancelEditAttendance(\''+uid+'\')" '+blockedAttr+' class="text-xs bg-white text-slate-600 font-semibold px-3 py-1.5 rounded-lg transition-all border border-slate-200 '+btnCancelClass+' '+batalHover+'">Batal</button>' +
+          '</div>';
+        return '<tr class="hover:bg-indigo-50/40 transition-colors duration-200" id="evtrow-'+uid+'">' +
+          '<td class="py-4 px-5 font-bold text-slate-800 text-sm">'+escapeHtml(r.full_name||'-')+'</td>' +
+          '<td class="py-4 px-5 text-center"><input type="time" '+(isBlocked ? 'disabled title="Tunggu konfirmasi kehadiran Anda"' : inpAttrs+' '+timeRangeTitle)+' '+minAttr+' '+maxAttr+' class="border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg px-2.5 py-1.5 text-sm transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:opacity-75" id="evttime-'+uid+'" data-timestart="'+escapeHtml(timeStart||'')+'" data-timeend="'+escapeHtml(timeEnd||'')+'" data-original="'+escapeHtml(r.time_in||'')+'" value="'+escapeHtml(r.time_in||'')+'"></td>' +
+          '<td class="py-4 px-5 text-center" id="evtstatus-'+uid+'">'+badge+'</td>' +
+          '<td class="py-4 px-5 text-center" id="evtacts-'+uid+'">' + acts + '</td></tr>';
+      }).join('');
+      tbody.innerHTML = html;
+    }
+    function editAttendanceRow(uidKey) {
+      var inp = document.getElementById('evttime-'+uidKey);
+      var btnWrap = document.getElementById('evtbtnwrap-'+uidKey);
+      var saveWrap = document.getElementById('evtsavewrap-'+uidKey);
+      var cancelBtn = document.getElementById('evtcancelbtn-'+uidKey);
+      if (inp) inp.disabled = false;
+      if (btnWrap) { btnWrap.classList.remove('flex'); btnWrap.classList.add('hidden'); }
+      if (saveWrap) { saveWrap.classList.remove('hidden'); saveWrap.classList.add('flex'); }
+      if (cancelBtn) { cancelBtn.classList.remove('hidden'); cancelBtn.classList.add('block'); }
+    }
+    function cancelEditAttendance(uidKey) {
+      var inp = document.getElementById('evttime-'+uidKey);
+      var btnWrap = document.getElementById('evtbtnwrap-'+uidKey);
+      var saveWrap = document.getElementById('evtsavewrap-'+uidKey);
+      var cancelBtn = document.getElementById('evtcancelbtn-'+uidKey);
+      if (inp) {
+        inp.value = inp.getAttribute('data-original') || '';
+        inp.disabled = true;
+      }
+      if (btnWrap) { btnWrap.classList.remove('hidden'); btnWrap.classList.add('flex'); }
+      if (saveWrap) { saveWrap.classList.remove('flex'); saveWrap.classList.add('hidden'); }
+      if (cancelBtn) { cancelBtn.classList.remove('block'); cancelBtn.classList.add('hidden'); }
+    }
+    function cancelAttendanceRow(eventId, userId, date, uidKey) {
+      showConfirm(
+        'Batalkan Kehadiran',
+        'Apakah Anda yakin ingin membatalkan kehadiran untuk guru ini?',
+        function(){
+          var token = localStorage.getItem('auth_token');
+          var modalBtn = document.getElementById('confirmModalBtn');
+          var cancelBtn = document.getElementById('evtcancelattbtn-'+uidKey);
+          var cancelBtnOriginalText = cancelBtn ? cancelBtn.innerHTML : '';
+          if(modalBtn) { modalBtn.disabled = true; modalBtn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Memproses...'; }
+          if(cancelBtn) { cancelBtn.disabled = true; cancelBtn.innerHTML = '<svg class="animate-spin h-4 w-4 text-rose-500 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>'; }
+          google.script.run
+            .withSuccessHandler(function(res){
+              if(modalBtn) { modalBtn.disabled = false; modalBtn.innerHTML = 'Ya, Lanjutkan'; }
+              if(cancelBtn) { cancelBtn.disabled = false; cancelBtn.innerHTML = cancelBtnOriginalText; }
+              if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal membatalkan.','error'); return; }
+              var statusEl = document.getElementById('evtstatus-'+uidKey);
+              if (statusEl) statusEl.innerHTML = '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-500/20">Belum Hadir</span>';
+              var inp = document.getElementById('evttime-'+uidKey);
+              if (inp) {
+                inp.value = '';
+                inp.setAttribute('data-original', '');
+                inp.disabled = false;
+              }
+              var btnWrap = document.getElementById('evtbtnwrap-'+uidKey);
+              var saveWrap = document.getElementById('evtsavewrap-'+uidKey);
+              var editCancelBtn = document.getElementById('evtcancelbtn-'+uidKey);
+              if (btnWrap) { btnWrap.classList.remove('flex'); btnWrap.classList.add('hidden'); }
+              if (saveWrap) { saveWrap.classList.remove('hidden'); saveWrap.classList.add('flex'); }
+              if (editCancelBtn) { editCancelBtn.classList.remove('block'); editCancelBtn.classList.add('hidden'); }
+              showToast('Kehadiran dibatalkan.','success');
+            })
+            .withFailureHandler(function(err){
+              if(modalBtn) { modalBtn.disabled = false; modalBtn.innerHTML = 'Ya, Lanjutkan'; }
+              if(cancelBtn) { cancelBtn.disabled = false; cancelBtn.innerHTML = cancelBtnOriginalText; }
+              showToast(String(err),'error');
+            })
+            .saveEventAttendance(token, {event_id:eventId, user_id:userId, date:date, time_in:''});
+        }
+      );
+    }
+    function saveAttendanceRow(eventId, userId, date, uidKey) {
+      var token   = localStorage.getItem('auth_token');
+      var inp     = document.getElementById('evttime-'+uidKey);
+      var timeIn  = (inp||{}).value||'';
+      var HH_MM   = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (timeIn === '') {
+        showToast('Input Jam Masuk terlebih dahulu', 'error');
+        return;
+      }
+      if (timeIn !== '' && !HH_MM.test(timeIn)) { showToast('Format jam masuk tidak valid (gunakan HH:mm).','error'); return; }
+      // Validasi: jam masuk tidak boleh kurang dari jam mulai acara
+      var timeStart = (inp && inp.getAttribute('data-timestart')) || _evtAttCurrentTimeStart || '';
+      if (timeStart && HH_MM.test(timeStart) && timeIn < timeStart) {
+        showToast('Jam Masuk tidak boleh kurang dari jam mulai acara (' + timeStart + ').', 'error');
+        return;
+      }
+      // Validasi: jam masuk tidak boleh melebihi jam selesai acara
+      var timeEnd = (inp && inp.getAttribute('data-timeend')) || _evtAttCurrentTimeEnd || '';
+      if (timeEnd && HH_MM.test(timeEnd) && timeIn >= timeEnd) {
+        showToast('Jam Masuk tidak boleh melebihi jam selesai acara (' + timeEnd + ').', 'error');
+        return;
+      }
+      var saveWrap = document.getElementById('evtsavewrap-'+uidKey);
+      var btnSave = saveWrap ? saveWrap.querySelector('button[onclick^="saveAttendanceRow"]') : null;
+      var btnSaveOriginalText = 'Simpan';
+      if (btnSave) {
+        btnSaveOriginalText = btnSave.innerHTML;
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Menyimpan...';
+      }
+      function restoreSaveBtn() {
+        if (btnSave) {
+          btnSave.disabled = false;
+          btnSave.innerHTML = btnSaveOriginalText;
+        }
+      }
+      google.script.run
+        .withSuccessHandler(function(res){
+          restoreSaveBtn();
+          if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal menyimpan.','error'); return; }
+          var statusEl = document.getElementById('evtstatus-'+uidKey);
+          var inp = document.getElementById('evttime-'+uidKey);
+          var btnWrap = document.getElementById('evtbtnwrap-'+uidKey);
+          var cancelBtn = document.getElementById('evtcancelbtn-'+uidKey);
+          if (statusEl) {
+            if (timeIn === '') {
+              statusEl.innerHTML = '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-500/20">Belum Hadir</span>';
+              if (inp) {
+                inp.disabled = false;
+                inp.setAttribute('data-original', '');
+              }
+              if (btnWrap) { btnWrap.classList.remove('flex'); btnWrap.classList.add('hidden'); }
+              if (saveWrap) { saveWrap.classList.remove('hidden'); saveWrap.classList.add('flex'); }
+              if (cancelBtn) { cancelBtn.classList.remove('block'); cancelBtn.classList.add('hidden'); }
+            } else {
+              statusEl.innerHTML = '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">Hadir &ndash; Belum Isi Jurnal</span>';
+              if (inp) {
+                inp.disabled = true;
+                inp.setAttribute('data-original', timeIn);
+              }
+              if (btnWrap) { btnWrap.classList.remove('hidden'); btnWrap.classList.add('flex'); }
+              if (saveWrap) { saveWrap.classList.remove('flex'); saveWrap.classList.add('hidden'); }
+              if (cancelBtn) { cancelBtn.classList.remove('hidden'); cancelBtn.classList.add('block'); }
+            }
+          }
+          showToast('Kehadiran tersimpan.','success');
+        })
+        .withFailureHandler(function(err){ restoreSaveBtn(); showToast((err&&err.message)||String(err),'error'); })
+        .saveEventAttendance(token, {event_id:eventId, user_id:userId, date:date, time_in:timeIn});
+    }
+    function initEventJournalPage() {
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      if (role !== 'guru') {
+        showToast('Akses Ditolak: Halaman ini hanya untuk Guru.', 'error');
+        handleNav('Page_Dashboard');
+        return;
+      }
+      var token  = localStorage.getItem('auth_token');
+      var listEl = document.getElementById('evtJournalList');
+      if (!listEl) return;
+      var now = new Date();
+      var monthSel = document.getElementById('evtHistMonth');
+      var yearInp  = document.getElementById('evtHistYear');
+      if (monthSel) monthSel.value = now.getMonth() + 1;
+      if (yearInp)  yearInp.value  = now.getFullYear();
+      listEl.innerHTML = '<div class="p-4 space-y-3">'+
+        '<div class="h-20 bg-slate-200 rounded-xl animate-pulse"></div>'+
+        '<div class="h-20 bg-slate-200 rounded-xl animate-pulse"></div></div>';
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res||res.status!=='success'){
+            var msg = (res&&res.message)||'Gagal memuat.';
+            showToast(msg, 'error');
+            if (msg.indexOf('Akses Ditolak') !== -1 || msg.indexOf('Unauthorized') !== -1 ||
+                msg.indexOf('Sesi habis') !== -1) {
+              handleNav('Page_Dashboard');
+            } else {
+              listEl.innerHTML = '<div class="p-6 text-red-500 text-sm">' + escapeHtml(msg) + '</div>';
+            }
+            return;
+          }
+          renderEvtJournalList(res.items||[]);
+        })
+        .withFailureHandler(function(err){ showToast(String(err),'error'); })
+        .getMyPendingJournals(token);
+      renderEventHistorySection(now.getMonth() + 1, now.getFullYear());
+    }
+    function renderEvtJournalList(items) {
+      var listEl = document.getElementById('evtJournalList');
+      if (!listEl) return;
+      if (!items.length) {
+        listEl.innerHTML = '<div class="bg-white rounded-2xl border border-slate-100 p-10 text-center shadow-sm"><div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div><h3 class="text-lg font-bold text-slate-800 mb-1">Semua Jurnal Telah Terisi</h3><p class="text-slate-500 text-sm">Tidak ada jurnal kehadiran yang perlu Anda lengkapi hari ini.</p></div>';
+        return;
+      }
+      var html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+      html += items.map(function(item){
+        var aid = escapeHtml(String(item.attendance_id||''));
+        var ename = escapeHtml(item.event_name||'-');
+        var evtDate = item.date || '';
+        var isToday = false;
+        var dateFormatted = '-';
+        if (evtDate) {
+          var dParts = evtDate.split('-'); // YYYY-MM-DD
+          if(dParts.length === 3) {
+            var dObj = new Date(dParts[0], parseInt(dParts[1],10)-1, dParts[2]);
+            var now = new Date();
+            if (dObj.getDate() === now.getDate() && dObj.getMonth() === now.getMonth() && dObj.getFullYear() === now.getFullYear()) {
+              isToday = true;
+            }
+            dateFormatted = dParts[2] + '/' + dParts[1] + '/' + dParts[0];
+          }
+        }
+        var btnClass = isToday 
+          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm hover:shadow'
+          : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed';
+        var btnTitle = isToday ? 'Isi Jurnal Sekarang' : 'Hanya bisa diinput pada hari H';
+        var btnOnClick = isToday ? 'onclick="openEvtJournalModal(\''+aid+'\',\''+ename+'\', \''+dateFormatted+'\')"' : 'disabled';
+        var btnText = isToday ? 'Isi Jurnal Sekarang' : 'Ditutup';
+        return '<div class="group bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-between gap-4 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-300 transform hover:-translate-y-1">' +
+          '<div class="flex items-start gap-4">' +
+            '<div class="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0 group-hover:scale-110 transition-transform"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></div>' +
+            '<div><p class="font-bold text-slate-800 text-base leading-tight mb-1">'+ename+'</p>' +
+            '<div class="flex flex-col gap-1 mt-2">' +
+              '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold border border-slate-100"><svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>Tanggal: '+escapeHtml(dateFormatted)+'</span>' +
+              '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold border border-slate-100"><svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Jam masuk: '+escapeHtml(item.time_in||'-')+'</span>' +
+            '</div></div>' +
+          '</div>' +
+          '<div class="pt-3 border-t border-slate-100"><button '+btnOnClick+' title="'+btnTitle+'" ' +
+          'class="w-full text-sm font-bold px-4 py-2.5 rounded-xl transition-all '+btnClass+'">'+btnText+'</button></div>' +
+          '</div>';
+      }).join('');
+      html += '</div>';
+      listEl.innerHTML = html;
+    }
+    function openEvtJournalModal(attendanceId, eventName, dateStr) {
+      var modal = document.getElementById('evtJournalModal');
+      if (!modal) return;
+      var enEl = document.getElementById('evtJrnEventName');
+      var dateEl = document.getElementById('evtJrnDateDisplay');
+      var descEl = document.getElementById('evtJrnDesc');
+      var aidEl  = document.getElementById('evtJrnAttendanceId');
+      var cntEl  = document.getElementById('evtJrnCharCount');
+      if (enEl)   enEl.value  = eventName||'';
+      if (dateEl) dateEl.value = dateStr||'';
+      if (descEl) descEl.value = '';
+      if (aidEl)  aidEl.value = attendanceId||'';
+      if (cntEl)  cntEl.textContent = '0';
+      modal.classList.remove('hidden');
+    }
+    function closeEvtJournalModal() {
+      var modal = document.getElementById('evtJournalModal');
+      if (modal) modal.classList.add('hidden');
+    }
+    function submitEvtJournal() {
+      var token = localStorage.getItem('auth_token');
+      var aid  = ((document.getElementById('evtJrnAttendanceId')||{}).value||'').trim();
+      var desc = ((document.getElementById('evtJrnDesc')||{}).value||'').trim();
+      if (!desc)       { showToast('Deskripsi jurnal tidak boleh kosong.','error'); return; }
+      if (desc.length>1000){ showToast('Deskripsi jurnal tidak boleh melebihi 1000 karakter.','error'); return; }
+      var btn = document.getElementById('submitEvtJournalBtn');
+      var btnOriginalText = btn ? btn.innerHTML : 'Simpan Jurnal';
+      if(btn) { btn.disabled = true; btn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Menyimpan...'; }
+      google.script.run
+        .withSuccessHandler(function(res){
+          if(btn) { btn.disabled = false; btn.innerHTML = btnOriginalText; }
+          if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal menyimpan.','error'); return; }
+          closeEvtJournalModal();
+          showToast('Jurnal berhasil disimpan.','success');
+          initEventJournalPage();
+        })
+        .withFailureHandler(function(err){ 
+          if(btn) { btn.disabled = false; btn.innerHTML = btnOriginalText; }
+          showToast((err&&err.message)||String(err),'error'); 
+        })
+        .saveEventJournal(token, {attendance_id:aid, description:desc});
+    }
+    function renderEventHistorySection(month, year) {
+      var token  = localStorage.getItem('auth_token');
+      var tbodyId = 'evtHistoryTableBody';
+      var tbody  = document.getElementById(tbodyId);
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="5" class="py-12 text-center"><div class="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto"></div></td></tr>';
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal memuat riwayat acara.','error'); return; }
+          var hist = res.history||[];
+          if (!hist.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="py-12 text-center text-slate-400 text-sm italic">Tidak ada riwayat kehadiran acara pada periode ini.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = hist.map(function(h){
+            var jsBadge = h.journal_status==='Sudah Diisi'
+              ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">Sudah Diisi</span>'
+              : '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">Belum Diisi</span>';
+            return '<tr class="hover:bg-indigo-50/40 transition-colors duration-200">' +
+              '<td class="py-4 px-5 font-bold text-slate-800 text-sm">'+escapeHtml(h.event_name||'-')+'</td>' +
+              '<td class="py-4 px-5 text-center font-medium text-slate-600 text-sm">'+escapeHtml(h.date||'-')+'</td>' +
+              '<td class="py-4 px-5 text-center text-sm font-medium"><span class="inline-flex items-center px-2 py-1 rounded-md bg-slate-50 text-slate-700 border border-slate-100">'+escapeHtml(h.time_in||'-')+'</span></td>' +
+              '<td class="py-4 px-5 text-center">'+jsBadge+'</td>' +
+              '<td class="py-4 px-5 text-center font-extrabold text-indigo-600">'+escapeHtml(String(h.jtm_val||0))+'</td></tr>';
+          }).join('');
+        })
+        .withFailureHandler(function(err){ showToast(String(err),'error'); })
+        .getEventAttendanceHistory(token, month, year);
+    }
+    function initEventJournalHistoryPage() {
+      var now = new Date();
+      var monthSelect = document.getElementById('evtJrnHistMonth');
+      var yearInput = document.getElementById('evtJrnHistYear');
+      if (monthSelect) monthSelect.value = now.getMonth() + 1;
+      if (yearInput) yearInput.value = now.getFullYear();
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      var thGuruName = document.getElementById('th-guru-name');
+      if (thGuruName) {
+        if (role === 'admin') {
+          thGuruName.classList.remove('hidden');
+        } else {
+          thGuruName.classList.add('hidden');
+        }
+      }
+      renderEventJournalHistorySection(now.getMonth() + 1, now.getFullYear());
+    }
+    function renderEventJournalHistorySection(month, year) {
+      var token = localStorage.getItem('auth_token');
+      var tbodyId = 'evtJrnHistoryTableBody';
+      var tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      var colspan = role === 'admin' ? 6 : 5;
+      tbody.innerHTML = '<tr><td colspan="' + colspan + '" class="py-16 text-center"><div class="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full mx-auto"></div></td></tr>';
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res||res.status!=='success'){ showToast((res&&res.message)||'Gagal memuat riwayat jurnal.','error'); return; }
+          var hist = res.history||[];
+          if (!hist.length) {
+            tbody.innerHTML = '<tr><td colspan="' + colspan + '" class="py-16 text-center text-slate-400 text-sm italic">Tidak ada riwayat jurnal acara pada periode ini.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = hist.map(function(h){
+            var dateObj = new Date(h.timestamp);
+            var submitTime = dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'}) + ' WIB';
+            var safeDesc = escapeHtml(h.description || '');
+            var payloadJson = JSON.stringify({
+              eventName: h.event_name,
+              eventDate: h.date,
+              userName: h.user_name,
+              submitTime: submitTime,
+              description: h.description
+            });
+            var payload = encodeURIComponent(payloadJson);
+            var rowHtml = '<tr class="group hover:bg-slate-50/70 transition-all duration-200">' +
+              '<td class="py-5 px-6 font-bold text-slate-800 text-sm align-top">' +
+                '<div class="flex items-center gap-2">' +
+                  '<div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>' +
+                  escapeHtml(h.date||'-') +
+                '</div>' +
+              '</td>' +
+              '<td class="py-5 px-6 text-sm text-slate-700 align-top font-bold">' + escapeHtml(h.event_name||'-') + '</td>';
+            if (role === 'admin') {
+              rowHtml += '<td class="py-5 px-6 text-sm text-slate-600 font-medium align-top">' + escapeHtml(h.user_name||'-') + '</td>';
+            }
+            rowHtml += '<td class="py-5 px-6 text-sm text-slate-500 align-top max-w-xs">' +
+                '<div class="line-clamp-2 leading-relaxed">' + safeDesc + '</div>' +
+              '</td>' +
+              '<td class="py-5 px-6 text-center text-xs font-medium text-slate-500 align-top whitespace-nowrap">' +
+                '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 font-semibold">' +
+                  '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+                  submitTime +
+                '</span>' +
+              '</td>' +
+              '<td class="py-5 px-6 text-center align-top">' +
+                '<button onclick="openEventJournalDetailModal(this)" data-payload="' + payload + '" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-700 rounded-xl transition-colors focus:outline-none">' +
+                  'Lihat Detail' +
+                  '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>' +
+                '</button>' +
+              '</td>' +
+            '</tr>';
+            return rowHtml;
+          }).join('');
+        })
+        .withFailureHandler(function(err){ showToast(String(err),'error'); })
+        .getEventJournalHistory(token, month, year);
+    }
+    function openEventJournalDetailModal(btn) {
+      var rawPayload = btn.getAttribute('data-payload');
+      if (!rawPayload) return;
+      var data = JSON.parse(decodeURIComponent(rawPayload));
+      document.getElementById('dtlEventName').textContent = data.eventName || '-';
+      document.getElementById('dtlEventDate').textContent = data.eventDate || '-';
+      var role = String(localStorage.getItem('user_role') || '').toLowerCase();
+      var guruNameContainer = document.getElementById('dtlGuruNameContainer');
+      if (guruNameContainer) {
+        if (role === 'admin') {
+          guruNameContainer.classList.remove('hidden');
+          document.getElementById('dtlGuruName').textContent = data.userName || '-';
+        } else {
+          guruNameContainer.classList.add('hidden');
+        }
+      }
+      document.getElementById('dtlSubmitTime').innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' + (data.submitTime || '-');
+      document.getElementById('dtlDescription').textContent = data.description || '-';
+      var modal = document.getElementById('evtJournalDetailModal');
+      var backdrop = document.getElementById('evtJournalDetailBackdrop');
+      var panel = document.getElementById('evtJournalDetailPanel');
+      modal.classList.remove('hidden');
+      void modal.offsetWidth; // trigger reflow
+      backdrop.classList.remove('opacity-0');
+      backdrop.classList.add('opacity-100');
+      panel.classList.remove('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+      panel.classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+    }
+    function closeEventJournalDetailModal() {
+      var modal = document.getElementById('evtJournalDetailModal');
+      var backdrop = document.getElementById('evtJournalDetailBackdrop');
+      var panel = document.getElementById('evtJournalDetailPanel');
+      backdrop.classList.remove('opacity-100');
+      backdrop.classList.add('opacity-0');
+      panel.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+      panel.classList.add('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+      setTimeout(function() {
+        modal.classList.add('hidden');
+      }, 300);
+    }
+    function _updateTransportEventInfo(containerId, eventDaysCount, regularDays) {
+      var el = document.getElementById(containerId);
+      if (!el || eventDaysCount===undefined) return;
+      var total = (regularDays||0) + (eventDaysCount||0);
+      el.title = (regularDays||0)+' hari reguler + '+(eventDaysCount||0)+' hari acara = '+total+' hari unik';
+    }
+    (function() {
+      function _attachCollapsedTooltips() {
+        var sidebar = document.getElementById('sidebar');
+        if (!sidebar || sidebar._tipListenersAdded) return;
+        sidebar._tipListenersAdded = true;
+        sidebar.addEventListener('mouseenter', function(e) {
+          if (!sidebar.classList.contains('sidebar-collapsed')) return;
+          var item = e.target && e.target.closest ? e.target.closest('.nav-item') : null;
+          if (!item) return;
+          var rect = item.getBoundingClientRect();
+          _showSidebarTooltip(item.getAttribute('data-tooltip'), rect.top + rect.height / 2);
+        }, true);
+        sidebar.addEventListener('mouseleave', function(e) {
+          if (!sidebar.classList.contains('sidebar-collapsed')) return;
+          var item = e.target && e.target.closest ? e.target.closest('.nav-item') : null;
+          if (item) _hideSidebarTooltip();
+        }, true);
+        sidebar.addEventListener('mouseleave', function() {
+          _hideSidebarTooltip();
+        }, false);
+      }
+      var _tipEl = null;
+      function _getSidebarTip() {
+        if (!_tipEl) {
+          _tipEl = document.createElement('div');
+          _tipEl.id = 'sidebarCollapsedTip';
+          _tipEl.style.cssText = [
+            'position:fixed',
+            'left:4.75rem',
+            'background:#1E293B',
+            'color:#E2E8F0',
+            'font-size:0.72rem',
+            'font-weight:600',
+            'white-space:nowrap',
+            'padding:5px 10px',
+            'border-radius:7px',
+            'pointer-events:none',
+            'opacity:0',
+            'z-index:9999',
+            'box-shadow:0 4px 12px rgba(0,0,0,0.25)',
+            'transition:opacity 0.15s ease',
+            'transform:translateY(-50%)'
+          ].join(';');
+          document.body.appendChild(_tipEl);
+        }
+        return _tipEl;
+      }
+      function _showSidebarTooltip(text, midY) {
+        if (!text) return;
+        var tip = _getSidebarTip();
+        tip.textContent = text;
+        tip.style.top = midY + 'px';
+        tip.style.opacity = '1';
+      }
+      function _hideSidebarTooltip() {
+        var tip = _getSidebarTip();
+        tip.style.opacity = '0';
+      }
+      window._hideSidebarTooltip = _hideSidebarTooltip;
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _attachCollapsedTooltips);
+      } else {
+        _attachCollapsedTooltips();
+      }
+      var _origInitSidebarState = window.initSidebarState;
+      window.initSidebarState = function() {
+        if (typeof _origInitSidebarState === 'function') _origInitSidebarState();
+        _attachCollapsedTooltips();
+      };
+    })();
+</script>
