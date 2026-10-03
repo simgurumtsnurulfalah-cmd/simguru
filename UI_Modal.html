@@ -1,0 +1,1925 @@
+<!-- Modal Manajemen Piket Dashboard Admin -->
+<div id="adminPicketModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(15,23,42,0.65); backdrop-filter:blur(4px);">
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh; animation: apm-pop 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards;">
+    <!-- Header modal -->
+    <div class="bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 px-5 py-4 flex-shrink-0">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 border border-white/30">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-white font-extrabold text-base leading-tight" id="apmModalTitle">Manajemen Piket</h3>
+            <p class="text-amber-100 text-xs mt-0.5" id="apmModalSubtitle">Guru Piket Hari Ini</p>
+          </div>
+        </div>
+        <button onclick="closeAdminPicketModal()" class="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition border border-white/20 flex-shrink-0" aria-label="Tutup">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Info guru (sticky top inside body) -->
+    <div class="flex-shrink-0 px-5 pt-4 pb-3 border-b border-slate-100 bg-slate-50/60">
+      <div class="flex items-center gap-3">
+        <div id="apmGuruAvatar" class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 font-extrabold text-base flex-shrink-0 border-2 border-amber-200">?</div>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-slate-800 text-sm truncate" id="apmGuruName">—</p>
+          <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+            <span id="apmRoleBadge" class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>Guru Piket
+            </span>
+            <span id="apmConfirmBadge" class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" id="apmConfirmDot"></span>
+              <span id="apmConfirmText">Belum Dikonfirmasi</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Konten scroll -->
+    <div class="overflow-y-auto flex-1 custom-scrollbar">
+      <!-- SECTION 1: Konfirmasi Kehadiran -->
+      <div class="px-5 pt-4 pb-3 border-b border-slate-100" id="apmSectionKonfirmasi">
+        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">① Konfirmasi Kehadiran Piket</p>
+        <div class="flex items-center gap-3">
+          <div class="flex-1">
+            <p class="text-sm text-slate-600 leading-relaxed">Konfirmasi kehadiran guru piket untuk hari ini. Setelah dikonfirmasi, JTM piket (4 JTM) akan masuk ke sistem honorarium.</p>
+          </div>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button id="apmBtnKonfirmasi" onclick="apmDoKonfirmasi()"
+            class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            Konfirmasi Hadir
+          </button>
+          <button id="apmBtnBatalKonfirmasi" onclick="apmDoRevokeKonfirmasi()"
+            class="hidden flex-1 items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-sm font-bold transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            Batalkan Konfirmasi
+          </button>
+        </div>
+      </div>
+
+      <!-- SECTION 2: Tunjuk Pengganti -->
+      <div class="px-5 pt-4 pb-3 border-b border-slate-100" id="apmSectionPengganti">
+        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">② Tunjuk Guru Piket Pengganti</p>
+        <div id="apmSubstInfo" class="hidden mb-3 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-7 h-7 rounded-lg bg-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-xs flex-shrink-0" id="apmSubstAvatar">?</div>
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-indigo-800 truncate" id="apmSubstName">—</p>
+                <p class="text-[10px] text-indigo-500">Pengganti aktif</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span id="apmSubstConfirmBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">Belum Konfirmasi</span>
+            </div>
+          </div>
+        </div>
+        <div id="apmSubstForm" class="space-y-2">
+          <div class="relative">
+            <select id="apmSubstSelect"
+              class="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 font-medium focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition cursor-pointer">
+              <option value="">— Pilih Guru Pengganti —</option>
+            </select>
+            <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+              <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <button id="apmBtnTunjukPengganti" onclick="apmDoTunjukPengganti()"
+            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+            Tunjuk Sebagai Pengganti
+          </button>
+        </div>
+      </div>
+
+      <!-- SECTION 3: Input Jam Masuk & Pulang -->
+      <div class="px-5 pt-4 pb-5">
+        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">③ Input Jam Masuk &amp; Pulang Riil</p>
+        <p class="text-xs text-slate-500 mb-3 leading-relaxed">Input jam kehadiran aktual guru piket / pengganti. Data ini digunakan untuk perhitungan tunjangan transportasi.</p>
+
+        <!-- Jam piket asli -->
+        <div id="apmJamOrigSection" class="mb-4">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3 h-3 text-amber-700" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+            </div>
+            <p class="text-xs font-bold text-slate-700" id="apmJamOrigLabel">Guru Piket Asli</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Masuk</label>
+              <div class="relative">
+                <input type="time" id="apmTimeInOrig"
+                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition">
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Pulang</label>
+              <div class="relative">
+                <input type="time" id="apmTimeOutOrig"
+                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition">
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+          </div>
+          <button onclick="apmDoSaveTimeOrig()"
+            class="mt-2.5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+            id="apmBtnSaveTimeOrig">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+            Simpan Jam Piket Asli
+          </button>
+        </div>
+
+        <!-- Jam piket pengganti (muncul hanya jika ada pengganti) -->
+        <div id="apmJamSubstSection" class="hidden">
+          <div class="border-t border-dashed border-slate-200 pt-4 mb-3"></div>
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-3 h-3 text-indigo-700" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+            </div>
+            <p class="text-xs font-bold text-slate-700" id="apmJamSubstLabel">Guru Piket Pengganti</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Masuk</label>
+              <div class="relative">
+                <input type="time" id="apmTimeInSubst"
+                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition">
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Pulang</label>
+              <div class="relative">
+                <input type="time" id="apmTimeOutSubst"
+                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition">
+                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+            </div>
+          </div>
+          <button onclick="apmDoSaveTimeSubst()"
+            class="mt-2.5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+            id="apmBtnSaveTimeSubst">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+            Simpan Jam Pengganti
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex-shrink-0 px-5 py-3.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
+      <button onclick="closeAdminPicketModal()"
+        class="px-5 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-100 transition active:scale-95">
+        Tutup
+      </button>
+    </div>
+  </div>
+</div>
+<!-- END Modal Manajemen Piket Dashboard Admin -->
+
+<!-- Student Attendance Input Modal -->
+<div id="studentAttendanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,0.6);">
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
+    <div class="bg-gradient-to-r from-teal-600 to-emerald-600 px-5 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+          </div>
+          <div>
+            <h3 class="text-white font-bold text-base" id="saModalTitle">Input Absensi Siswa</h3>
+            <p class="text-teal-100 text-xs">Rekap kehadiran hari ini</p>
+          </div>
+        </div>
+        <button onclick="closeStudentAttendanceModal()" class="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="p-5 space-y-3">
+      <input type="hidden" id="saInpClassName">
+      <input type="hidden" id="saInpStdSiswa" value="">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
+          <label class="block text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-2">Hadir</label>
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="adjustSaInput('saInpHadir',-1)" class="w-7 h-7 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-lg flex items-center justify-center hover:bg-emerald-100 transition flex-shrink-0">-</button>
+            <input type="number" id="saInpHadir" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-emerald-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-emerald-400 outline-none">
+            <button type="button" onclick="adjustSaInput('saInpHadir',1)" class="w-7 h-7 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-lg flex items-center justify-center hover:bg-emerald-100 transition flex-shrink-0">+</button>
+          </div>
+        </div>
+        <div class="bg-amber-50 rounded-xl p-3 border border-amber-200">
+          <label class="block text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-2">Sakit</label>
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="adjustSaInput('saInpSakit',-1)" class="w-7 h-7 rounded-lg bg-white border border-amber-300 text-amber-700 font-bold text-lg flex items-center justify-center hover:bg-amber-100 transition flex-shrink-0">-</button>
+            <input type="number" id="saInpSakit" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-amber-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
+            <button type="button" onclick="adjustSaInput('saInpSakit',1)" class="w-7 h-7 rounded-lg bg-white border border-amber-300 text-amber-700 font-bold text-lg flex items-center justify-center hover:bg-amber-100 transition flex-shrink-0">+</button>
+          </div>
+        </div>
+        <div class="bg-blue-50 rounded-xl p-3 border border-blue-200">
+          <label class="block text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-2">Izin</label>
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="adjustSaInput('saInpIzin',-1)" class="w-7 h-7 rounded-lg bg-white border border-blue-300 text-blue-700 font-bold text-lg flex items-center justify-center hover:bg-blue-100 transition flex-shrink-0">-</button>
+            <input type="number" id="saInpIzin" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-blue-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
+            <button type="button" onclick="adjustSaInput('saInpIzin',1)" class="w-7 h-7 rounded-lg bg-white border border-blue-300 text-blue-700 font-bold text-lg flex items-center justify-center hover:bg-blue-100 transition flex-shrink-0">+</button>
+          </div>
+        </div>
+        <div class="bg-red-50 rounded-xl p-3 border border-red-200">
+          <label class="block text-[11px] font-bold text-red-700 uppercase tracking-wider mb-2">Alpa</label>
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="adjustSaInput('saInpAlpa',-1)" class="w-7 h-7 rounded-lg bg-white border border-red-300 text-red-700 font-bold text-lg flex items-center justify-center hover:bg-red-100 transition flex-shrink-0">-</button>
+            <input type="number" id="saInpAlpa" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-red-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-red-400 outline-none">
+            <button type="button" onclick="adjustSaInput('saInpAlpa',1)" class="w-7 h-7 rounded-lg bg-white border border-red-300 text-red-700 font-bold text-lg flex items-center justify-center hover:bg-red-100 transition flex-shrink-0">+</button>
+          </div>
+        </div>
+      </div>
+      <div id="saTotalDisplay" class="flex items-center justify-between rounded-xl px-4 py-2.5 border transition-colors duration-200 bg-slate-50 border-slate-200">
+        <div class="flex flex-col">
+          <span class="text-xs font-semibold text-slate-500">Total Siswa</span>
+          <span id="saTotalHint" class="text-[11px] text-slate-400 hidden"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-mono font-bold text-slate-800 text-base" id="saTotalCount">0</span>
+          <span id="saTotalStdBadge" class="hidden text-[11px] font-semibold px-2 py-0.5 rounded-full"></span>
+        </div>
+      </div>
+    </div>
+    <div class="px-5 pb-5 flex gap-3">
+      <button type="button" onclick="closeStudentAttendanceModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition">Batal</button>
+      <button type="button" id="btnSaveStudentAttendance" onclick="submitStudentAttendance()" class="flex-1 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">Simpan</button>
+    </div>
+  </div>
+</div>
+<div id="confirmModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+    <div class="fixed inset-0 transition-opacity backdrop-blur-sm" style="background:rgba(15,23,42,0.55);" aria-hidden="true" onclick="closeConfirmModal()"></div>
+    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+    <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md w-full">
+      <div class="px-6 pt-6 pb-3 flex items-start gap-4">
+        <div id="confirmIconWrap" class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <svg id="confirmIconSvg" class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-extrabold text-slate-900 leading-tight" id="confirmTitle">Konfirmasi</h3>
+          <div class="text-sm text-slate-500 mt-1.5 leading-relaxed" id="confirmMessage">...</div>
+        </div>
+        <button type="button" onclick="closeConfirmModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="bg-slate-50 px-5 py-4 sm:flex sm:flex-row-reverse gap-2 border-t border-slate-100">
+        <button type="button" onclick="executeConfirm(); return false;"
+          class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-transparent shadow-sm px-5 py-2.5 bg-blue-600 text-sm font-bold text-white hover:bg-blue-700 sm:ml-3 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+          Ya, Lanjutkan
+        </button>
+        <button type="button" onclick="closeConfirmModal(); return false;"
+          class="mt-3 w-full sm:w-auto sm:mt-0 inline-flex justify-center rounded-xl border border-slate-200 shadow-sm px-5 py-2.5 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-slate-300">
+          Batal
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="userModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
+    <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          </div>
+          <div>
+            <h3 class="text-white font-bold text-lg" id="titleUserModal">Tambah User</h3>
+            <p class="text-blue-100 text-xs">Kelola data akun pengguna</p>
+          </div>
+        </div>
+      </div>
+      <form id="formUser" onsubmit="event.preventDefault(); submitUser();" class="p-6 space-y-4">
+        <input type="hidden" id="inpUserId">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Lengkap</label>
+          <input type="text" id="inpNamaLengkap" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Masukkan nama lengkap">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIP</label>
+          <input type="text" id="inpNip" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono" placeholder="Nomor Induk Pegawai (opsional)">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Username</label>
+          <input type="text" id="inpUsernameUser" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Username untuk login">
+        </div>
+        <div id="divUserPassword">
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Password</label>
+          <input type="text" id="inpPasswordUser" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono" value="123456">
+          <p class="text-[11px] text-slate-400 mt-1">Password default: 123456 (wajib diganti saat login pertama)</p>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Role</label>
+          <select id="inpRole" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+            <option value="guru">Guru</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jarak ke Sekolah (km)</label>
+          <input type="number" id="inpKmDistance" step="0.01" min="0.01" max="999.99"
+            class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+            placeholder="10.25">
+          <p class="text-[11px] text-slate-400 mt-1">Opsional. Angka positif, maks 2 desimal (0,01–999,99). Kosongkan jika tidak ada tunjangan transportasi.</p>
+          <p id="errKmDistance" class="text-[11px] text-red-500 mt-1 hidden"></p>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeUserModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+          <button type="submit" id="btnSubmitUser" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-200">Simpan Data</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div id="scheduleModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="titleScheduleModal">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeScheduleModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <div class="flex-1 min-w-0 pr-8">
+            <h3 class="text-white font-bold text-lg truncate" id="titleScheduleModal">Jadwal Pelajaran</h3>
+            <p class="text-emerald-100 text-xs">Isi data jadwal mengajar</p>
+          </div>
+          <button type="button" onclick="closeScheduleModal()" aria-label="Tutup"
+            class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/12 hover:bg-white/22 active:scale-95 flex items-center justify-center text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <form id="formSchedule" onsubmit="event.preventDefault(); submitSchedule();" class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+        <input type="hidden" id="inpSchedId">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Hari</label>
+            <select id="inpSchedDay" onchange="_schedCheckLocalConflict()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition">
+              <option value="1">Senin</option><option value="2">Selasa</option><option value="3">Rabu</option>
+              <option value="4">Kamis</option><option value="5">Jumat</option><option value="6">Sabtu</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">JTM</label>
+            <input type="number" id="inpSchedJTM" min="1" max="10" oninput="_schedAutoCalcEnd(); _schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition" placeholder="Mis: 2">
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5" title="Jam Mulai">Mulai</label>
+            <input type="time" id="inpSchedStart" oninput="_schedAutoCalcEnd(); _schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5" title="Waktu Istirahat (Menit)">Istirahat</label>
+            <input type="number" id="inpSchedRestTime" min="0" oninput="_schedAutoCalcEnd(); _schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition" placeholder="Menit">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5" title="Jam Selesai">Selesai</label>
+            <input type="time" id="inpSchedEnd" oninput="_schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition">
+          </div>
+        </div>
+        <div id="schedDurationPreview" class="hidden text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-2">
+          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span id="schedDurationLabel">—</span>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Pengampu</label>
+          <select id="inpSchedTeacher" onchange="_schedCheckLocalConflict()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tahun Pelajaran</label>
+            <input type="text" id="inpSchedTP" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-slate-100 text-slate-500 cursor-not-allowed" placeholder="Cth: 2025/2026" readonly>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Semester</label>
+            <select id="inpSchedSem" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-slate-100 text-slate-500 cursor-not-allowed" disabled>
+              <option value="Ganjil">Ganjil</option>
+              <option value="Genap">Genap</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Kelas</label>
+            <select id="inpSchedClass" onchange="_schedCheckLocalConflict()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mata Pelajaran</label>
+            <select id="inpSchedSubject" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition"></select>
+          </div>
+        </div>
+        <div id="schedConflictWarning" class="hidden text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
+          <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+          <span id="schedConflictMessage">—</span>
+        </div>
+      </form>
+      <div class="px-5 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex gap-3 flex-shrink-0">
+        <button type="button" onclick="closeScheduleModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 active:scale-95 rounded-xl font-semibold text-sm transition">Batal</button>
+        <button type="button" id="btnSaveSchedule" onclick="submitSchedule()"
+          class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 active:scale-95 transition shadow-md shadow-emerald-200 inline-flex items-center justify-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          Simpan Jadwal
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="journalModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);"></div>
+    <div class="relative w-full max-w-lg overflow-hidden flex flex-col" style="background:#fff;border-top-left-radius:24px;border-top-right-radius:24px;border-bottom-left-radius:0;border-bottom-right-radius:0;box-shadow:0 -12px 48px rgba(0,0,0,0.22);max-height:92vh;" id="journalModalSheet">
+      <div style="background:linear-gradient(135deg,#312e81 0%,#4338ca 50%,#4f46e5 100%);padding:18px 22px 16px;position:relative;overflow:hidden;flex-shrink:0;">
+        <div style="position:absolute;top:-30px;right:-30px;width:160px;height:160px;background:rgba(255,255,255,0.05);border-radius:50%;"></div>
+        <div style="position:absolute;bottom:-50px;left:10%;width:220px;height:220px;background:rgba(255,255,255,0.03);border-radius:50%;"></div>
+        <button type="button" onclick="closeJournalModal()" aria-label="Tutup"
+          style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;z-index:2;"
+          onmouseover="this.style.background='rgba(255,255,255,0.22)';"
+          onmouseout="this.style.background='rgba(255,255,255,0.12)';">
+          <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div style="position:relative;z-index:1;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+            <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <h3 id="journalModalTitle" style="color:white;font-weight:800;font-size:17px;font-family:'DM Sans',sans-serif;line-height:1.2;">Laporan Jurnal Mengajar</h3>
+              <p style="color:rgba(199,210,254,0.9);font-size:12px;margin-top:2px;font-family:'DM Sans',sans-serif;word-break:break-word;line-height:1.35;">
+                <span id="txtMapel">Mapel</span> &middot; <span id="txtKelas">Kelas</span>
+              </p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;">
+              <svg width="13" height="13" fill="none" stroke="rgba(199,210,254,0.9)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span id="txtJam" style="color:white;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;">00:00</span>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;">
+              <svg width="13" height="13" fill="none" stroke="rgba(199,210,254,0.9)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <span id="txtJournalJTM" style="color:white;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:700;">0</span>
+              <span style="color:rgba(199,210,254,0.8);font-size:11px;font-family:'DM Sans',sans-serif;">JTM</span>
+            </div>
+            <div id="journalDurationBadge" style="display:none;align-items:center;gap:5px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;">
+              <svg width="13" height="13" fill="none" stroke="rgba(199,210,254,0.9)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <span id="txtJournalDuration" style="color:white;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;">0 mnt</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <form id="formJournal" onsubmit="event.preventDefault(); submitJournal();" style="padding:18px 22px 4px;font-family:'DM Sans',sans-serif;overflow-y:auto;flex:1;">
+        <input type="hidden" id="inpScheduleId">
+        <input type="hidden" id="inpJournalDateHidden">
+        <input type="hidden" id="inpJournalLogId">
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+            <label for="inpMateri" style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;">
+              Materi Pembelajaran <span style="color:#F43F5E;">*</span>
+            </label>
+            <span id="materiCounter" style="font-size:10px;font-weight:600;color:#94A3B8;font-family:'JetBrains Mono',monospace;">0/500</span>
+          </div>
+          <textarea id="inpMateri" dir="auto" rows="3" maxlength="500" oninput="updateMateriCounter()"
+            class="db-modal-textarea"
+            style="width:100%;padding:11px 14px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical;min-height:74px;transition:border-color 0.15s,box-shadow 0.15s;box-sizing:border-box;color:#1E293B;line-height:1.55;"
+            placeholder="Tuliskan materi yang diajarkan hari ini... (Mendukung tulisan Arab &amp; Indonesia)"></textarea>
+          <p id="materiHint" style="display:none;font-size:10.5px;color:#F43F5E;margin-top:4px;font-weight:600;">Materi pembelajaran wajib diisi.</p>
+          <div id="journalEditNotice" style="display:none;margin-top:8px;padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;font-size:11.5px;color:#92400E;font-weight:600;">
+            <svg style="display:inline;vertical-align:-2px;margin-right:4px;" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 20h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.5 0l-7.1 13.25A2 2 0 005 20z"/></svg>
+            Mode Edit: perubahan akan menggantikan jurnal yang sudah ada.
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Siswa Hadir</label>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button type="button" onclick="adjustNumberInput('inpHadir',-1)" tabindex="-1"
+                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#F8FAFC;color:#475569;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s,border-color 0.15s;flex-shrink:0;line-height:1;"
+                onmouseover="this.style.background='#E2E8F0';" onmouseout="this.style.background='#F8FAFC';">−</button>
+              <input type="number" id="inpHadir" min="0" max="200" value="0" inputmode="numeric"
+                style="width:100%;padding:10px 6px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:18px;font-weight:800;color:#059669;text-align:center;font-family:'JetBrains Mono',monospace;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;min-width:0;">
+              <button type="button" onclick="adjustNumberInput('inpHadir',1)" tabindex="-1"
+                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#F0FDF4;color:#059669;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s,border-color 0.15s;flex-shrink:0;line-height:1;"
+                onmouseover="this.style.background='#DCFCE7';" onmouseout="this.style.background='#F0FDF4';">+</button>
+            </div>
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Sakit / Izin / Alfa</label>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button type="button" onclick="adjustNumberInput('inpSakit',-1)" tabindex="-1"
+                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#F8FAFC;color:#475569;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s;flex-shrink:0;line-height:1;"
+                onmouseover="this.style.background='#E2E8F0';" onmouseout="this.style.background='#F8FAFC';">−</button>
+              <input type="number" id="inpSakit" min="0" max="200" value="0" inputmode="numeric"
+                style="width:100%;padding:10px 6px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:18px;font-weight:800;color:#E11D48;text-align:center;font-family:'JetBrains Mono',monospace;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;min-width:0;">
+              <button type="button" onclick="adjustNumberInput('inpSakit',1)" tabindex="-1"
+                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#FFF1F2;color:#E11D48;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s;flex-shrink:0;line-height:1;"
+                onmouseover="this.style.background='#FECDD3';" onmouseout="this.style.background='#FFF1F2';">+</button>
+            </div>
+          </div>
+        </div>
+        <div id="studentExpectedHint" style="display:none;margin-bottom:10px;padding:10px 14px;background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:7px;">
+              <div id="studentExpectedIcon" style="width:28px;height:28px;border-radius:8px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="14" height="14" fill="none" stroke="#2563EB" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
+              </div>
+              <div>
+                <p id="studentExpectedLabel" style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.06em;margin:0;">Standar Kelas</p>
+                <p style="font-size:13px;font-weight:800;color:#1E40AF;font-family:'JetBrains Mono',monospace;margin:0;">
+                  <span id="studentExpected">0</span> siswa
+                </p>
+              </div>
+            </div>
+            <div id="studentExpectedDeltaWrap" style="display:flex;align-items:center;gap:6px;">
+              <span id="studentExpectedDelta" style="font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;"></span>
+            </div>
+          </div>
+          <!-- Progress bar: hadir/absen vs standar -->
+          <div id="studentExpectedProgressWrap" style="display:none;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748B;font-weight:600;margin-bottom:3px;">
+              <span>Terisi: <span id="studentExpectedFilledCount" style="font-family:'JetBrains Mono',monospace;font-weight:800;">0</span></span>
+              <span id="studentExpectedSlotLabel" style="font-weight:700;"></span>
+            </div>
+            <div style="height:6px;border-radius:999px;overflow:hidden;background:#E2E8F0;position:relative;">
+              <div id="studentExpectedProgressBar" style="height:100%;border-radius:999px;transition:width 0.3s ease,background 0.3s;width:0%;background:#3B82F6;"></div>
+            </div>
+          </div>
+        </div>
+        <div id="studentTotalIndicator" style="display:none;margin-bottom:14px;padding:10px 14px;background:#EEF2FF;border:1.5px solid #C7D2FE;border-radius:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#4338CA;font-weight:600;margin-bottom:6px;">
+            <span>Total siswa terisi: <strong id="totalStudents" style="font-weight:800;font-family:'JetBrains Mono',monospace;">0</strong></span>
+            <span id="totalAttendanceRate" style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#1E40AF;">0%</span>
+          </div>
+          <div style="display:flex;height:6px;border-radius:999px;overflow:hidden;background:#E0E7FF;">
+            <span id="totalAttHadirBar" style="background:#10B981;display:block;height:100%;width:0%;transition:width 0.25s ease;"></span>
+            <span id="totalAttAbsenBar" style="background:#F43F5E;display:block;height:100%;width:0%;transition:width 0.25s ease;"></span>
+          </div>
+        </div>
+        <!-- Modal Konfirmasi Mismatch -->
+        <div id="mismatchAlertBox" style="display:none;margin-bottom:12px;border-radius:14px;overflow:hidden;border:2px solid #FEF08A;">
+          <div style="background:linear-gradient(135deg,#FEFCE8,#FEF9C3);padding:12px 14px;">
+            <div style="display:flex;align-items:flex-start;gap:10px;">
+              <div style="width:34px;height:34px;border-radius:10px;background:#FDE047;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
+                <svg width="17" height="17" fill="none" stroke="#713F12" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <p style="font-weight:800;font-size:13px;color:#713F12;margin:0 0 3px;">Jumlah Siswa Tidak Sesuai</p>
+                <p id="mismatchAlertMsg" style="font-size:12px;color:#92400E;margin:0;line-height:1.5;"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
+            <label for="inpCatatan" style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;">
+              Catatan Tambahan <span style="color:#CBD5E1;font-weight:400;">(opsional)</span>
+            </label>
+            <span id="catatanCounter" style="font-size:10px;font-weight:600;color:#94A3B8;font-family:'JetBrains Mono',monospace;">0/200</span>
+          </div>
+          <input type="text" id="inpCatatan" maxlength="200" oninput="updateCatatanCounter()"
+            style="width:100%;padding:11px 14px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;color:#1E293B;transition:border-color 0.15s,box-shadow 0.15s;"
+            placeholder="Catatan kejadian khusus di kelas...">
+        </div>
+        <div id="modalLoading" class="hidden" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;background:#EEF2FF;border-radius:12px;border:1px solid #C7D2FE;">
+            <div style="width:16px;height:16px;border:2.5px solid #4F46E5;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+            <span style="color:#4338CA;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;">Sedang mengirim laporan...</span>
+          </div>
+        </div>
+      </form>
+      <div style="padding:12px 22px 18px;border-top:1px solid #F1F5F9;background:#FAFBFD;flex-shrink:0;display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" onclick="closeJournalModal()"
+          style="flex:1 1 120px;padding:11px;border:1.5px solid #E2E8F0;border-radius:12px;background:#FFFFFF;color:#475569;font-weight:700;font-size:13.5px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;"
+          onmouseover="this.style.background='#F1F5F9';" onmouseout="this.style.background='#FFFFFF';">
+          Batal
+        </button>
+        <button type="button" id="btnSubmitJournal" onclick="submitJournal()"
+          style="flex:1 1 160px;padding:11px;border:none;border-radius:12px;background:linear-gradient(135deg,#4338CA,#4F46E5);color:#fff;font-weight:800;font-size:13.5px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:box-shadow 0.18s, opacity 0.18s;box-shadow:0 4px 12px rgba(79,70,229,0.30);display:flex;align-items:center;justify-content:center;gap:7px;"
+          onmouseover="this.style.boxShadow='0 6px 18px rgba(79,70,229,0.40)';"
+          onmouseout="this.style.boxShadow='0 4px 12px rgba(79,70,229,0.30)';">
+          <svg id="iconSubmitJournal" width="15" height="15" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+          <span id="lblSubmitJournal">Kirim Laporan</span>
+          <span style="font-size:10.5px;opacity:0.75;font-weight:600;display:none;" id="submitShortcutHint">(Ctrl+↵)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  @media (min-width: 640px) {
+    #journalModal #journalModalSheet {
+      border-bottom-left-radius: 24px !important;
+      border-bottom-right-radius: 24px !important;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.22) !important;
+    }
+  }
+</style>
+<div id="viewJournalModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);"></div>
+    <div class="relative w-full max-w-md overflow-hidden" style="background:#fff;border-radius:24px;box-shadow:0 24px 64px rgba(0,0,0,0.22);">
+      <div style="background:linear-gradient(135deg,#0F172A 0%,#1E3A5F 100%);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="17" height="17" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <div style="min-width:0;">
+            <h3 style="color:white;font-weight:800;font-size:15px;font-family:'DM Sans',sans-serif;">Detail Jurnal Mengajar</h3>
+            <p id="viewJournalSubtitle" style="color:rgba(148,163,184,0.85);font-size:11px;font-family:'DM Sans',sans-serif;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Rincian aktivitas pembelajaran</p>
+          </div>
+        </div>
+        <button onclick="closeViewJournalModal()" aria-label="Tutup"
+          style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.08);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;flex-shrink:0;"
+          onmouseover="this.style.background='rgba(255,255,255,0.16)';" onmouseout="this.style.background='rgba(255,255,255,0.08)';">
+          <svg width="16" height="16" fill="none" stroke="rgba(203,213,225,0.9)" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="padding:20px 22px 22px;font-family:'DM Sans',sans-serif;max-height:80vh;overflow-y:auto;">
+        <div id="viewJournalGuruRow" style="display:none;margin-bottom:12px;padding:10px 12px;background:linear-gradient(135deg,#F0F9FF,#E0F2FE);border:1px solid #BAE6FD;border-radius:12px;align-items:center;gap:10px;">
+          <div id="viewJournalGuruAvatar" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4338CA,#6366F1);color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">?</div>
+          <div style="min-width:0;flex:1;">
+            <p style="font-size:9px;font-weight:700;color:#0369A1;text-transform:uppercase;letter-spacing:0.07em;">Diisi oleh</p>
+            <p id="viewJournalGuruName" style="font-weight:700;color:#0C4A6E;font-size:13.5px;word-break:break-word;">—</p>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px;margin-bottom:10px;">
+          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;min-width:0;">
+            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Tanggal</p>
+            <p id="viewJournalDate" style="font-weight:700;color:#1E293B;font-size:13px;line-height:1.3;word-break:break-word;">...</p>
+          </div>
+          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;min-width:0;">
+            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Waktu</p>
+            <p id="viewJournalTime" style="font-weight:700;color:#1E293B;font-size:13px;font-family:'JetBrains Mono',monospace;">...</p>
+          </div>
+          <div style="background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:10px 12px;text-align:center;min-width:0;">
+            <p style="font-size:9px;font-weight:700;color:#818CF8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">JTM</p>
+            <p id="viewJournalJTM" style="font-weight:800;color:#4338CA;font-size:20px;font-family:'JetBrains Mono',monospace;line-height:1.1;">0</p>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF);border:1px solid #C7D2FE;border-radius:12px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:#4F46E5;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          </div>
+          <div style="min-width:0;flex:1;">
+            <p style="font-size:9px;font-weight:700;color:#818CF8;text-transform:uppercase;letter-spacing:0.07em;">Mapel &amp; Kelas</p>
+            <p id="viewJournalClassMapel" style="font-weight:700;color:#312E81;font-size:14px;margin-top:1px;word-break:break-word;">...</p>
+          </div>
+        </div>
+        <div style="background:#FAFBFF;border:1.5px solid #E8EAF0;border-radius:14px;padding:14px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;">
+            <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.07em;display:flex;align-items:center;gap:5px;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+              Materi Pembelajaran
+            </p>
+            <button id="btnCopyMateri" type="button" onclick="copyJournalMateri()" title="Salin materi"
+              style="background:transparent;border:1px solid #DDE1F0;color:#64748B;border-radius:8px;padding:3px 8px;font-size:10.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background 0.15s,color 0.15s,border-color 0.15s;font-family:'DM Sans',sans-serif;"
+              onmouseover="this.style.background='#F1F5F9';this.style.color='#1E293B';"
+              onmouseout="this.style.background='transparent';this.style.color='#64748B';">
+              <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              Salin
+            </button>
+          </div>
+          <p id="viewJournalMateri" dir="auto" style="color:#374151;font-size:13.5px;line-height:1.6;font-weight:500;white-space:pre-wrap;word-break:break-word;">...</p>
+        </div>
+        <div style="background:linear-gradient(135deg,#F8FAFC,#F1F5F9);border:1px solid #E2E8F0;border-radius:14px;padding:12px 14px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:10.5px;color:#64748B;font-weight:700;">
+            <span style="text-transform:uppercase;letter-spacing:0.07em;">Tingkat Kehadiran</span>
+            <span id="viewJournalAttPct" style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#1E293B;">0%</span>
+          </div>
+          <div style="display:flex;height:8px;border-radius:999px;overflow:hidden;background:#E2E8F0;margin-bottom:10px;">
+            <span id="viewJournalAttHadirBar" style="background:linear-gradient(90deg,#10B981,#34D399);display:block;height:100%;width:0%;transition:width 0.4s ease;"></span>
+            <span id="viewJournalAttAbsenBar" style="background:linear-gradient(90deg,#F43F5E,#FB7185);display:block;height:100%;width:0%;transition:width 0.4s ease;"></span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:10px;text-align:center;">
+              <p style="font-size:10px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Hadir</p>
+              <p id="viewJournalPresent" style="font-weight:800;font-size:24px;color:#059669;font-family:'JetBrains Mono',monospace;line-height:1;">0</p>
+            </div>
+            <div style="background:#FFF1F2;border:1px solid #FECDD3;border-radius:10px;padding:10px;text-align:center;">
+              <p style="font-size:10px;font-weight:700;color:#F43F5E;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Absen</p>
+              <p id="viewJournalAbsent" style="font-weight:800;font-size:24px;color:#E11D48;font-family:'JetBrains Mono',monospace;line-height:1;">0</p>
+            </div>
+          </div>
+        </div>
+        <div id="viewJournalNotesWrap" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:14px;">
+          <p style="font-size:9px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Catatan Tambahan</p>
+          <p id="viewJournalNotes" style="color:#78350F;font-size:13px;font-style:italic;line-height:1.5;white-space:pre-wrap;word-break:break-word;">-</p>
+        </div>
+        <div id="viewJournalActionRow" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="btnViewJournalEdit" type="button" onclick="editJournalFromView()"
+            style="flex:1 1 120px;padding:11px;border:1.5px solid #FDE68A;border-radius:12px;background:#FFFBEB;color:#92400E;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;"
+            onmouseover="this.style.background='#FEF3C7';" onmouseout="this.style.background='#FFFBEB';">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Edit
+          </button>
+          <button id="btnViewJournalDelete" type="button" onclick="deleteJournalFromView()"
+            style="flex:1 1 120px;padding:11px;border:1.5px solid #FECDD3;border-radius:12px;background:#FFF1F2;color:#BE123C;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;"
+            onmouseover="this.style.background='#FFE4E6';" onmouseout="this.style.background='#FFF1F2';">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Hapus
+          </button>
+          <button onclick="closeViewJournalModal()"
+            style="flex:1 1 120px;padding:11px;border:1.5px solid #E2E8F0;border-radius:12px;background:#F8FAFC;color:#475569;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;"
+            onmouseover="this.style.background='#EEF2FF';this.style.borderColor='#C7D2FE';this.style.color='#4338CA';"
+            onmouseout="this.style.background='#F8FAFC';this.style.borderColor='#E2E8F0';this.style.color='#475569';">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="allowanceModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAllowanceModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
+      <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-5 sm:px-6 py-4 flex items-center gap-3 flex-shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-white font-bold truncate" id="allowanceModalTitle">Tambah Tunjangan</h3>
+          <p class="text-emerald-100 text-xs">Tunjangan tetap per guru per jenis tugas</p>
+        </div>
+        <button type="button" onclick="closeAllowanceModal()" aria-label="Tutup"
+          class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="formAllowance" onsubmit="event.preventDefault(); submitAllowance();" class="flex flex-col flex-1 min-h-0">
+        <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+          <input type="hidden" id="inpAllowanceId">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Tugas / Tunjangan <span class="text-red-500">*</span></label>
+            <input type="text" id="inpDutyName" list="dutySuggestions" maxlength="60" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" placeholder="Contoh: Wali Kelas 7A, Pembina OSIS...">
+            <datalist id="dutySuggestions"></datalist>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Penerima <span class="text-red-500">*</span></label>
+            <select id="inpDutyTeacher" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nominal Tunjangan <span class="text-red-500">*</span></label>
+            <div class="relative">
+              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">Rp</span>
+              <input type="number" id="inpDutyAmount" min="0" oninput="_settingsPreviewAllowance()"
+                class="w-full pl-10 pr-3 border border-slate-200 rounded-xl py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition" placeholder="Contoh: 150000">
+            </div>
+            <p id="allowanceAmountPreview" class="hidden text-xs text-emerald-700 font-bold mt-1.5">—</p>
+          </div>
+        </div>
+        <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
+          <button type="button" onclick="closeAllowanceModal()" class="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-100 transition active:scale-95">Batal</button>
+          <button type="submit" id="btnSubmitAllowance" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            Simpan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div id="subjectModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSubjectModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm overflow-hidden flex flex-col" style="max-height:92vh;">
+      <div class="bg-gradient-to-r from-violet-600 to-purple-600 px-5 sm:px-6 py-4 flex items-center gap-3 flex-shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-white font-bold truncate" id="subjectModalTitle">Tambah Mata Pelajaran</h3>
+          <p class="text-violet-100 text-xs">Mata pelajaran untuk dipakai di jadwal mengajar</p>
+        </div>
+        <button type="button" onclick="closeSubjectModal()" aria-label="Tutup"
+          class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form id="formSubject" onsubmit="event.preventDefault(); submitSubject();" class="flex flex-col flex-1 min-h-0">
+        <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+          <input type="hidden" id="inpSubjectId">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Mata Pelajaran <span class="text-red-500">*</span></label>
+            <input type="text" id="inpSubjectName" maxlength="50" oninput="_settingsUpdateSubjectCounter()"
+              class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition" placeholder="Contoh: Matematika, Bahasa Arab...">
+            <p class="text-xs text-slate-400 mt-1 flex items-center justify-between">
+              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Tidak peka huruf besar/kecil</span>
+              <span id="subjectCharCounter" class="font-mono">0/50</span>
+            </p>
+          </div>
+        </div>
+        <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
+          <button type="button" onclick="closeSubjectModal()" class="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-100 transition active:scale-95">Batal</button>
+          <button type="submit" id="btnSubmitSubject" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-sm hover:bg-violet-700 transition shadow-lg shadow-violet-200 active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            Simpan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div id="forgotModal" class="hidden fixed inset-0 overflow-y-auto" style="z-index: 100000;">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div class="h-1 bg-slate-100">
+                <div id="forgotProgressBar" class="h-1 bg-blue-500 transition-all duration-400" style="width:33%"></div>
+            </div>
+            <div class="p-6 text-center">
+                <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                </div>
+                <div id="forgotStep1">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Lupa Password?</h3>
+                    <p class="text-sm text-slate-500 mb-4">Masukkan username Anda untuk melanjutkan verifikasi identitas.</p>
+                    <div class="flex items-center justify-center gap-2 mb-4">
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-blue-600 text-white">1</span>
+                        <div class="w-6 h-0.5 bg-slate-200"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-slate-100 text-slate-400">2</span>
+                        <div class="w-6 h-0.5 bg-slate-200"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-slate-100 text-slate-400">3</span>
+                    </div>
+                    <input type="text" id="inpForgotUsername" placeholder="Masukkan username Anda" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 mb-4 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" autocomplete="off"
+                      onkeydown="if(event.key==='Enter'){ event.preventDefault(); forgotNextStep(); }">
+                    <div class="flex gap-2">
+                        <button onclick="closeForgotModal()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">Batal</button>
+                        <button onclick="forgotNextStep()" id="btnForgotNext" class="flex-1 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">Lanjutkan →</button>
+                    </div>
+                </div>
+                <div id="forgotStepMethod" class="hidden">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Pilih Metode Verifikasi</h3>
+                    <p class="text-xs text-slate-400 mb-4">Akun <strong id="txtForgotUsernameMethod" class="text-slate-600"></strong></p>
+                    <div class="flex items-center justify-center gap-2 mb-4">
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-blue-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-blue-600 text-white">2</span>
+                        <div class="w-6 h-0.5 bg-slate-200"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-slate-100 text-slate-400">3</span>
+                    </div>
+                    <div class="space-y-2 text-left mb-4">
+                        <button id="btnMethodSecQ" onclick="forgotChooseMethod('secq')" type="button"
+                          class="w-full border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition flex items-start gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                          <div class="w-9 h-9 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093V14m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <p class="font-bold text-slate-800 text-sm">Pertanyaan Keamanan</p>
+                            <p class="text-xs text-slate-500 mt-0.5" id="txtMethodSecQDesc">Jawab pertanyaan keamanan Anda.</p>
+                          </div>
+                          <svg class="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <button id="btnMethodOtp" onclick="forgotChooseMethod('otp')" type="button"
+                          class="w-full border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition flex items-start gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                          <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <p class="font-bold text-slate-800 text-sm">Kode OTP Email</p>
+                            <p class="text-xs text-slate-500 mt-0.5" id="txtMethodOtpDesc">Kirim kode 6 digit ke email terverifikasi.</p>
+                          </div>
+                          <svg class="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="forgotBackToStep1()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">← Kembali</button>
+                    </div>
+                </div>
+                <div id="forgotStep2" class="hidden">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Verifikasi Identitas</h3>
+                    <p class="text-xs text-slate-400 mb-4">Jawab pertanyaan keamanan untuk akun <strong id="txtForgotUsername" class="text-slate-600"></strong></p>
+                    <div class="flex items-center justify-center gap-2 mb-4">
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-blue-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-blue-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-blue-600 text-white">3</span>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-3 text-left">
+                        <p class="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Pertanyaan Keamanan</p>
+                        <p id="txtSecurityQuestion" class="text-sm font-semibold text-slate-700 leading-snug"></p>
+                    </div>
+                    <input type="text" id="inpSecurityAnswerForgot" placeholder="Tulis jawaban Anda di sini" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 mb-1 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" autocomplete="off"
+                      onkeydown="if(event.key==='Enter'){ event.preventDefault(); submitForgotAction(); }">
+                    <p class="text-xs text-slate-400 mb-4">Jawaban tidak peka huruf besar/kecil</p>
+                    <div class="flex gap-2">
+                        <button onclick="forgotBackToMethod()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">← Kembali</button>
+                        <button onclick="submitForgotAction()" id="btnSubmitForgot" class="flex-1 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">Verifikasi</button>
+                    </div>
+                </div>
+                <div id="forgotStep3Otp" class="hidden">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Verifikasi Kode OTP</h3>
+                    <p class="text-xs text-slate-400 mb-4">Kode OTP dikirim ke <strong id="txtForgotOtpEmail" class="text-slate-600">—</strong></p>
+                    <div class="flex items-center justify-center gap-2 mb-4">
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-blue-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-blue-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-amber-500 text-white">3</span>
+                    </div>
+                    <input type="text" inputmode="numeric" maxlength="6" id="inpForgotOtp" placeholder="••••••" class="w-full border border-slate-200 rounded-xl px-4 py-3 mb-1 text-center text-lg font-mono font-bold tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-amber-300" autocomplete="one-time-code"
+                      oninput="this.value = this.value.replace(/\\D/g,'').slice(0,6); if(this.value.length===6){ var b=document.getElementById('btnSubmitForgotOtp'); if(b && !b.disabled){ b.classList.add('ring-2','ring-amber-300'); } } else { var b=document.getElementById('btnSubmitForgotOtp'); if(b){ b.classList.remove('ring-2','ring-amber-300'); } }"
+                      onkeydown="if(event.key==='Enter' && this.value.length===6){ event.preventDefault(); submitForgotOtpAction(); }">
+                    <div class="flex items-center justify-between text-[11px] gap-2 flex-wrap mt-1 mb-4">
+                        <p class="text-slate-400">Kode berlaku 10 menit</p>
+                        <button type="button" id="btnForgotResendOtp" onclick="forgotRequestOtp(true)" class="text-amber-600 hover:text-amber-800 font-bold transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>Kirim ulang</button>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="forgotBackToMethod()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">← Kembali</button>
+                        <button onclick="submitForgotOtpAction()" id="btnSubmitForgotOtp" class="flex-1 py-2.5 text-sm bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition">Verifikasi</button>
+                    </div>
+                </div>
+                <div id="forgotStepFinal" class="hidden text-left">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1 text-center">Buat Password Baru</h3>
+                    <p class="text-xs text-slate-400 mb-4 text-center">Akun <strong id="txtForgotUsernameFinal" class="text-slate-600"></strong></p>
+                    <div class="flex items-center justify-center gap-2 mb-4">
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-green-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
+                        <div class="w-6 h-0.5 bg-green-400"></div>
+                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-emerald-500 text-white">✓</span>
+                    </div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Password Baru</label>
+                    <div class="relative mb-1">
+                      <input type="password" id="inpForgotNewPass" placeholder="Min. 8 karakter" autocomplete="new-password"
+                        class="w-full border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                        oninput="forgotEvalPassword()">
+                      <button type="button" onclick="forgotTogglePassVis('inpForgotNewPass', this)" tabindex="-1"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 transition" aria-label="Toggle visibility">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                      </button>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
+                      <div id="forgotPassStrengthBar" class="h-full transition-all duration-300" style="width:0%; background:#E2E8F0;"></div>
+                    </div>
+                    <p id="forgotPassStrengthLabel" class="text-[11px] font-semibold text-slate-400 mb-3">Kekuatan: —</p>
+                    <ul id="forgotPassChecklist" class="text-[11px] grid grid-cols-2 gap-x-3 gap-y-1 mb-4">
+                      <li data-rule="length"  class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Min. 8 karakter</li>
+                      <li data-rule="upper"   class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Huruf besar</li>
+                      <li data-rule="lower"   class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Huruf kecil</li>
+                      <li data-rule="digit"   class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Angka</li>
+                      <li data-rule="symbol"  class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Karakter khusus</li>
+                      <li data-rule="noident" class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Tidak memuat username</li>
+                    </ul>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Konfirmasi Password Baru</label>
+                    <div class="relative mb-1">
+                      <input type="password" id="inpForgotConfirmPass" placeholder="Ulangi password baru" autocomplete="new-password"
+                        class="w-full border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                        oninput="forgotEvalPassword()"
+                        onkeydown="if(event.key==='Enter'){ event.preventDefault(); submitForgotNewPassword(); }">
+                      <button type="button" onclick="forgotTogglePassVis('inpForgotConfirmPass', this)" tabindex="-1"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 transition" aria-label="Toggle visibility">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                      </button>
+                    </div>
+                    <p id="forgotConfirmHint" class="text-[11px] text-slate-400 mb-4">Masukkan password yang sama persis.</p>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeForgotModal()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">Batal</button>
+                        <button type="button" onclick="submitForgotNewPassword()" id="btnSubmitNewPass" class="flex-1 py-2.5 text-sm bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>Simpan Password</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="subModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);" onclick="closeSubModal()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" style="box-shadow:0 24px 64px rgba(0,0,0,0.22);">
+            <div id="subModalHeader" style="background:linear-gradient(135deg,#B45309 0%,#D97706 50%,#F59E0B 100%);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
+                <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                  <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                </div>
+                <div style="min-width:0;flex:1;">
+                  <h3 id="subModalTitle" style="color:white;font-weight:800;font-size:16px;font-family:'DM Sans',sans-serif;line-height:1.2;">Tugaskan Guru Pengganti</h3>
+                  <p id="subModalSubtitle" style="color:rgba(255,255,255,0.85);font-size:11.5px;font-family:'DM Sans',sans-serif;margin-top:2px;">Pilih guru yang akan menggantikan tugas ini.</p>
+                </div>
+              </div>
+              <button type="button" onclick="closeSubModal()" aria-label="Tutup"
+                style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.16);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;flex-shrink:0;"
+                onmouseover="this.style.background='rgba(255,255,255,0.28)';" onmouseout="this.style.background='rgba(255,255,255,0.16)';">
+                <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div style="padding:18px 22px 20px;font-family:'DM Sans',sans-serif;">
+              <div id="subModalDetailCard" style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:11px 14px;margin-bottom:14px;">
+                <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;" id="subModalDetailLabel">Konteks</p>
+                <p id="txtSubDetails" style="font-weight:700;color:#1E293B;font-size:13px;word-break:break-word;line-height:1.45;">...</p>
+              </div>
+              <input type="hidden" id="inpSubScheduleId">
+              <input type="hidden" id="inpIsCeremonySub">
+              <input type="hidden" id="inpIsPicketSub">
+              <div style="margin-bottom:14px;">
+                <label for="inpSubTeacher" style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Pilih Guru Pengganti <span style="color:#F43F5E;">*</span></label>
+                <select id="inpSubTeacher" style="width:100%;padding:10px 12px;border:1.5px solid #DDE1F0;border-radius:10px;font-size:13.5px;font-family:'DM Sans',sans-serif;background:#fff;color:#1E293B;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"></select>
+                <p id="subTeacherHint" style="font-size:11px;color:#94A3B8;margin-top:5px;font-weight:500;">Daftar tidak menyertakan guru yang sedang ditugaskan pada konteks ini.</p>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" onclick="closeSubModal()"
+                  style="flex:1 1 110px;padding:11px;border:1.5px solid #E2E8F0;border-radius:11px;background:#F8FAFC;color:#475569;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;"
+                  onmouseover="this.style.background='#F1F5F9';" onmouseout="this.style.background='#F8FAFC';">
+                  Batal
+                </button>
+                <button id="btnSubmitSubstitute" type="button" onclick="submitSubstitute()"
+                  style="flex:1 1 150px;padding:11px;border:none;border-radius:11px;background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;font-weight:800;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:box-shadow 0.18s,opacity 0.18s;box-shadow:0 4px 12px rgba(217,119,6,0.30);display:flex;align-items:center;justify-content:center;gap:6px;">
+                  <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  <span id="lblSubmitSubstitute">Tetapkan Pengganti</span>
+                </button>
+              </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="rekapKelasModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapKelasModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-violet-600 to-purple-700 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-white font-bold text-lg truncate">Rekap Jadwal per Kelas</h3>
+              <p class="text-violet-200 text-xs">Ringkasan semua jadwal dikelompokkan berdasarkan kelas</p>
+            </div>
+          </div>
+          <button onclick="closeRekapKelasModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3" id="rekapKelasStats"></div>
+        <div class="mt-3 relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="rekapKelasSearch" oninput="_rekapFilter('rekapKelasBody', this.value)" placeholder="Cari kelas, guru, atau mapel..."
+            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
+        </div>
+      </div>
+      <div id="rekapKelasBody" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar"></div>
+      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
+        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
+        <button id="btnDlRekapKelas" onclick="downloadRekapDirectPDF('rekapKelasBody', 'Rekap_Jadwal_per_Kelas', this)"
+          class="ml-auto inline-flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-violet-700 active:scale-95 transition shadow-md shadow-violet-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Unduh PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="rekapGuruModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapGuruModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-white font-bold text-lg truncate">Rekap Jadwal per Guru</h3>
+              <p class="text-teal-100 text-xs">Ringkasan jadwal dikelompokkan per guru pengampu</p>
+            </div>
+          </div>
+          <button onclick="closeRekapGuruModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3" id="rekapGuruStats"></div>
+        <div class="mt-3 relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="rekapGuruSearch" oninput="_rekapFilter('rekapGuruBody', this.value)" placeholder="Cari guru, kelas, atau mapel..."
+            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
+        </div>
+      </div>
+      <div id="rekapGuruBody" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar"></div>
+      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
+        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
+        <button id="btnDlRekapGuru" onclick="downloadRekapDirectPDF('rekapGuruBody', 'Rekap_Jadwal_per_Guru', this)"
+          class="ml-auto inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-teal-700 active:scale-95 transition shadow-md shadow-teal-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Unduh PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="rekapHariModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapHariModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-white font-bold text-lg truncate">Rekap Jadwal per Hari</h3>
+              <p class="text-amber-100 text-xs">Ringkasan jadwal dikelompokkan per hari</p>
+            </div>
+          </div>
+          <button onclick="closeRekapHariModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3" id="rekapHariStats"></div>
+        <div class="mt-3 relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="rekapHariSearch" oninput="_rekapFilter('rekapHariBody', this.value)" placeholder="Cari hari, guru, kelas, atau mapel..."
+            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
+        </div>
+      </div>
+      <div id="rekapHariBody" class="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar"></div>
+      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
+        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
+        <button id="btnDlRekapHari" onclick="downloadRekapDirectPDF('rekapHariBody', 'Rekap_Jadwal_per_Hari', this)"
+          class="ml-auto inline-flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-amber-600 active:scale-95 transition shadow-md shadow-amber-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Unduh PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="rekapKelasHariModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapKelasHariModal()"></div>
+    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="bg-gradient-to-r from-sky-600 to-cyan-600 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-white font-bold text-lg truncate">Rekap Kelas × Hari</h3>
+              <p class="text-sky-100 text-xs">Jadwal tiap kelas diurutkan per hari</p>
+            </div>
+          </div>
+          <button onclick="closeRekapKelasHariModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-3" id="rekapKelasHariStats"></div>
+        <div class="mt-3 relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input type="text" id="rekapKelasHariSearch" oninput="_rekapFilter('rekapKelasHariBody', this.value)" placeholder="Cari kelas, hari, guru, atau mapel..."
+            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
+        </div>
+      </div>
+      <div id="rekapKelasHariBody" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar"></div>
+      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
+        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
+        <button id="btnDlRekapKelasHari" onclick="downloadRekapDirectPDF('rekapKelasHariBody', 'Rekap_Jadwal_per_Kelas_per_Hari', this)"
+          class="ml-auto inline-flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-sky-700 active:scale-95 transition shadow-md shadow-sky-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Unduh PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="slipModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="slipModalTitle">
+  <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity slip-modal-backdrop" onclick="closeSlipModal()"></div>
+  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col slip-modal-panel" style="max-height:92vh;">
+    <div class="bg-white border-b border-slate-200 px-5 sm:px-6 py-3.5 flex justify-between items-center z-10 rounded-t-2xl flex-shrink-0 gap-3 sticky top-0">
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div class="min-w-0 flex-1">
+          <h3 id="slipModalTitle" class="text-base font-bold text-slate-800 leading-tight truncate">Slip Honorarium</h3>
+          <p id="slipModalSubtitle" class="text-xs text-slate-400 mt-0.5 truncate"></p>
+        </div>
+      </div>
+      <button onclick="closeSlipModal()" type="button" aria-label="Tutup"
+        class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center text-slate-500 hover:text-slate-700 flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div id="slipContent" class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50/40">
+      <div class="flex items-center justify-center gap-3 py-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span class="text-slate-500 font-medium">Memuat slip honorarium...</span>
+      </div>
+    </div>
+    <div class="bg-white border-t border-slate-200 px-5 sm:px-6 py-3 flex justify-between items-center gap-3 z-10 rounded-b-2xl flex-shrink-0 flex-wrap sticky bottom-0">
+      <p class="text-xs text-slate-400 hidden sm:block">
+        <svg class="inline w-3.5 h-3.5 -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Data slip bersumber dari arsip yang telah difinalisasi
+      </p>
+      <div class="flex items-center gap-2 ml-auto">
+        <button onclick="closeSlipModal()" type="button"
+          class="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:border-slate-300 rounded-lg transition active:scale-95">
+          Tutup
+        </button>
+        <button onclick="exportSlipToPDF()" id="btnExportSlipPDF" type="button"
+          class="hidden items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 transition shadow-sm hover:shadow-md">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Unduh PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="examBapModal" class="hidden fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="examBapModalTitle">
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="gExam_closeBapModal()"></div>
+    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
+      <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
+        <button type="button" onclick="gExam_closeBapModal()" aria-label="Tutup"
+          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/12 hover:bg-white/22 active:scale-95 flex items-center justify-center text-white transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0 pr-8">
+            <h3 class="text-white font-bold text-lg" id="examBapModalTitle">Isi BAP Pengawas Ujian</h3>
+            <p class="text-blue-100 text-xs mt-0.5" id="examBapModalSub">Berita Acara Pelaksanaan</p>
+          </div>
+        </div>
+        <div id="examBapStatusBadge" class="hidden mt-3 inline-flex items-center gap-1.5 bg-white/15 border border-white/20 rounded-full px-2.5 py-1 text-[11px] font-bold text-white">
+          <span id="examBapStatusBadgeDot" class="w-1.5 h-1.5 rounded-full bg-white"></span>
+          <span id="examBapStatusBadgeLabel">—</span>
+        </div>
+      </div>
+      <div class="bg-slate-50 border-b border-slate-200 px-5 sm:px-6 py-3 sm:py-4 grid grid-cols-2 gap-3 flex-shrink-0">
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Tanggal
+          </p>
+          <p class="text-sm font-semibold text-slate-700" id="examBapInfoDate">—</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Sesi
+          </p>
+          <p class="text-sm font-semibold text-slate-700" id="examBapInfoSession">—</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            Ruang
+          </p>
+          <p class="text-sm font-semibold text-slate-700" id="examBapInfoRoom">—</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Mata Ujian
+          </p>
+          <p class="text-sm font-semibold text-slate-700" id="examBapInfoSubject">—</p>
+        </div>
+      </div>
+      <input type="hidden" id="inpBapSupervisorId">
+      <div class="p-5 sm:p-6 pb-32 sm:pb-6 space-y-4 overflow-y-auto flex-1">
+        <!-- Skeleton Loading -->
+        <div id="examBapSkeleton" class="hidden space-y-4">
+          <div class="grid grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <div class="skeleton h-4 w-24 mb-1.5 rounded"></div>
+              <div class="skeleton h-10 w-full rounded-xl"></div>
+            </div>
+            <div>
+              <div class="skeleton h-4 w-24 mb-1.5 rounded"></div>
+              <div class="skeleton h-10 w-full rounded-xl"></div>
+            </div>
+          </div>
+          <div class="skeleton h-16 w-full rounded-xl"></div>
+          <div>
+            <div class="skeleton h-4 w-32 mb-1.5 rounded"></div>
+            <div class="skeleton h-20 w-full rounded-xl"></div>
+          </div>
+        </div>
+        <!-- Content BAP (akan disembunyikan saat loading) -->
+        <div id="examBapContent" class="space-y-4">
+        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Peserta Hadir <span class="text-red-500">*</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="adjustNumberInput('inpBapHadir',-1)" tabindex="-1"
+                class="w-9 h-10 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-200 active:scale-95 text-slate-600 font-bold text-base transition flex-shrink-0">−</button>
+              <input id="inpBapHadir" type="number" min="0" max="200" placeholder="0"
+                inputmode="numeric"
+                oninput="updateBapTotalIndicator()"
+                class="db-modal-input w-full border border-slate-200 rounded-xl px-2 py-2.5 text-base font-bold text-center text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none">
+              <button type="button" onclick="adjustNumberInput('inpBapHadir',1)" tabindex="-1"
+                class="w-9 h-10 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 font-bold text-base transition flex-shrink-0">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Peserta Absen <span class="text-red-500">*</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="adjustNumberInput('inpBapAbsen',-1)" tabindex="-1"
+                class="w-9 h-10 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-200 active:scale-95 text-slate-600 font-bold text-base transition flex-shrink-0">−</button>
+              <input id="inpBapAbsen" type="number" min="0" max="200" placeholder="0"
+                inputmode="numeric"
+                oninput="updateBapTotalIndicator()"
+                class="db-modal-input w-full border border-slate-200 rounded-xl px-2 py-2.5 text-base font-bold text-center text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none">
+              <button type="button" onclick="adjustNumberInput('inpBapAbsen',1)" tabindex="-1"
+                class="w-9 h-10 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 font-bold text-base transition flex-shrink-0">+</button>
+            </div>
+          </div>
+        </div>
+        <div id="bapTotalIndicator" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3">
+          <div class="flex items-center justify-between text-xs font-semibold text-indigo-700 mb-1.5">
+            <span>Total peserta tercatat: <strong id="bapTotalCount" class="font-extrabold font-mono">0</strong></span>
+            <span id="bapAttendanceRate" class="font-mono font-extrabold text-indigo-800">0%</span>
+          </div>
+          <div class="flex h-1.5 rounded-full overflow-hidden bg-indigo-100">
+            <span id="bapHadirBar" class="bg-emerald-500 block h-full" style="width:0%; transition: width 0.25s ease;"></span>
+            <span id="bapAbsenBar" class="bg-rose-500 block h-full" style="width:0%; transition: width 0.25s ease;"></span>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Catatan Kejadian Khusus <span class="text-slate-400 font-normal">(opsional)</span>
+            </label>
+            <span id="bapCatatanCounter" class="text-[10px] font-mono font-semibold text-slate-400">0/300</span>
+          </div>
+          <textarea id="inpBapCatatan" rows="3" maxlength="300"
+            oninput="updateBapCatatanCounter()"
+            placeholder="Tuliskan jika ada insiden, kecurangan, atau hal khusus..."
+            class="db-modal-textarea w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
+        </div>
+        <div id="examBapReadOnlyMsg" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 font-medium flex items-start gap-2">
+          <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+          <span id="examBapReadOnlyMsgText">—</span>
+        </div>
+        </div>
+        <!-- End of examBapContent -->
+      </div>
+      <div id="examBapActions" class="px-5 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/60 flex gap-3 flex-shrink-0">
+        <button type="button" onclick="gExam_closeBapModal()"
+          class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 active:scale-95 rounded-xl font-semibold text-sm transition">Tutup</button>
+        <button type="button" onclick="gExam_submitBap()" id="btnSubmitBap"
+          class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition shadow-md flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          Submit BAP
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  #msDetailModal .ms-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px; margin-bottom: 10px;
+  }
+  #msDetailModal .ms-detail-grid > div { min-width: 0; }
+  #msDetailModal .ms-detail-grid p { word-break: break-word; }
+  @media (max-width: 360px) {
+    #msDetailModal .ms-detail-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    #msDetailModal > div > .relative > div:first-child { padding: 14px 16px !important; }
+    #msDetailModal > div > .relative > div:last-child { padding: 14px 16px 16px !important; }
+  }
+</style>
+<div id="msDetailModal" class="hidden fixed inset-0 z-[60] overflow-y-auto">
+  <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);" onclick="closeMyScheduleDetailModal()"></div>
+    <div class="relative w-full max-w-md overflow-hidden" style="background:#fff;border-radius:24px;box-shadow:0 24px 64px rgba(0,0,0,0.22);">
+      <div style="background:linear-gradient(135deg,#0F172A 0%,#1E3A5F 100%);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;">
+            <svg width="17" height="17" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <div>
+            <h3 style="color:white;font-weight:800;font-size:15px;font-family:'DM Sans',sans-serif;">Detail Jadwal</h3>
+            <p style="color:rgba(148,163,184,0.8);font-size:11px;font-family:'DM Sans',sans-serif;margin-top:1px;">Rincian sesi mengajar</p>
+          </div>
+        </div>
+        <button onclick="closeMyScheduleDetailModal()" aria-label="Tutup"
+          style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.08);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;"
+          onmouseover="this.style.background='rgba(255,255,255,0.18)';" onmouseout="this.style.background='rgba(255,255,255,0.08)';">
+          <svg width="16" height="16" fill="none" stroke="rgba(203,213,225,0.9)" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="padding:18px 22px 20px;font-family:'DM Sans',sans-serif;">
+        <div class="ms-detail-grid">
+          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;">
+            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Hari</p>
+            <p id="msDetailDay" style="font-weight:700;color:#1E293B;font-size:13.5px;">—</p>
+          </div>
+          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;">
+            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Jam</p>
+            <p id="msDetailTime" style="font-weight:700;color:#1E293B;font-size:13.5px;font-family:'JetBrains Mono',monospace;">—</p>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF);border:1px solid #C7D2FE;border-radius:12px;padding:11px 14px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:32px;height:32px;background:#4F46E5;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="15" height="15" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <p style="font-size:9px;font-weight:700;color:#818CF8;text-transform:uppercase;letter-spacing:0.07em;">Mata Pelajaran</p>
+              <p id="msDetailSubject" style="font-weight:700;color:#312E81;font-size:14px;margin-top:1px;word-break:break-word;">—</p>
+            </div>
+          </div>
+        </div>
+        <div class="ms-detail-grid">
+          <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:11px 14px;text-align:center;">
+            <p style="font-size:9px;font-weight:700;color:#3B82F6;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Kelas</p>
+            <p id="msDetailClass" style="font-weight:800;color:#1D4ED8;font-size:18px;word-break:break-word;">—</p>
+          </div>
+          <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:12px;padding:11px 14px;text-align:center;">
+            <p style="font-size:9px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">JTM</p>
+            <p id="msDetailJtm" style="font-weight:800;color:#059669;font-size:18px;font-family:'JetBrains Mono',monospace;">0</p>
+          </div>
+        </div>
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:10px 14px;margin-bottom:14px;text-align:center;">
+          <p style="font-size:9px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Durasi Sesi</p>
+          <p id="msDetailDuration" style="font-weight:700;color:#78350F;font-size:13px;">—</p>
+        </div>
+        <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;color:#0369A1;line-height:1.5;">
+          <strong>💡 Info:</strong> Anda dapat mengisi jurnal mengajar pada hari sesi ini berlangsung melalui halaman <strong>Dashboard</strong>, minimal 5 menit setelah jam pelajaran selesai.
+        </div>
+        <button onclick="closeMyScheduleDetailModal()"
+          style="width:100%;padding:11px;border:1.5px solid #E2E8F0;border-radius:12px;background:#F8FAFC;color:#475569;font-weight:700;font-size:13.5px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;"
+          onmouseover="this.style.background='#EEF2FF';this.style.borderColor='#C7D2FE';this.style.color='#4338CA';"
+          onmouseout="this.style.background='#F8FAFC';this.style.borderColor='#E2E8F0';this.style.color='#475569';">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  #annModal {
+    z-index: 70;
+  }
+  #annModal .ann-card {
+    width: 100%;
+    max-width: 560px;
+    background: #fff;
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px -20px rgba(15,23,42,0.55), 0 0 0 1px rgba(15,23,42,0.04);
+    transform: translateY(20px) scale(0.97);
+    opacity: 0;
+    transition: transform 0.32s cubic-bezier(0.34,1.56,0.64,1), opacity 0.22s ease;
+  }
+  #annModal.is-open .ann-card { transform: translateY(0) scale(1); opacity: 1; }
+  #annModal .ann-header {
+    position: relative;
+    padding: 22px 24px;
+    color: #fff;
+    overflow: hidden;
+  }
+  #annModal .ann-header::before {
+    content: ''; position: absolute; inset: -40% -20% auto auto;
+    width: 240px; height: 240px;
+    background: radial-gradient(closest-side, rgba(255,255,255,0.18), transparent 70%);
+    pointer-events: none;
+  }
+  #annModal .ann-header > * { position: relative; z-index: 1; }
+  #annModal .ann-header[data-severity="info"]     { background: linear-gradient(135deg,#3B82F6 0%,#1E40AF 100%); }
+  #annModal .ann-header[data-severity="success"]  { background: linear-gradient(135deg,#10B981 0%,#047857 100%); }
+  #annModal .ann-header[data-severity="warning"]  { background: linear-gradient(135deg,#F59E0B 0%,#B45309 100%); }
+  #annModal .ann-header[data-severity="critical"] { background: linear-gradient(135deg,#EF4444 0%,#991B1B 100%); }
+  #annModal .ann-icon {
+    width: 44px; height: 44px; border-radius: 14px;
+    background: rgba(255,255,255,0.2);
+    display:inline-flex; align-items:center; justify-content:center;
+    backdrop-filter: blur(6px);
+  }
+  #annModal .ann-eyebrow {
+    font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    font-weight: 700; opacity: 0.9; margin-bottom: 6px;
+  }
+  #annModal .ann-title {
+    font-size: 18px; font-weight: 800; line-height: 1.25;
+    word-break: break-word;
+  }
+  #annModal .ann-meta {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+  }
+  #annModal .ann-chip {
+    display:inline-flex; align-items:center; gap:6px;
+    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  #annModal .ann-body {
+    padding: 22px 24px; max-height: 50vh; overflow-y: auto;
+    color: #334155; font-size: 14px; line-height: 1.65;
+  }
+  #annModal .ann-body p { margin: 0 0 10px; }
+  #annModal .ann-body a { color: #2563EB; text-decoration: underline; }
+  #annModal .ann-body ul, #annModal .ann-body ol { margin: 6px 0 12px 22px; padding-left: 4px; }
+  #annModal .ann-body ul { list-style-type: disc; }
+  #annModal .ann-body ul ul { list-style-type: circle; margin-top: 4px; margin-bottom: 4px; }
+  #annModal .ann-body ol { list-style-type: decimal; }
+  #annModal .ann-body ol ol { list-style-type: lower-alpha; margin-top: 4px; margin-bottom: 4px; }
+  #annModal .ann-body li { margin: 4px 0; display: list-item; }
+  #annModal .ann-body strong { color: #0F172A; }
+  #annModal .ann-body code {
+    background: #F1F5F9; padding: 1px 6px; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px;
+  }
+  #annModal .ann-footer {
+    padding: 14px 24px 18px;
+    border-top: 1px solid #F1F5F9;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+    background: #FAFBFC;
+  }
+  #annModal .ann-counter {
+    font-size: 11px; color: #94A3B8; font-weight: 600;
+  }
+  #annModal .ann-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  #annModal .ann-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border-radius: 12px;
+    font-size: 13px; font-weight: 700;
+    border: 1px solid transparent; cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  #annModal .ann-btn:active { transform: scale(0.97); }
+  #annModal .ann-btn-primary {
+    background: linear-gradient(135deg,#4F46E5,#3B82F6);
+    color: #fff;
+    box-shadow: 0 6px 16px -4px rgba(79,70,229,0.45);
+  }
+  #annModal .ann-btn-primary:hover {
+    box-shadow: 0 10px 24px -6px rgba(79,70,229,0.55);
+    transform: translateY(-1px);
+  }
+  #annModal .ann-btn-ghost {
+    background: #fff; color: #475569; border-color: #E2E8F0;
+  }
+  #annModal .ann-btn-ghost:hover { background: #F1F5F9; color: #1E293B; }
+  #annModal .ann-btn-prev,
+  #annModal .ann-btn-next {
+    background: #fff; color: #475569; border-color: #E2E8F0;
+    width: 38px; height: 38px; padding: 0; justify-content: center;
+  }
+  #annModal .ann-btn-prev:hover,
+  #annModal .ann-btn-next:hover { background: #EEF2FF; color: #4F46E5; }
+  #annModal .ann-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+  #annModal .ann-pip-row {
+    display: flex; gap: 6px; align-items: center; justify-content: center;
+    margin-top: 10px;
+  }
+  #annModal .ann-pip {
+    width: 6px; height: 6px; border-radius: 999px; background: #CBD5E1;
+    transition: width 0.2s, background 0.2s;
+  }
+  #annModal .ann-pip.is-active { width: 24px; background: #4F46E5; }
+  #annModal .ann-close-x {
+    position: absolute; top: 14px; right: 14px;
+    width: 32px; height: 32px; border-radius: 999px;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.25);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; cursor: pointer; transition: background 0.15s;
+    z-index: 2;
+  }
+  #annModal .ann-close-x:hover { background: rgba(255,255,255,0.32); }
+  #annModal .ann-preview-banner {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px;
+    background: linear-gradient(90deg, #FDE68A 0%, #FCD34D 100%);
+    color: #78350F;
+    font-size: 11.5px; font-weight: 700;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(120,53,15,0.2);
+  }
+  #annModal .ann-preview-banner svg { flex-shrink: 0; }
+  @media (max-width: 480px) {
+    #annModal .ann-card { border-radius: 18px 18px 0 0; max-width: 100%; }
+    #annModal .ann-body { max-height: 55vh; padding: 18px 20px; }
+    #annModal .ann-footer { padding: 12px 18px 16px; }
+  }
+</style>
+<div id="annModal" class="hidden fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="annTitle" aria-describedby="annBody">
+  <div class="fixed inset-0 backdrop-blur-sm" id="annBackdrop" style="background:rgba(15,23,42,0.6);"></div>
+  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4 relative">
+    <div class="ann-card">
+      <div id="annPreviewBadge" class="ann-preview-banner hidden" style="display:none;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <span>MODE PRATINJAU · Tampilan persis seperti yang dilihat pengguna</span>
+      </div>
+      <div class="ann-header" id="annHeader" data-severity="info">
+        <button type="button" class="ann-close-x" id="annBtnCloseX" onclick="closeAnnouncementModal()" aria-label="Tutup">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="flex items-start gap-3">
+          <div class="ann-icon" id="annIcon">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          </div>
+          <div class="flex-1 min-w-0 pr-6">
+            <p class="ann-eyebrow" id="annEyebrow">Pengumuman</p>
+            <h3 class="ann-title" id="annTitle">—</h3>
+            <div class="ann-meta" id="annMeta"></div>
+          </div>
+        </div>
+      </div>
+      <div class="ann-body" id="annBody">—</div>
+      <div class="ann-footer">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" class="ann-btn ann-btn-prev" id="annBtnPrev" onclick="annNav(-1)" aria-label="Sebelumnya">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <button type="button" class="ann-btn ann-btn-next" id="annBtnNext" onclick="annNav(1)" aria-label="Berikutnya">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <span class="ann-counter" id="annCounter">1 / 1</span>
+        </div>
+        <div class="ann-actions">
+          <a id="annBtnCta" class="ann-btn ann-btn-ghost hidden" target="_blank" rel="noopener noreferrer" style="display:none;">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            <span id="annBtnCtaLbl">Buka</span>
+          </a>
+          <button type="button" class="ann-btn ann-btn-primary" id="annBtnAck" onclick="annAcknowledge()">
+            <span id="annBtnAckLbl">Mengerti</span>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="ann-pip-row" id="annPips" style="padding:0 18px 14px;"></div>
+    </div>
+  </div>
+</div>
+  <div id="attendanceModals">
+    <!-- Modal Set Jam Jadwal -->
+    <div id="attendanceSetJadwalModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSetJadwalModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
+            <h3 class="text-white font-bold text-lg">Set Jam Jadwal</h3>
+            <p class="text-blue-100 text-xs">Atur jam masuk dan pulang untuk <span id="lblSetJadwalUserName" class="font-bold"></span></p>
+          </div>
+          <form onsubmit="event.preventDefault(); submitSetJadwal();" class="p-6 space-y-4">
+            <input type="hidden" id="inpSetJadwalUserId">
+            <div class="flex gap-4">
+              <div class="flex-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Masuk</label>
+                <input type="time" id="inpSetJadwalIn" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+              </div>
+              <div class="flex-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang</label>
+                <input type="time" id="inpSetJadwalOut" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+              </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="button" onclick="closeSetJadwalModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+              <button type="submit" id="btnSubmitSetJadwal" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">Simpan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Catat Jam Datang -->
+    <div id="attendanceTimeInModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeTimeInModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div class="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-5">
+            <h3 class="text-white font-bold text-lg">Catat Jam Datang</h3>
+            <p class="text-blue-100 text-xs">Untuk <span id="lblTimeInUserName" class="font-bold"></span></p>
+          </div>
+          <form onsubmit="event.preventDefault(); submitTimeIn();" class="p-6 space-y-4">
+            <input type="hidden" id="inpTimeInUserId">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Datang Aktual</label>
+              <input type="time" id="inpTimeIn" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-center focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="button" onclick="closeTimeInModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+              <button type="submit" id="btnSubmitTimeIn" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">Simpan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Catat Jam Pulang -->
+    <div id="attendanceTimeOutModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeTimeOutModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-5">
+            <h3 class="text-white font-bold text-lg">Catat Jam Pulang</h3>
+            <p class="text-emerald-100 text-xs">Untuk <span id="lblTimeOutUserName" class="font-bold"></span></p>
+          </div>
+          <form onsubmit="event.preventDefault(); submitTimeOut();" class="p-6 space-y-4">
+            <input type="hidden" id="inpTimeOutUserId">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang Aktual</label>
+              <input type="time" id="inpTimeOut" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none" required>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="button" onclick="closeTimeOutModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+              <button type="submit" id="btnSubmitTimeOut" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition">Simpan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Detail Kehadiran -->
+    <div id="attendanceDetailModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAttendanceDetailModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div class="bg-gradient-to-r from-slate-700 to-slate-900 px-6 py-5">
+            <h3 class="text-white font-bold text-lg">Detail Kehadiran Manual</h3>
+            <p class="text-slate-300 text-xs">Untuk <span id="lblDetailUserName" class="font-bold"></span></p>
+          </div>
+          <div id="formAttendanceDetailLoading" class="p-8 text-center hidden">
+            <svg class="w-8 h-8 animate-spin mx-auto text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <p class="text-sm mt-2 text-slate-500">Memuat data...</p>
+          </div>
+          <form id="formAttendanceDetailContent" onsubmit="event.preventDefault(); submitAttendanceDetail();" class="p-6 space-y-4">
+            <input type="hidden" id="inpDetailUserId">
+            <div class="flex gap-4">
+              <div class="flex-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Datang</label>
+                <input type="time" id="inpDetailTimeIn" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+              <div class="flex-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang</label>
+                <input type="time" id="inpDetailTimeOut" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status Kehadiran</label>
+              <select id="inpDetailStatus" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="">-- Pilih Status (Kosongkan jika hadir normal) --</option>
+                <option value="Hadir">Hadir</option>
+                <option value="Izin">Izin</option>
+                <option value="Sakit">Sakit</option>
+                <option value="Alpa">Alpa</option>
+              </select>
+              <p class="text-[10px] text-slate-400 mt-1">*Hanya diisi jika guru tidak hadir secara normal.</p>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="button" onclick="closeAttendanceDetailModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+              <button type="submit" id="btnSubmitDetail" class="flex-1 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition">Simpan Perubahan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Izin Keluar Sementara -->
+    <div id="attendanceLeaveModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeLeaveModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div class="bg-gradient-to-r from-rose-500 to-pink-500 px-6 py-5">
+            <h3 class="text-white font-bold text-lg">Izin Keluar Sementara</h3>
+            <p class="text-rose-100 text-xs mt-0.5">Untuk <span id="lblLeaveModalUserName" class="font-bold"></span></p>
+          </div>
+          <div class="p-5 space-y-4">
+            <!-- Form input entri baru -->
+            <div id="leaveFormSection">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catat Izin Baru</p>
+              <div class="flex gap-3 mb-3">
+                <div class="flex-1">
+                  <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Keluar</label>
+                  <input type="time" id="inpLeaveTime" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-center focus:ring-2 focus:ring-rose-500 outline-none">
+                </div>
+                <div class="flex-1">
+                  <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Kembali</label>
+                  <input type="time" id="inpReturnTime" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-center focus:ring-2 focus:ring-rose-500 outline-none">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Keterangan <span class="text-rose-500">*</span></label>
+                <input type="text" id="inpLeaveReason" maxlength="200" placeholder="Mis: keperluan keluarga, urusan bank..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-rose-500 outline-none" required>
+              </div>
+              <button id="btnSubmitLeave" onclick="submitLeave()" class="w-full py-2.5 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition">Simpan Izin Keluar</button>
+            </div>
+            <!-- Daftar izin yang sudah ada -->
+            <div>
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Riwayat Hari Ini</p>
+              <div id="leaveListContainer"></div>
+            </div>
+            <button type="button" onclick="closeLeaveModal()" class="w-full py-2 text-slate-500 text-sm font-semibold hover:text-slate-700 transition">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Tambah Guru ke Daftar Kehadiran -->
+    <div id="attendanceAddAttendeeModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAddAttendeeModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-5">
+            <h3 class="text-white font-bold text-lg">Tambah Guru ke Daftar Kehadiran</h3>
+            <p class="text-violet-100 text-xs mt-0.5">Guru yang tidak terjadwal hari ini</p>
+          </div>
+          <form onsubmit="event.preventDefault(); submitAddAttendee();" class="p-6 space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pilih Guru <span class="text-red-500">*</span></label>
+              <div class="relative mb-1.5">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="inpAddAttendeeSearch" placeholder="Cari nama atau username..." autocomplete="off"
+                  oninput="_filterAddAttendeeSelect(this.value)"
+                  class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none transition">
+              </div>
+              <select id="selAddAttendeeUser" size="6" class="w-full border border-slate-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-violet-500 outline-none cursor-pointer" required>
+                <option value="">Memuat daftar guru...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Alasan Penambahan <span class="text-red-500">*</span></label>
+              <textarea id="inpAddAttendeeReason" rows="3" maxlength="300" required
+                placeholder="Mis: Hadir mendampingi kegiatan OSIS, menggantikan tugas piket mendadak..."
+                class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none"></textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button type="button" onclick="closeAddAttendeeModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+              <button type="submit" id="btnSubmitAddAttendee" class="flex-1 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-sm hover:bg-violet-700 transition">Tambahkan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- Modal Atur Jam Jadwal (KBM/Ujian per hari) -->
+    <div id="schedTemplateModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSchedTemplateModal()"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div class="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-5">
+            <h3 class="text-white font-bold text-lg" id="lblSchedTemplateModalTitle">Atur Jam Jadwal</h3>
+            <p class="text-indigo-100 text-xs mt-1" id="lblSchedTemplateModalSub">Jam masuk dan pulang default</p>
+          </div>
+          <form onsubmit="event.preventDefault(); submitSchedTemplate();" class="p-6 space-y-4">
+            <input type="hidden" id="inpSchedTemplateId">
+            <input type="hidden" id="inpSchedTemplateSchedType">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Hari <span class="text-red-500">*</span></label>
+              <select id="inpSchedTemplateDayIndex" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                <option value="">-- Pilih Hari --</option>
+                <option value="1">Senin</option>
+                <option value="2">Selasa</option>
+                <option value="3">Rabu</option>
+                <option value="4">Kamis</option>
+                <option value="5">Jumat</option>
+                <option value="6">Sabtu</option>
+              </select>
+            </div>
+            <div class="flex gap-4">
+              <div class="flex-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Masuk <span class="text-red-500">*</span></label>
+                <input type="time" id="inpSchedTemplateTimeIn" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
+              </div>
+              <div class="flex-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang <span class="text-red-500">*</span></label>
+                <input type="time" id="inpSchedTemplateTimeOut" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
+              </div>
+            </div>
+            <p id="lblSchedTemplateApplyNote" class="text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 hidden"></p>
+            <div class="flex gap-3 pt-2">
+              <button type="button" onclick="closeSchedTemplateModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
+              <button type="submit" id="btnSubmitSchedTemplate" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition">Simpan & Terapkan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

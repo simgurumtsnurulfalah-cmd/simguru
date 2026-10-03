@@ -1,0 +1,153 @@
+<style>
+  #app-navbar {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border-bottom: 1px solid rgba(226,232,240,0.8);
+    box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.03);
+  }
+  #navHamburger {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    color: #64748B;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    background: transparent;
+  }
+  #navHamburger:hover { background: #F1F5F9; color: #0F172A; border-color: #CBD5E1; }
+  @media (min-width: 768px) {
+    #navHamburger { display: none; }
+  }
+  #navUserPill {
+    display: flex; align-items: center; gap: 9px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 40px;
+    border: 1px solid #E2E8F0;
+    background: #F8FAFC;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  #navUserPill:hover { background: #F1F5F9; border-color: #CBD5E1; box-shadow: 0 2px 8px rgba(15,23,42,0.07); }
+  #navUserPill:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }
+  #navUserAvatar {
+    position: relative;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, #3B82F6, #6366F1);
+    color: white; font-size: 0.7rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(59,130,246,0.3); flex-shrink: 0;
+  }
+  #navUserAvatar::after {
+    content: '';
+    position: absolute; right: -1px; bottom: -1px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #34D399;
+    border: 2px solid white;
+  }
+  #navUserName { font-size: 0.8rem; font-weight: 600; color: #0F172A; line-height: 1.1; }
+  #navUserRole { font-size: 0.67rem; color: #64748B; line-height: 1.1; text-transform: capitalize; }
+  #navClockBadge {
+    font-size: 0.72rem; font-weight: 600; color: #475569;
+    background: #F1F5F9; border: 1px solid #E2E8F0;
+    border-radius: 8px; padding: 4px 10px;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+    min-width: 50px; text-align: center;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  #navClockBadge svg { color: #94A3B8; }
+  #navDateBadge {
+    font-size: 0.7rem; font-weight: 600; color: #64748B;
+    display: none; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 8px;
+  }
+  @media (min-width: 1024px) { #navDateBadge { display: inline-flex; } }
+  #navPageTitle {
+    font-size: 0.875rem; font-weight: 700; color: #0F172A;
+  }
+  #navBreadcrumb {
+    font-size: 0.7rem; color: #94A3B8; font-weight: 500;
+    display: none;
+  }
+  @media (min-width: 768px) { #navBreadcrumb { display: inline; } }
+  #navBreadcrumb a {
+    color: #64748B;
+    transition: color 0.15s;
+  }
+  #navBreadcrumb a:hover { color: #3B82F6; cursor: pointer; }
+  #navBreadcrumb-sep { color: #CBD5E1; margin: 0 6px; }
+  #navLoadingBar {
+    position: absolute;
+    left: 0; bottom: -1px;
+    height: 2px; width: 0%;
+    background: linear-gradient(to right, #3B82F6, #8B5CF6, #EC4899);
+    transition: width 0.32s ease, opacity 0.32s ease;
+    opacity: 0;
+    pointer-events: none;
+  }
+  #navLoadingBar.is-loading {
+    opacity: 1;
+    animation: nav-loading-stripe 1.2s linear infinite;
+    background-size: 200% 100%;
+  }
+  @keyframes nav-loading-stripe {
+    0%   { background-position: 100% 0%; }
+    100% { background-position: -100% 0%; }
+  }
+  @media (max-width: 480px) {
+    #navUserPill .nav-user-info,
+    #navUserPill .nav-user-chevron { display: none !important; }
+  }
+</style>
+<header id="app-navbar" class="sticky top-0 z-30 relative">
+  <div class="px-3 sm:px-6">
+    <div class="flex items-center justify-between h-14 gap-2">
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <button id="navHamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Sembunyikan/Tampilkan Sidebar">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-1 h-5 rounded-full bg-gradient-to-b from-blue-400 to-indigo-500 hidden sm:block flex-shrink-0"></div>
+          <div class="min-w-0">
+            <div id="navBreadcrumb" class="truncate">
+              <a onclick="handleNav('Page_Dashboard')">Beranda</a>
+              <span id="navBreadcrumb-sep">›</span>
+              <span id="navBreadcrumbCurrent">Dashboard</span>
+            </div>
+            <div id="navPageTitle" class="truncate">Dashboard</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div id="navDateBadge">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <span id="navDateText">—</span>
+        </div>
+        <div id="navClockBadge" title="Waktu sekarang (WIB)">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span id="navClockText">--:--</span>
+        </div>
+        <button id="navUserPill" onclick="handleNav('Page_Profile')" type="button" aria-label="Buka profil saya" title="Profil Saya">
+          <div id="navUserAvatar"><span id="navUserInitial">U</span></div>
+          <div class="nav-user-info hidden sm:block text-left">
+            <div id="navUserName">Memuat...</div>
+            <div id="navUserRole">...</div>
+          </div>
+          <svg class="nav-user-chevron w-3 h-3 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="navLoadingBar"></div>
+</header>

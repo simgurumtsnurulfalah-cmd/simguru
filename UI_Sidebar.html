@@ -1,0 +1,670 @@
+<style>
+  #sidebar {
+    background: linear-gradient(180deg, #0F172A 0%, #1a2744 100%);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    font-family: 'Inter', sans-serif;
+    width: 16rem;
+    flex-shrink: 0;
+    transition: transform 0.3s ease-in-out, width 0.32s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden; /* prevents content flash during width transition */
+  }
+  #sidebar-header {
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    transition: padding 0.32s cubic-bezier(0.4,0,0.2,1);
+  }
+  .sidebar-label {
+    transition: opacity 0.2s ease, max-width 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-width: 200px;
+    overflow: hidden;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  #sidebarSearch {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #E2E8F0;
+    font-size: 0.78rem;
+    padding: 7px 10px 7px 32px;
+    border-radius: 9px;
+    width: 100%;
+    transition: border-color 0.18s, background 0.18s;
+    outline: none;
+  }
+  #sidebarSearch::placeholder { color: rgba(148,163,184,0.6); }
+  #sidebarSearch:focus {
+    background: rgba(255,255,255,0.09);
+    border-color: rgba(96,165,250,0.4);
+  }
+  #sidebarSearchWrap { position: relative; padding: 0 12px 8px; }
+  #sidebarSearchWrap svg {
+    position: absolute; left: 22px; top: 50%; transform: translateY(-60%);
+    pointer-events: none; color: rgba(148,163,184,0.7);
+  }
+  .nav-item.is-search-hidden { display: none !important; }
+  @media (min-width: 768px) {
+    /* Width — sidebar shrinks to icon-only strip; overflow hidden prevents
+       the collapsed content from leaking into page layout */
+    #sidebar.sidebar-collapsed { width: 4.5rem; overflow: hidden; }
+    /* Text labels: hide */
+    #sidebar.sidebar-collapsed .sidebar-label {
+      opacity: 0; max-width: 0; pointer-events: none;
+    }
+    /* Old section labels: collapse */
+    #sidebar.sidebar-collapsed .nav-section-label {
+      opacity: 0; height: 0; margin: 0; padding: 0; overflow: hidden;
+      transition: opacity 0.2s ease, height 0.3s ease, margin 0.3s ease;
+    }
+    /* Search: hide */
+    #sidebar.sidebar-collapsed #sidebarSearchWrap { display: none; }
+    /* Nav items: center icon only */
+    #sidebar.sidebar-collapsed .nav-item {
+      justify-content: center;
+      padding-left: 0.65rem;
+      padding-right: 0.65rem;
+    }
+    #sidebar.sidebar-collapsed .nav-item svg { flex-shrink: 0; margin: 0 auto; }
+    /* Badge positioning in collapsed state */
+    #sidebar.sidebar-collapsed .nav-badge-count {
+      position: absolute; top: 2px; right: 2px;
+      min-width: 15px; height: 15px; font-size: 0.5rem;
+    }
+    #sidebar.sidebar-collapsed .nav-dot-badge {
+      position: absolute; top: 4px; right: 5px;
+    }
+    /* Flex-1 spans inside buttons (e.g. "Piket & Upacara") must not take space */
+    #sidebar.sidebar-collapsed .nav-item .flex-1 {
+      flex: 0 0 auto; max-width: 0; overflow: hidden; opacity: 0;
+    }
+    /* Header: centered, logo hidden */
+    #sidebar.sidebar-collapsed #sidebar-header {
+      justify-content: center; padding-left: 0.5rem; padding-right: 0.5rem;
+    }
+    #sidebar.sidebar-collapsed #sidebarLogoBlock { display: none; }
+    #sidebar.sidebar-collapsed #btnCollapseDesktop { transform: rotate(180deg); }
+    /* Bottom section */
+    #sidebar.sidebar-collapsed #sidebar-bottom { padding: 0.5rem; }
+    #sidebar.sidebar-collapsed #btnSidebarProfile {
+      justify-content: center; padding: 0.5rem;
+    }
+    /* Hide name/role text and arrow in profile button */
+    #sidebar.sidebar-collapsed #btnSidebarProfile > div.flex-1 { display: none; }
+    #sidebar.sidebar-collapsed #btnSidebarProfile > svg { display: none; }
+    #sidebar.sidebar-collapsed #btnSidebarLogout {
+      justify-content: center; padding: 0.5rem 0.65rem;
+    }
+    /* Hide logout text, keep icon */
+    #sidebar.sidebar-collapsed #btnSidebarLogout .sidebar-label { display: none; }
+    /* Menu container: hide horizontal scroll but allow vertical scroll without visible scrollbar */
+    #sidebar.sidebar-collapsed #sidebarMenuContainer {
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+    #sidebar.sidebar-collapsed #sidebarMenuContainer::-webkit-scrollbar {
+      display: none; /* Chrome/Safari */
+    }
+    /* Guru/Admin sections: no extra top margin */
+    #sidebar.sidebar-collapsed #guru-section,
+    #sidebar.sidebar-collapsed #admin-section { margin-top: 0; }
+  }
+  #btnCollapseDesktop {
+    display: none;
+    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+  }
+  @media (min-width: 768px) {
+    #btnCollapseDesktop { display: flex; }
+  }
+  .nav-section-label {
+    transition: opacity 0.2s ease, height 0.3s ease, margin 0.3s ease;
+  }
+  .nav-item {
+    position: relative;
+    color: #94A3B8 !important;
+    border-radius: 10px;
+    transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .nav-item:hover {
+    background: rgba(255,255,255,0.08) !important;
+    color: #E2E8F0 !important;
+    transform: translateX(2px);
+  }
+  .nav-item:hover svg { color: #93C5FD !important; }
+  .nav-item:focus-visible {
+    outline: 2px solid #60A5FA;
+    outline-offset: 2px;
+  }
+  .nav-item.bg-blue-50 {
+    background: linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(99,102,241,0.18) 100%) !important;
+    color: #BAC9FF !important;
+    box-shadow: inset 0 0 0 1px rgba(99,130,246,0.22), 0 2px 10px rgba(59,130,246,0.12);
+  }
+  .nav-item.bg-blue-50::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 18%; bottom: 18%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #60A5FA, #818CF8);
+    box-shadow: 0 0 8px rgba(96,165,250,0.55);
+  }
+  .nav-item.bg-blue-50 svg { color: #60A5FA !important; }
+  .nav-item.text-blue-700 { color: #BAC9FF !important; }
+  .nav-section-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 0 12px;
+    margin: 18px 0 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.2s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+  }
+  .nav-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.05);
+  }
+  #sidebar-bottom {
+    border-top: 1px solid rgba(255,255,255,0.06);
+    background: rgba(0,0,0,0.18);
+  }
+  #btnSidebarLogout {
+    background: rgba(239,68,68,0.08);
+    color: #FCA5A5;
+    border: 1px solid rgba(239,68,68,0.18);
+    border-radius: 10px;
+    transition: all 0.18s ease;
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.01em;
+  }
+  #btnSidebarLogout:hover {
+    background: rgba(239,68,68,0.18);
+    color: #FECACA;
+    border-color: rgba(239,68,68,0.38);
+    box-shadow: 0 4px 12px rgba(239,68,68,0.15);
+  }
+  #sidebar .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+  #sidebar .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  #sidebar .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
+  .nav-badge-count {
+    font-size: 0.6rem; font-weight: 800;
+    min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 9px; background: #EF4444; color: white;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2px #0F172A, 0 0 8px rgba(239,68,68,0.4);
+  }
+  .nav-dot-badge {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #EF4444; flex-shrink: 0;
+    box-shadow: 0 0 0 2px #0F172A, 0 0 6px rgba(239,68,68,0.5);
+    animation: nav-dot-pulse 2s infinite;
+  }
+  @keyframes nav-dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px #0F172A, 0 0 6px rgba(239,68,68,0.5); }
+    50%      { box-shadow: 0 0 0 2px #0F172A, 0 0 14px rgba(239,68,68,0.85); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nav-dot-badge { animation: none; }
+  }
+  .nav-search-empty {
+    display: none;
+    color: rgba(148,163,184,0.7);
+    font-size: 0.72rem;
+    text-align: center;
+    padding: 16px 12px;
+    font-style: italic;
+  }
+  .nav-search-empty.is-visible { display: block; }
+  /* Accordion groups */
+  .nav-accordion-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px 6px 4px;
+    margin: 4px 0 2px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+    color: rgba(148,163,184,0.9);
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .nav-accordion-header:hover { background: rgba(255,255,255,0.06); color: rgba(203,213,225,0.95); }
+  .nav-accordion-header.is-open { color: #93C5FD; }
+  .nav-accordion-chevron {
+    width: 14px; height: 14px; flex-shrink: 0;
+    transition: transform 0.2s ease;
+    opacity: 0.6;
+  }
+  .nav-accordion-header.is-open .nav-accordion-chevron { transform: rotate(90deg); opacity: 1; }
+  .nav-accordion-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s cubic-bezier(0.4,0,0.2,1);
+  }
+  .nav-accordion-body.is-open { grid-template-rows: 1fr; }
+  .nav-accordion-inner { overflow: hidden; min-height: 0; }
+  /* ── Nested (level-2) accordion inside sidebar accordion ─────────────────── */
+  .nav-nested-accordion {
+    margin: 2px 0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .nav-nested-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 8px 7px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+    color: rgba(148,163,184,0.85);
+    font-size: 11px; font-weight: 600;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    width: 100%;
+    text-align: left;
+  }
+  .nav-nested-header:hover { background: rgba(255,255,255,0.07); color: rgba(203,213,225,0.95); }
+  .nav-nested-header.is-open { background: rgba(99,102,241,0.12); color: #A5B4FC; border-color: rgba(99,102,241,0.2); }
+  .nav-nested-chevron {
+    width: 12px; height: 12px; flex-shrink: 0;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+  }
+  .nav-nested-header.is-open .nav-nested-chevron { transform: rotate(90deg); opacity: 0.8; }
+  .nav-nested-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  .nav-nested-body.is-open { grid-template-rows: 1fr; }
+  .nav-nested-inner {
+    overflow: hidden; min-height: 0;
+    padding-left: 10px;
+    border-left: 2px solid rgba(99,102,241,0.25);
+    margin-left: 8px;
+  }
+  /* In collapsed sidebar, show nested headers as icon row; bypass grid transition */
+  @media (min-width: 768px) {
+    #sidebar.sidebar-collapsed .nav-nested-header { display: none; }
+    #sidebar.sidebar-collapsed .nav-nested-body { display: block; overflow: visible; }
+    #sidebar.sidebar-collapsed .nav-nested-inner { overflow: visible; min-height: unset; padding-left: 0; border-left: none; margin-left: 0; }
+    #sidebar.sidebar-collapsed .nav-nested-accordion { margin: 0; }
+  }
+  /* ── Collapsed sidebar: bypass accordion entirely ─────────────────────────
+     In icon-only mode the accordion concept doesn't apply — hide headers,
+     force bodies open, and let the existing icon-only nav-item rules take over.
+  ────────────────────────────────────────────────────────────────────────── */
+  @media (min-width: 768px) {
+    /* 1. Hide accordion headers completely */
+    #sidebar.sidebar-collapsed .nav-accordion-header {
+      display: none;
+    }
+    /* 2. Force all accordion bodies open so nav-items are reachable */
+    #sidebar.sidebar-collapsed .nav-accordion-body {
+      display: block;
+      overflow: visible;
+    }
+    #sidebar.sidebar-collapsed .nav-accordion-inner {
+      overflow: visible;
+      min-height: unset;
+    }
+    /* 3. Reset accordion wrapper spacing so items sit flush */
+    #sidebar.sidebar-collapsed .nav-accordion {
+      margin-bottom: 0;
+    }
+    /* 4. Thin divider between accordion groups for visual rhythm */
+    #sidebar.sidebar-collapsed .nav-accordion + .nav-accordion {
+      padding-top: 2px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      margin-top: 2px;
+    }
+  }
+  @media (min-width: 768px) {
+    /* Tooltip positioning is handled by JS (#sidebarCollapsedTip div).
+       ::after and ::before pseudo-elements are not used for tooltips. */
+    #sidebar.sidebar-collapsed .nav-item { position: relative; }
+  }
+</style>
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:static flex flex-col h-full shadow-2xl">
+  <div id="sidebar-header" class="flex items-center justify-between h-16 px-5 shrink-0">
+    <div id="sidebarLogoBlock" class="flex items-center gap-3 min-w-0">
+      <div class="relative w-8 h-8 flex-shrink-0">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/50">
+          <svg width="15" height="15" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+        </div>
+        <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0F172A]" title="Online"></div>
+      </div>
+      <div class="min-w-0">
+        <div class="text-sm font-bold text-white tracking-tight leading-none sidebar-label" id="sidebarAppName">SiM-Guru</div>
+        <div class="text-[10px] text-slate-500 mt-0.5 font-medium sidebar-label">Sistem Manajemen Guru</div>
+      </div>
+    </div>
+    <button id="btnCollapseDesktop" onclick="toggleSidebar()" title="Sembunyikan/Tampilkan Sidebar" aria-label="Toggle sidebar"
+      class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-white flex-shrink-0">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </button>
+    <button onclick="toggleSidebar()" aria-label="Tutup sidebar" class="md:hidden w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 transition flex items-center justify-center text-slate-400 hover:text-white">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+  <div id="sidebarSearchWrap" class="pt-3">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input id="sidebarSearch" type="search" placeholder="Cari menu..." aria-label="Cari menu" oninput="filterSidebarMenu(this.value)" autocomplete="off">
+  </div>
+  <div class="flex-1 overflow-y-auto py-2 px-3 custom-scrollbar" id="sidebarMenuContainer">
+    <div class="nav-section-label">Menu Utama</div>
+    <button id="nav-Page_Dashboard" data-tooltip="Dashboard" data-search="dashboard beranda home" onclick="handleNav('Page_Dashboard')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+      <span class="sidebar-label">Dashboard</span>
+    </button>
+    <!-- GURU SECTION -->
+    <div id="guru-section" class="hidden">
+      <div class="nav-accordion" data-group="guru-kbm">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-kbm')" type="button" aria-expanded="false">
+          <span>KBM</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-guru-kbm">
+          <div class="nav-accordion-inner">
+      <button id="nav-Page_MySchedule" data-tooltip="Jadwal Saya" data-search="jadwal saya kbm mengajar" onclick="handleNav('Page_MySchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="sidebar-label">Jadwal Saya</span>
+      </button>
+      <button id="nav-Page_Journal" data-tooltip="Jurnal Mengajar" data-search="jurnal mengajar log" onclick="handleNav('Page_Journal')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        <span class="sidebar-label">Jurnal Mengajar</span>
+      </button>
+          </div>
+        </div>
+      </div>
+      <div class="nav-accordion" data-group="guru-kehadiran">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-kehadiran')" type="button" aria-expanded="false">
+          <span>Kehadiran &amp; Tugas</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-guru-kehadiran">
+          <div class="nav-accordion-inner">
+      <!-- Nested accordion: Absensi Siswa (Guru) -->
+      <div class="nav-nested-accordion" data-nested-group="guru-absensi-siswa">
+        <button class="nav-nested-header" onclick="toggleNestedNavAccordion('guru-absensi-siswa')" type="button" aria-expanded="false" id="nested-header-guru-absensi-siswa" data-tooltip="Absensi Siswa" data-search="absensi siswa kelas rekap piket kehadiran riwayat input">
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            <span class="sidebar-label">Absensi Siswa</span>
+          </span>
+          <svg class="nav-nested-chevron sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-nested-body" id="nested-body-guru-absensi-siswa">
+          <div class="nav-nested-inner">
+      <button id="nav-Page_StudentAttendanceInput" data-tooltip="Input Absensi" data-search="input absensi siswa kelas rekap piket" onclick="handleNav('Page_StudentAttendanceInput')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        <span class="sidebar-label">Input Absensi</span>
+      </button>
+      <button id="nav-Page_StudentAttendanceHistory" data-tooltip="Riwayat Absensi" data-search="riwayat absensi siswa histori history" onclick="handleNav('Page_StudentAttendanceHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="sidebar-label">Riwayat Absensi</span>
+      </button>
+          </div>
+        </div>
+      </div>
+      <button id="nav-Page_Picket" data-tooltip="Piket & Upacara" data-search="piket upacara absen kehadiran" onclick="handleNav('Page_Picket')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Piket &amp; Upacara</span>
+        <span id="badgePicketNotification" class="hidden nav-dot-badge"></span>
+      </button>
+      <button id="nav-Page_EventAttendance" data-tooltip="Kehadiran Acara" data-search="kehadiran acara kegiatan" onclick="handleNav('Page_EventAttendance')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="sidebar-label">Kehadiran Acara</span>
+      </button>
+      <button id="nav-Page_Attendance" data-tooltip="Kehadiran Harian" data-search="kehadiran harian absen absensi" onclick="handleNav('Page_Attendance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span class="sidebar-label">Kehadiran Harian</span>
+      </button>
+      <button id="nav-Page_MyAttendance" data-tooltip="Riwayat Kehadiran" data-search="riwayat kehadiran absen jam masuk pulang histori" onclick="handleNav('Page_MyAttendance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span class="sidebar-label">Riwayat Kehadiran</span>
+      </button>
+      <button id="nav-Page_ExamPanitia" data-tooltip="Panitia Ujian" data-search="panitia ujian pengawas bap" onclick="handleNav('Page_ExamPanitia')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Panitia Ujian</span>
+        <span id="badgeExamPanitiaNotification" class="hidden nav-dot-badge"></span>
+      </button>
+          </div>
+        </div>
+      </div>
+      <div class="nav-accordion" data-group="guru-jurnal-acara">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-jurnal-acara')" type="button" aria-expanded="false">
+          <span>Jurnal Acara</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-guru-jurnal-acara">
+          <div class="nav-accordion-inner">
+      <button id="nav-Page_EventJournal" data-tooltip="Jurnal Acara" data-search="jurnal acara kegiatan" onclick="handleNav('Page_EventJournal')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        <span class="sidebar-label">Jurnal Acara</span>
+      </button>
+      <button id="nav-Page_EventJournalHistory" data-tooltip="Riwayat Jurnal Acara" data-search="riwayat jurnal acara kegiatan history" onclick="handleNav('Page_EventJournalHistory')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        <span class="sidebar-label">Riwayat Jurnal Acara</span>
+      </button>
+          </div>
+        </div>
+      </div>
+      <div class="nav-accordion" data-group="guru-honorarium">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-honorarium')" type="button" aria-expanded="false">
+          <span>Honorariumku</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-guru-honorarium">
+          <div class="nav-accordion-inner">
+      <button id="nav-Page_Honorarium" data-tooltip="Honorarium" data-search="honorarium gaji honor jtm" onclick="handleNav('Page_Honorarium')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="sidebar-label">Honorarium</span>
+      </button>
+      <button id="nav-Page_HonorariumHistory" data-tooltip="Arsip Honor" data-search="arsip honor riwayat history" onclick="handleNav('Page_HonorariumHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+        <span class="sidebar-label">Arsip Honor</span>
+      </button>
+
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ADMIN SECTION -->
+    <div id="admin-section" class="hidden">
+      <div class="nav-accordion" data-group="admin-kehadiran">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-kehadiran')" type="button" aria-expanded="false">
+          <span>Kehadiran &amp; Absensi</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-admin-kehadiran">
+          <div class="nav-accordion-inner">
+      <!-- Nested accordion: Absensi Siswa (Admin) -->
+      <div class="nav-nested-accordion" data-nested-group="admin-absensi-siswa">
+        <button class="nav-nested-header" onclick="toggleNestedNavAccordion('admin-absensi-siswa')" type="button" aria-expanded="false" id="nested-header-admin-absensi-siswa" data-tooltip="Absensi Siswa" data-search="absensi siswa kelas rekap piket kehadiran riwayat input">
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            <span class="sidebar-label">Absensi Siswa</span>
+          </span>
+          <svg class="nav-nested-chevron sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-nested-body" id="nested-body-admin-absensi-siswa">
+          <div class="nav-nested-inner">
+      <button id="nav-Page_StudentAttendanceInput_Admin" data-tooltip="Input Absensi" data-search="input absensi siswa kelas rekap piket" onclick="handleNav('Page_StudentAttendanceInput')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        <span class="sidebar-label">Input Absensi</span>
+      </button>
+      <button id="nav-Page_StudentAttendanceHistory_Admin" data-tooltip="Riwayat Absensi" data-search="riwayat absensi siswa histori history" onclick="handleNav('Page_StudentAttendanceHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="sidebar-label">Riwayat Absensi</span>
+      </button>
+          </div>
+        </div>
+      </div>
+      <button id="nav-Page_Picket_Admin" data-tooltip="Piket & Upacara" data-search="piket upacara absen kehadiran" onclick="handleNav('Page_Picket')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Piket &amp; Upacara</span>
+        <span id="badgePicketNotification_Admin" class="hidden nav-dot-badge"></span>
+      </button>
+      <button id="nav-Page_EventAttendance_Admin" data-tooltip="Kehadiran Acara" data-search="kehadiran acara kegiatan" onclick="handleNav('Page_EventAttendance')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="sidebar-label">Kehadiran Acara</span>
+      </button>
+      <!-- Nested accordion: Kehadiran Harian -->
+      <div class="nav-nested-accordion" data-nested-group="admin-kehadiran-harian">
+        <button class="nav-nested-header" onclick="toggleNestedNavAccordion('admin-kehadiran-harian')" type="button" aria-expanded="false" id="nested-header-admin-kehadiran-harian" data-tooltip="Kehadiran Harian" data-search="kehadiran harian absen absensi daftar atur jam jadwal">
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <span class="sidebar-label">Kehadiran Harian</span>
+          </span>
+          <svg class="nav-nested-chevron sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-nested-body" id="nested-body-admin-kehadiran-harian">
+          <div class="nav-nested-inner">
+      <button id="nav-Page_AttendanceList" data-tooltip="Daftar Kehadiran" data-search="daftar kehadiran absen absensi harian guru" onclick="handleNav('Page_AttendanceList')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span class="sidebar-label">Daftar Kehadiran</span>
+      </button>
+      <button id="nav-Page_AttendanceSchedule" data-tooltip="Atur Jam Jadwal" data-search="atur jam jadwal kehadiran template kbm ujian" onclick="handleNav('Page_AttendanceSchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="sidebar-label">Atur Jam Jadwal</span>
+      </button>
+          </div>
+        </div>
+      </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-accordion" data-group="admin-honorarium">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-honorarium')" type="button" aria-expanded="false">
+          <span>Honorarium</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-admin-honorarium">
+          <div class="nav-accordion-inner">
+      <button id="nav-Page_Honorarium_Admin" data-tooltip="Honorarium" data-search="honorarium gaji honor jtm" onclick="handleNav('Page_Honorarium')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="sidebar-label">Honorarium</span>
+      </button>
+      <button id="nav-Page_HonorariumHistory_Admin" data-tooltip="Arsip Honor" data-search="arsip honor riwayat history" onclick="handleNav('Page_HonorariumHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+        <span class="sidebar-label">Arsip Honor</span>
+      </button>
+
+          </div>
+        </div>
+      </div>
+      <div class="nav-accordion" data-group="admin-manajemen">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-manajemen')" type="button" aria-expanded="false">
+          <span>Manajemen</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-admin-manajemen">
+          <div class="nav-accordion-inner">
+      <button id="nav-Page_Users" data-tooltip="Data Pengguna" data-search="data pengguna user akun guru admin" onclick="handleNav('Page_Users')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <span class="sidebar-label">Data Pengguna</span>
+      </button>
+      <button id="nav-Page_ManageSchedule" data-tooltip="Manajemen Jadwal" data-search="manajemen jadwal pelajaran kbm" onclick="handleNav('Page_ManageSchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="sidebar-label">Manajemen Jadwal</span>
+      </button>
+      <button id="nav-Page_ExamSchedule" data-tooltip="Jadwal Ujian" data-search="jadwal ujian periode sesi pengawas" onclick="handleNav('Page_ExamSchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span class="sidebar-label">Jadwal Ujian</span>
+      </button>
+      <button id="nav-Page_EventManagement" data-tooltip="Manajemen Acara" data-search="manajemen acara kegiatan" onclick="handleNav('Page_EventManagement')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        <span class="sidebar-label">Manajemen Acara</span>
+      </button>
+      <button id="nav-Page_AdminDailyAttendance" data-tooltip="Riwayat Kehadiran Harian" data-search="riwayat kehadiran harian absen absensi semua guru" onclick="handleNav('Page_AdminDailyAttendance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        <span class="sidebar-label">Riwayat Kehadiran Harian</span>
+      </button>
+      <button id="nav-Page_EventJournalHistory_Admin" data-tooltip="Riwayat Jurnal Acara" data-search="riwayat jurnal acara kegiatan history admin" onclick="handleNav('Page_EventJournalHistory')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        <span class="sidebar-label">Riwayat Jurnal Acara</span>
+      </button>
+      <button id="nav-Page_Journal_Admin" data-tooltip="Riwayat Jurnal" data-search="riwayat jurnal mengajar log" onclick="handleNav('Page_Journal')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        <span class="sidebar-label">Riwayat Jurnal Mengajar</span>
+      </button>
+          </div>
+        </div>
+      </div>
+      <div class="nav-accordion" data-group="admin-konfigurasi">
+        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-konfigurasi')" type="button" aria-expanded="false">
+          <span>Konfigurasi</span>
+          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div class="nav-accordion-body" id="acc-body-admin-konfigurasi">
+          <div class="nav-accordion-inner">
+      <button id="nav-Page_Settings_Config" data-tooltip="Konfigurasi Umum" data-search="konfigurasi umum pengaturan" onclick="handleNav('Page_Settings_Config')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Konfigurasi Umum</span>
+      </button>
+      <button id="nav-Page_Settings_Kalender" data-tooltip="Kalender Libur" data-search="kalender libur tanggal" onclick="handleNav('Page_Settings_Kalender')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Kalender Libur</span>
+      </button>
+      <button id="nav-Page_Settings_Mapel" data-tooltip="Mata Pelajaran" data-search="mata pelajaran mapel subjek" onclick="handleNav('Page_Settings_Mapel')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        <span class="flex-1 text-left sidebar-label">Mata Pelajaran</span>
+      </button>
+      <button id="nav-Page_Settings_Tunjangan" data-tooltip="Tunjangan" data-search="tunjangan tugas tambahan" onclick="handleNav('Page_Settings_Tunjangan')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Tunjangan</span>
+      </button>
+      <button id="nav-Page_Settings_Transportasi" data-tooltip="Transportasi Harian" data-search="tunjangan transportasi harian" onclick="handleNav('Page_Settings_Transportasi')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Transportasi</span>
+      </button>
+      <button id="nav-Page_Settings_Maintenance" data-tooltip="Mode Maintenance" data-search="mode maintenance pemeliharaan" onclick="handleNav('Page_Settings_Maintenance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Maintenance</span>
+      </button>
+      <button id="nav-Page_Settings_Pengumuman" data-tooltip="Pengumuman" data-search="pengumuman informasi" onclick="handleNav('Page_Settings_Pengumuman')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+        <span class="flex-1 text-left sidebar-label">Pengumuman</span>
+      </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="sidebarSearchEmpty" class="nav-search-empty">Tidak ada menu yang cocok</div>
+  </div>
+  <div id="sidebar-bottom" class="p-3 space-y-2 shrink-0">
+    <button id="btnSidebarProfile" onclick="handleNav('Page_Profile')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/08 transition-all group" style="background:rgba(255,255,255,0.04);" title="Buka Profil Saya">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-md group-hover:ring-2 group-hover:ring-blue-400/30 transition-all" id="sidebarUserInitial">U</div>
+      <div class="flex-1 text-left min-w-0 sidebar-label">
+        <div class="text-xs font-semibold text-slate-200 truncate" id="sidebarUserName">Memuat...</div>
+        <div class="text-[10px] text-slate-500 truncate capitalize" id="sidebarUserRole">—</div>
+      </div>
+      <svg class="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition flex-shrink-0 sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </button>
+    <button id="btnSidebarLogout" onclick="actionLogout()" class="w-full flex items-center justify-center gap-2 py-2.5 px-3" title="Keluar dari aplikasi">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      <span class="sidebar-label">Keluar Aplikasi</span>
+    </button>
+  </div>
+</aside>
+<div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden backdrop-blur-sm"></div>
