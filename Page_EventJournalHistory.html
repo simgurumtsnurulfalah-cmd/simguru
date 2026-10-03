@@ -1,0 +1,125 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-4 sm:p-6 lg:p-8">
+      <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="p-3 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg shadow-indigo-200">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          <div>
+            <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-indigo-600 tracking-tight">Riwayat Jurnal Acara</h1>
+            <p class="text-sm text-slate-500 mt-1.5 font-medium">Lihat dan tinjau riwayat jurnal acara kegiatan yang telah Anda isi</p>
+          </div>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+          <h2 class="text-xl font-bold text-slate-800 tracking-tight">Filter Riwayat</h2>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="relative">
+            <select id="evtJrnHistMonth" class="appearance-none border border-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-sm font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-slate-50 hover:bg-slate-100 cursor-pointer">
+              <option value="1">Januari</option><option value="2">Februari</option>
+              <option value="3">Maret</option><option value="4">April</option>
+              <option value="5">Mei</option><option value="6">Juni</option>
+              <option value="7">Juli</option><option value="8">Agustus</option>
+              <option value="9">September</option><option value="10">Oktober</option>
+              <option value="11">November</option><option value="12">Desember</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+          </div>
+          <input type="number" id="evtJrnHistYear" min="2020" max="2099"
+            class="border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-slate-50 hover:bg-slate-100">
+          <button onclick="renderEventJournalHistorySection(parseInt(document.getElementById('evtJrnHistMonth').value),parseInt(document.getElementById('evtJrnHistYear').value))"
+            class="bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            Tampilkan
+          </button>
+        </div>
+      </div>
+      <div class="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden relative">
+        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-emerald-400"></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50/80 text-slate-500 text-[11px] font-black uppercase tracking-widest border-b border-slate-100">
+              <tr>
+                <th class="py-5 px-6 text-left">Tanggal</th>
+                <th class="py-5 px-6 text-left">Nama Acara</th>
+                <th id="th-guru-name" class="py-5 px-6 text-left hidden">Nama Guru</th>
+                <th class="py-5 px-6 text-left">Deskripsi Jurnal</th>
+                <th class="py-5 px-6 text-center">Waktu Submit</th>
+                <th class="py-5 px-6 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="evtJrnHistoryTableBody" class="divide-y divide-slate-100 text-slate-700">
+              <tr><td id="td-empty-jrn-history" colspan="6" class="py-16 text-center text-slate-400 text-sm">Pilih bulan dan tahun, lalu klik Tampilkan.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+<!-- Modal Detail Jurnal -->
+<div id="evtJournalDetailModal" class="fixed inset-0 z-[60] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <!-- Backdrop -->
+  <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity opacity-0" id="evtJournalDetailBackdrop" onclick="closeEventJournalDetailModal()"></div>
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <!-- Modal Panel -->
+      <div id="evtJournalDetailPanel" class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 border border-slate-100">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-slate-50 to-white px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800" id="modal-title">Detail Jurnal Acara</h3>
+          </div>
+          <button type="button" onclick="closeEventJournalDetailModal()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors focus:outline-none">
+            <span class="sr-only">Close</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <!-- Body -->
+        <div class="px-6 py-6 space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div class="space-y-1">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Nama Acara</p>
+              <p id="dtlEventName" class="text-sm font-semibold text-slate-800"></p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tanggal Acara</p>
+              <p id="dtlEventDate" class="text-sm font-medium text-slate-700"></p>
+            </div>
+            <div class="space-y-1" id="dtlGuruNameContainer">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Nama Guru</p>
+              <p id="dtlGuruName" class="text-sm font-medium text-slate-700"></p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Waktu Submit</p>
+              <div id="dtlSubmitTime" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100"></div>
+            </div>
+          </div>
+          <div class="space-y-2 pt-4 border-t border-slate-100">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Isi Jurnal / Deskripsi</p>
+            <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+              <div id="dtlDescription" class="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap break-words leading-relaxed font-medium"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Footer -->
+        <div class="bg-slate-50/50 px-6 py-5 border-t border-slate-100 flex justify-end">
+          <button type="button" onclick="closeEventJournalDetailModal()" class="bg-white border border-slate-200 text-slate-700 font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

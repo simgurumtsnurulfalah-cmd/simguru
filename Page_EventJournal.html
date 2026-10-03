@@ -1,0 +1,93 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-4 sm:p-6 lg:p-8">
+      <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-indigo-600 tracking-tight">Jurnal Kehadiran Acara</h1>
+          <p class="text-sm text-slate-500 mt-2 font-medium">Isi jurnal untuk acara yang Anda hadiri hari ini</p>
+        </div>
+      </div>
+      <div id="evtJournalList" class="mb-8">
+        <div class="p-6 space-y-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+          <div class="h-16 bg-slate-100 rounded-xl animate-pulse"></div>
+          <div class="h-16 bg-slate-100 rounded-xl animate-pulse w-3/4"></div>
+        </div>
+      </div>
+      <!-- Riwayat Kehadiran Acara -->
+      <div class="mt-12">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <h2 class="text-xl font-bold text-slate-800 tracking-tight">Riwayat Kehadiran Acara</h2>
+          <div class="flex items-center gap-3 flex-wrap">
+            <select id="evtHistMonth" class="border border-slate-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-white">
+              <option value="1">Januari</option><option value="2">Februari</option>
+              <option value="3">Maret</option><option value="4">April</option>
+              <option value="5">Mei</option><option value="6">Juni</option>
+              <option value="7">Juli</option><option value="8">Agustus</option>
+              <option value="9">September</option><option value="10">Oktober</option>
+              <option value="11">November</option><option value="12">Desember</option>
+            </select>
+            <input type="number" id="evtHistYear" min="2020" max="2099"
+              class="border border-slate-300 rounded-xl px-4 py-2 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-white">
+            <button onclick="renderEventHistorySection(parseInt(document.getElementById('evtHistMonth').value),parseInt(document.getElementById('evtHistYear').value))"
+              class="bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-5 py-2 rounded-xl transition shadow-sm hover:shadow">Tampilkan</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
+                <tr>
+                  <th class="py-4 px-5 text-left">Nama Acara</th>
+                  <th class="py-4 px-5 text-center">Tanggal</th>
+                  <th class="py-4 px-5 text-center">Jam Masuk</th>
+                  <th class="py-4 px-5 text-center">Status Jurnal</th>
+                  <th class="py-4 px-5 text-center">JTM</th>
+                </tr>
+              </thead>
+              <tbody id="evtHistoryTableBody" class="divide-y divide-slate-100 text-slate-700">
+                <tr><td colspan="5" class="py-12 text-center text-slate-400 text-sm">Pilih bulan dan tahun, lalu klik Tampilkan.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+<!-- Event Journal Modal -->
+<div id="evtJournalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onclick="closeEvtJournalModal()"></div>
+  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="flex items-center justify-between p-6 border-b border-slate-100/60 bg-slate-50/50">
+      <h3 class="text-xl font-extrabold text-slate-800 tracking-tight">Isi Jurnal Acara</h3>
+      <button onclick="closeEvtJournalModal()" class="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-full transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="p-6 space-y-5 overflow-y-auto">
+      <div>
+        <label class="block text-sm font-bold text-slate-700 mb-1.5">Nama Acara</label>
+        <input id="evtJrnEventName" type="text" readonly class="w-full border border-slate-200 bg-slate-50/80 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 focus:outline-none mb-4">
+        <label class="block text-sm font-bold text-slate-700 mb-1.5">Tanggal Acara</label>
+        <input id="evtJrnDateDisplay" type="text" readonly class="w-full border border-slate-200 bg-slate-50/80 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-slate-700 mb-1.5">Deskripsi Kegiatan <span class="text-rose-500">*</span></label>
+        <textarea id="evtJrnDesc" rows="4" maxlength="1000"
+          oninput="document.getElementById('evtJrnCharCount').textContent=this.value.length"
+          class="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-white"
+          placeholder="Deskripsikan kegiatan yang berlangsung..."></textarea>
+        <p class="text-right text-xs font-medium text-slate-400 mt-1.5"><span id="evtJrnCharCount">0</span> / 1000</p>
+      </div>
+      <input type="hidden" id="evtJrnAttendanceId">
+    </div>
+    <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+      <button type="button" onclick="closeEvtJournalModal()" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">Batal</button>
+      <button id="submitEvtJournalBtn" type="button" onclick="submitEvtJournal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-sm hover:shadow hover:-translate-y-0.5">Simpan Jurnal</button>
+    </div>
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__
