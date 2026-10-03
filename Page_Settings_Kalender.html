@@ -1,0 +1,83 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-3 sm:p-6">
+      <div class="mb-4 sm:mb-5">
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Kalender Libur</h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola hari libur dan acara sekolah.</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+        <div id="spanel-kalender" class="p-4 sm:p-5">
+          <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+            <div class="lg:col-span-4 xl:col-span-3 p-4 sm:p-5 bg-slate-50/50">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Tambah / Edit Libur</p>
+              <div class="space-y-3">
+                <input type="hidden" id="inpLiburId">
+                <div class="flex items-center bg-white border border-slate-200 rounded-lg p-1 gap-1">
+                  <button onclick="setLiburMode('single')" id="btnModeSingle"
+                    class="flex-1 py-1.5 rounded-md text-xs font-bold bg-slate-800 text-white transition">Tanggal Tunggal</button>
+                  <button onclick="setLiburMode('range')" id="btnModeRange"
+                    class="flex-1 py-1.5 rounded-md text-xs font-bold text-slate-500 hover:bg-slate-100 transition">Rentang Tanggal</button>
+                </div>
+                <div id="libur-single-mode">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal</label>
+                  <input type="date" id="inpLiburDate"
+                    class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
+                </div>
+                <div id="libur-range-mode" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mulai</label>
+                    <input type="date" id="inpLiburDateFrom"
+                      class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Selesai</label>
+                    <input type="date" id="inpLiburDateTo"
+                      class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Keterangan</label>
+                  <input type="text" id="inpLiburDesc" placeholder="Contoh: Hari Raya Idul Fitri..."
+                    class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
+                </div>
+                <div>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="chkIsBonus" class="w-4 h-4 rounded text-amber-500 accent-amber-500">
+                    <span class="text-xs font-semibold text-slate-600">Hitung sebagai Bonus JTM</span>
+                  </label>
+                </div>
+                <div class="flex gap-2 pt-1">
+                  <button id="btnCancelLibur" onclick="resetLiburForm()" class="hidden flex-1 text-xs text-slate-500 hover:text-slate-700 font-bold py-2 rounded-xl hover:bg-slate-200 border border-slate-200 bg-white transition">Batal</button>
+                  <button id="btnAddHoliday" onclick="addHolidayAction()"
+                    class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl text-xs font-bold transition shadow-sm shadow-amber-100">Simpan</button>
+                </div>
+              </div>
+            </div>
+            <div class="lg:col-span-8 xl:col-span-9 flex flex-col">
+              <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-white">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Daftar Kalender</p>
+              </div>
+              <div class="overflow-y-auto custom-scrollbar flex-1 settings-table-scroll">
+                <table class="w-full text-sm text-left settings-mobile-cards">
+                  <thead class="sticky top-0 z-10">
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
+                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Bonus</th>
+                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyHolidays" class="divide-y divide-slate-50"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

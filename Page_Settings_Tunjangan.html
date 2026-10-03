@@ -1,0 +1,45 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-3 sm:p-6">
+      <div class="mb-4 sm:mb-5">
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Tunjangan</h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola tunjangan tugas tambahan.</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+        <div id="spanel-tunjangan" class="">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/40">
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-slate-700">Tunjangan &amp; Tugas Tambahan</p>
+              <p class="text-xs text-slate-400 mt-0.5">Tunjangan per guru per jenis tugas</p>
+            </div>
+            <button onclick="openAllowanceModal()"
+              class="inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm shadow-indigo-100 self-start sm:self-auto active:scale-95">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+              Tambah Tunjangan
+            </button>
+          </div>
+          <div class="overflow-y-auto custom-scrollbar settings-table-scroll">
+            <table class="w-full text-sm text-left settings-mobile-cards">
+              <thead class="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-10">No.</th>
+                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Jenis Tugas</th>
+                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Guru</th>
+                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Nominal</th>
+                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyAllowances" class="divide-y divide-slate-50"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__
