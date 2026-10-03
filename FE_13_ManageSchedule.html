@@ -1,0 +1,619 @@
+<script>
+      openForgotModal();
+    }
+    function initResetRequests() {
+      const token = localStorage.getItem('auth_token');
+      const tbody = document.getElementById('tbodyResetRequests');
+      if (!tbody) return;
+      tbody.innerHTML = skeletonTableRows(3, 3);
+      google.script.run.withSuccessHandler((res) => {
+        updateNotificationBadges();
+        if (res.status === 'success') {
+          if (!res.data || res.data.length === 0) {
+            tbody.innerHTML = `
+            <tr><td colspan="3" class="py-2 settings-cell-empty">
+              <div class="error-state-container">
+                <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                  <svg class="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <p class="text-slate-500 font-semibold text-sm">Tidak ada permintaan reset</p>
+                <p class="text-slate-400 text-xs mt-1">Semua permintaan telah diproses</p>
+              </div>
+            </td></tr>`;
+            return;
+          }
+          let html = '';
+          res.data.forEach(r => {
+            const safeRequestId = String(r.request_id || '').replace(/'/g, "\\'");
+            const safeUsername = String(r.username || '').replace(/'/g, "\\'");
+            const safeFullName = String(r.full_name || 'Unknown').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            html += `
+            <tr class="border-b hover:bg-slate-50 transition-colors">
+              <td class="px-4 py-3 font-semibold text-slate-700" data-label="Nama Lengkap"><span class="settings-mobile-value">${safeFullName}</span></td>
+              <td class="px-4 py-3 text-slate-500 text-sm" data-label="Username"><span class="settings-mobile-value">${safeUsername}</span></td>
+              <td class="px-4 py-3 text-center settings-cell-actions">
+                <button id="btnApprove_${safeRequestId}" onclick="approveResetAction('${safeRequestId}', '${safeUsername}')"
+                  class="inline-flex items-center gap-1.5 bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-600 transition-all shadow-sm">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  Setujui
+                </button>
+              </td>
+            </tr>`;
+          });
+          tbody.innerHTML = html;
+        } else {
+          tbody.innerHTML = errorTableRows(3, res.message || 'Gagal memuat data.', 'initResetRequests()');
+        }
+      }).withFailureHandler((err) => {
+        tbody.innerHTML = errorTableRows(3, 'Koneksi gagal: ' + (err.message || err), 'initResetRequests()');
+      }).getResetRequests(token);
+    }
+    function approveResetAction(requestId, username) {
+      showConfirm(
+        'Setujui Reset Password',
+        `Apakah Anda yakin menyetujui reset password untuk ${username}? Password akan diubah menjadi '123456'.`,
+        () => {
+          const btn = document.getElementById('btnApprove_' + requestId);
+          var restore = (typeof _busyButton === 'function') ? _busyButton(btn, '...') : function () {
+            if (btn) { btn.disabled = true; btn.dataset._oldHTML = btn.innerHTML; btn.innerHTML = '...'; }
+            return function () { if (btn) { btn.disabled = false; if (btn.dataset._oldHTML) { btn.innerHTML = btn.dataset._oldHTML; delete btn.dataset._oldHTML; } } };
+          }();
+          const token = localStorage.getItem('auth_token');
+          google.script.run.withSuccessHandler((res) => {
+            if (res && res.status === 'success') {
+              showToast('Password berhasil direset ke standar.', 'success');
+              initResetRequests();
+              updateNotificationBadges();
+            } else {
+              restore();
+              showToast((res && res.message) || 'Gagal memproses permintaan', 'error');
+            }
+          }).withFailureHandler((err) => {
+            restore();
+            showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+          }).approveResetRequest(token, requestId, username);
+        }
+      );
+    }
+    function initMySchedule() {
+      const token = localStorage.getItem('auth_token');
+      const tbody = document.getElementById('tbodyMyWeeklySchedule');
+      const listAllowances = document.getElementById('listMyAllowances');
+      const listPickets = document.getElementById('listMyPickets');
+      if (!tbody) return;
+      const dayColors = {
+        'Senin': { bg: '#EFF6FF', color: '#1D4ED8', dot: '#3B82F6', border: '#BFDBFE' },
+        'Selasa': { bg: '#F5F3FF', color: '#5B21B6', dot: '#8B5CF6', border: '#DDD6FE' },
+        'Rabu': { bg: '#ECFDF5', color: '#065F46', dot: '#10B981', border: '#A7F3D0' },
+        'Kamis': { bg: '#FFF7ED', color: '#9A3412', dot: '#F97316', border: '#FED7AA' },
+        'Jumat': { bg: '#FDF4FF', color: '#7E22CE', dot: '#D946EF', border: '#F0ABFC' },
+        'Sabtu': { bg: '#F0F9FF', color: '#0369A1', dot: '#38BDF8', border: '#BAE6FD' },
+        'Minggu': { bg: '#FEF2F2', color: '#9F1239', dot: '#F43F5E', border: '#FECACA' },
+      };
+      const examPanel = document.getElementById('panelExamMySchedule');
+      if (examPanel) {
+        const grid = examPanel.nextElementSibling;
+        if (grid) grid.classList.remove('hidden');
+      }
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const todayName = days[new Date().getDay()];
+      google.script.run.withSuccessHandler((res) => {
+        if (res.status === 'success') {
+          window._mySchedulesCache = res.schedules || [];
+          window._myWeeklyData = res;
+          const totalSesi = res.schedules ? res.schedules.length : 0;
+          const totalJtm = res.schedules ? res.schedules.reduce((s, x) => s + Number(x.jtm_val || 0), 0) : 0;
+          const totalPiket = res.picket_days ? res.picket_days.length : 0;
+          const totalUpacara = res.ceremony_assignments ? res.ceremony_assignments.length : 0;
+          const elSesi = document.getElementById('statTotalJadwal');
+          const elJtm = document.getElementById('statTotalJtm');
+          const elPiket = document.getElementById('statTotalPiket');
+          const elUpacara = document.getElementById('statTotalUpacara');
+          if (typeof animateValue === 'function') {
+            if (elSesi) animateValue(elSesi, 0, totalSesi, 700);
+            if (elJtm) animateValue(elJtm, 0, totalJtm, 800);
+            if (elPiket) animateValue(elPiket, 0, totalPiket, 600);
+            if (elUpacara) animateValue(elUpacara, 0, totalUpacara, 600);
+          } else {
+            if (elSesi) elSesi.textContent = totalSesi;
+            if (elJtm) elJtm.textContent = totalJtm;
+            if (elPiket) elPiket.textContent = totalPiket;
+            if (elUpacara) elUpacara.textContent = totalUpacara;
+          }
+          const badgeCount = document.getElementById('badgeJadwalCount');
+          if (badgeCount) {
+            if (totalSesi === 0) {
+              badgeCount.textContent = 'Tidak ada';
+              badgeCount.style.cssText = 'background:#F1F5F9;color:#64748B;border:1px solid #E2E8F0;';
+            } else {
+              badgeCount.textContent = totalSesi + ' Sesi · ' + totalJtm + ' JTM';
+              badgeCount.style.cssText = 'background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;';
+            }
+          }
+          renderMyWeeklyScheduleTable(res.schedules || [], { dayColors, todayName });
+          if (!res.picket_days || res.picket_days.length === 0) {
+            listPickets.innerHTML = `<li class="ms-empty" style="padding:1rem 0;">
+            <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p>Tidak ada jadwal piket</p>
+            <span>Anda tidak terjadwal sebagai guru piket pekan ini</span>
+          </li>`;
+          } else {
+            let html = '';
+            res.picket_days.forEach(day => {
+              const isToday = day === todayName;
+              const bg = isToday ? '#FFFBEB' : 'transparent';
+              const todayBadge = isToday
+                ? '<span class="ml-2 inline-flex items-center gap-1 text-[9px] font-extrabold bg-amber-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block"></span>Hari Ini</span>'
+                : '';
+              html += `<li class="ms-piket-item" style="background:${bg}; border-radius:8px; padding-left:8px; padding-right:8px;">
+              <span class="ms-piket-dot"></span>
+              <span class="ms-piket-day">Hari ${escapeHtml(day)}${todayBadge}</span>
+              <span class="ms-piket-lbl">Piket</span>
+            </li>`;
+            });
+            listPickets.innerHTML = html;
+          }
+          if (!res.allowances || res.allowances.length === 0) {
+            listAllowances.innerHTML = `<li class="ms-empty" style="padding:1rem 0;">
+            <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p>Tidak ada tugas tambahan</p>
+            <span>Anda belum mendapat tunjangan tugas khusus</span>
+          </li>`;
+          } else {
+            let html = '';
+            res.allowances.forEach(a => {
+              const dutyName = escapeHtml(a.duty_name || 'Tunjangan');
+              const amt = a.amount && String(a.amount).replace(/[^0-9]/g, '') !== '0' ? a.amount : 'Rp 0';
+              html += `<li class="ms-allowance-item" title="Tunjangan bulanan untuk ${dutyName}">
+              <span class="ms-allowance-name">${dutyName}</span>
+              <span class="ms-allowance-amt">${escapeHtml(amt)}<span style="opacity:0.7;font-weight:600;"> /bulan</span></span>
+            </li>`;
+            });
+            listAllowances.innerHTML = html;
+          }
+          const listCeremonies = document.getElementById('listMyCeremonies');
+          if (listCeremonies) {
+            const ceremonies = res.ceremony_assignments || [];
+            if (ceremonies.length === 0) {
+              listCeremonies.innerHTML = `<div class="ms-empty" style="padding:1rem 0;">
+              <svg class="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+              <p>Tidak ada jadwal pembina upacara</p>
+              <span>Belum ditugaskan sebagai pembina upacara</span>
+            </div>`;
+            } else {
+              let html = '';
+              ceremonies.forEach(c => {
+                let bg, border, dotColor, labelHtml;
+                if (c.is_today) {
+                  bg = '#EFF6FF'; border = '#BFDBFE'; dotColor = '#3B82F6';
+                  labelHtml = `<span style="font-size:0.65rem; font-weight:800; color:#1D4ED8; background:#DBEAFE; padding:2px 8px; border-radius:999px;display:inline-flex;align-items:center;gap:4px;"><span class="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse"></span>Hari Ini</span>`;
+                } else if (c.is_past) {
+                  bg = c.is_confirmed ? '#F8FAFC' : '#FFF1F2';
+                  border = c.is_confirmed ? '#E2E8F0' : '#FECDD3';
+                  dotColor = c.is_confirmed ? '#94A3B8' : '#F43F5E';
+                  labelHtml = c.is_confirmed
+                    ? `<span style="font-size:0.65rem; font-weight:800; color:#64748B; background:#F1F5F9; padding:2px 8px; border-radius:999px;">Selesai ✓</span>`
+                    : `<span style="font-size:0.65rem; font-weight:800; color:#BE123C; background:#FFE4E6; padding:2px 8px; border-radius:999px;">Tidak Hadir</span>`;
+                } else {
+                  bg = '#F5F3FF'; border = '#DDD6FE'; dotColor = '#8B5CF6';
+                  labelHtml = `<span style="font-size:0.65rem; font-weight:800; color:#5B21B6; background:#EDE9FE; padding:2px 8px; border-radius:999px;">Mendatang</span>`;
+                }
+                html += `<div class="ms-ceremony-item" style="background:${bg}; border-color:${border};">
+                <span class="ms-ceremony-dot" style="background:${dotColor};"></span>
+                <p style="flex:1; min-width:0; font-size:0.8125rem; font-weight:600; color:#1E293B;">${escapeHtml(c.date_formatted)}</p>
+                ${labelHtml}
+              </div>`;
+              });
+              listCeremonies.innerHTML = html;
+            }
+          }
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" class="py-2">${errorStateHTML(res.message || 'Gagal memuat data.', 'initMySchedule()')}</td></tr>`;
+          if (listAllowances) listAllowances.innerHTML = `<li style="color:#EF4444; font-size:0.8rem; text-align:center;">Gagal memuat data.</li>`;
+          if (listPickets) listPickets.innerHTML = `<li style="color:#EF4444; font-size:0.8rem; text-align:center;">Gagal memuat data.</li>`;
+          ['statTotalJadwal', 'statTotalJtm', 'statTotalPiket', 'statTotalUpacara'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '0';
+          });
+        }
+      }).withFailureHandler((err) => {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-2">${errorStateHTML('Koneksi gagal: ' + err, 'initMySchedule()')}</td></tr>`;
+        if (listAllowances) listAllowances.innerHTML = `<li style="color:#EF4444; font-size:0.8rem; text-align:center;">Koneksi gagal.</li>`;
+        if (listPickets) listPickets.innerHTML = `<li style="color:#EF4444; font-size:0.8rem; text-align:center;">Koneksi gagal.</li>`;
+        ['statTotalJadwal', 'statTotalJtm', 'statTotalPiket', 'statTotalUpacara'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = '—';
+        });
+      }).getMyWeeklyData(token);
+      checkExamForMySchedule();
+      setTimeout(() => { if (typeof _fixMobileLayouts === 'function') _fixMobileLayouts(); }, 250);
+    }
+    function renderMyWeeklyScheduleTable(schedules, opts) {
+      const tbody = document.getElementById('tbodyMyWeeklySchedule');
+      if (!tbody) return;
+      if (!schedules || schedules.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8">
+        <div class="ms-empty">
+          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <p>Belum ada jadwal mengajar</p>
+          <span>Hubungi admin jika seharusnya ada jadwal yang tersedia</span>
+        </div>
+      </td></tr>`;
+        return;
+      }
+      const dayColors = (opts && opts.dayColors) || {};
+      const todayName = (opts && opts.todayName) || '';
+      const nowMin = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+      const toMin = (t) => {
+        const parts = String(t || '00:00').split(':').map(Number);
+        return (parts[0] || 0) * 60 + (parts[1] || 0);
+      };
+      let html = '';
+      let prevDay = null;
+      schedules.forEach((s, idx) => {
+        const dc = dayColors[s.day_name] || { bg: '#F8FAFC', color: '#475569', dot: '#94A3B8', border: '#E2E8F0' };
+        const isToday = s.day_name === todayName;
+        const sMin = toMin(s.time_start);
+        const eMin = toMin(s.time_end);
+        const isLive = isToday && nowMin >= sMin && nowMin <= eMin;
+        const isUpcomingToday = isToday && nowMin < sMin;
+        const isFirstOfNewDay = (prevDay !== null && prevDay !== s.day_name);
+        prevDay = s.day_name;
+        let inlineStyle = 'cursor:pointer;';
+        let liveBadge = '';
+        if (isLive) {
+          inlineStyle += 'background:linear-gradient(90deg,#FEFCE8,#FFFBEB);box-shadow:inset 3px 0 0 #F59E0B;';
+          liveBadge = '<span class="inline-flex items-center gap-1 ml-1.5 text-[9px] font-extrabold bg-amber-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block"></span>Live</span>';
+        } else if (isUpcomingToday) {
+          inlineStyle += 'background:linear-gradient(90deg,#EFF6FF,#F0F9FF);box-shadow:inset 3px 0 0 #3B82F6;';
+          liveBadge = '<span class="inline-flex items-center gap-1 ml-1.5 text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Berikutnya</span>';
+        }
+        if (isFirstOfNewDay) {
+          inlineStyle += 'border-top:2px solid #F1F5F9;';
+        }
+        html += `<tr data-day="${escapeHtml(s.day_name)}" onclick="openMyScheduleDetailModal(${idx})" style="${inlineStyle}">
+        <td>
+          <span class="ms-day-badge" style="background:${dc.bg}; color:${dc.color}; border:1px solid ${dc.border};">
+            <span class="ms-day-dot" style="background:${dc.dot};"></span>
+            ${escapeHtml(s.day_name)}
+          </span>
+        </td>
+        <td>
+          <span style="font-family:monospace; font-size:0.75rem; color:#64748B; font-weight:600; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:3px 8px; display:inline-flex;align-items:center;gap:4px; white-space:nowrap;">
+            ${escapeHtml(String(s.time_start))}<span style="color:#CBD5E1;">&ndash;</span>${escapeHtml(String(s.time_end))}
+          </span>
+          ${liveBadge}
+        </td>
+        <td><span class="ms-class-badge">${escapeHtml(s.class_name)}</span></td>
+        <td class="ms-cell-clip" style="color:#334155; font-weight:500;" title="${escapeHtml(s.subject)}">${escapeHtml(s.subject)}</td>
+        <td style="text-align:center;"><span class="ms-jtm-badge">${escapeHtml(String(s.jtm_val || '0'))}</span></td>
+      </tr>`;
+      });
+      tbody.innerHTML = html;
+    }
+    function openMyScheduleDetailModal(idx) {
+      const sch = (window._mySchedulesCache || [])[idx];
+      if (!sch) return;
+      const modal = document.getElementById('msDetailModal');
+      if (!modal) return;
+      const setT = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      setT('msDetailDay', sch.day_name || '-');
+      setT('msDetailTime', `${sch.time_start || '--:--'} – ${sch.time_end || '--:--'}`);
+      setT('msDetailClass', sch.class_name || '-');
+      setT('msDetailSubject', sch.subject || '-');
+      setT('msDetailJtm', String(sch.jtm_val || '0'));
+      const toMin = (t) => { const p = String(t || '00:00').split(':').map(Number); return (p[0] || 0) * 60 + (p[1] || 0); };
+      const dur = Math.max(0, toMin(sch.time_end) - toMin(sch.time_start));
+      setT('msDetailDuration', `${dur} menit (~${(dur / 60).toFixed(1)} jam)`);
+      modal.classList.remove('hidden');
+    }
+    function closeMyScheduleDetailModal() {
+      const modal = document.getElementById('msDetailModal');
+      if (modal) modal.classList.add('hidden');
+    }
+    function refreshMySchedule() {
+      const btn = document.getElementById('btnRefreshMySchedule');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      if (typeof showToast === 'function') showToast('Memperbarui jadwal...', 'info');
+      initMySchedule();
+    }
+    function filterMySchedule() {
+      const all = window._mySchedulesCache || [];
+      const search = (document.getElementById('msSearchInput')?.value || '').toLowerCase().trim();
+      const dayFilter = document.getElementById('msDayFilter')?.value || '';
+      const filtered = all.filter(s => {
+        const matchSearch = !search ||
+          String(s.subject || '').toLowerCase().includes(search) ||
+          String(s.class_name || '').toLowerCase().includes(search);
+        const matchDay = !dayFilter || s.day_name === dayFilter;
+        return matchSearch && matchDay;
+      });
+      const dayColors = {
+        'Senin': { bg: '#EFF6FF', color: '#1D4ED8', dot: '#3B82F6', border: '#BFDBFE' },
+        'Selasa': { bg: '#F5F3FF', color: '#5B21B6', dot: '#8B5CF6', border: '#DDD6FE' },
+        'Rabu': { bg: '#ECFDF5', color: '#065F46', dot: '#10B981', border: '#A7F3D0' },
+        'Kamis': { bg: '#FFF7ED', color: '#9A3412', dot: '#F97316', border: '#FED7AA' },
+        'Jumat': { bg: '#FDF4FF', color: '#7E22CE', dot: '#D946EF', border: '#F0ABFC' },
+        'Sabtu': { bg: '#F0F9FF', color: '#0369A1', dot: '#38BDF8', border: '#BAE6FD' },
+        'Minggu': { bg: '#FEF2F2', color: '#9F1239', dot: '#F43F5E', border: '#FECACA' },
+      };
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const todayName = days[new Date().getDay()];
+      const tbody = document.getElementById('tbodyMyWeeklySchedule');
+      if (!tbody) return;
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8">
+        <div class="ms-empty">
+          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <p>Tidak ada hasil</p>
+          <span>Coba kata kunci atau filter hari yang berbeda</span>
+        </div>
+      </td></tr>`;
+        const badgeCount = document.getElementById('badgeJadwalCount');
+        if (badgeCount) badgeCount.textContent = '0 dari ' + all.length + ' sesi · 0 JTM';
+        return;
+      }
+      const nowMin = (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })();
+      const toMin = (t) => { const p = String(t || '00:00').split(':').map(Number); return (p[0] || 0) * 60 + (p[1] || 0); };
+      let html = '';
+      let prevDay = null;
+      filtered.forEach((s) => {
+        const origIdx = all.indexOf(s);
+        const dc = dayColors[s.day_name] || { bg: '#F8FAFC', color: '#475569', dot: '#94A3B8', border: '#E2E8F0' };
+        const isToday = s.day_name === todayName;
+        const sMin = toMin(s.time_start);
+        const eMin = toMin(s.time_end);
+        const isLive = isToday && nowMin >= sMin && nowMin <= eMin;
+        const isUpcomingToday = isToday && nowMin < sMin;
+        const isFirstOfNewDay = (prevDay !== null && prevDay !== s.day_name);
+        prevDay = s.day_name;
+        let inlineStyle = 'cursor:pointer;';
+        let liveBadge = '';
+        if (isLive) {
+          inlineStyle += 'background:linear-gradient(90deg,#FEFCE8,#FFFBEB);box-shadow:inset 3px 0 0 #F59E0B;';
+          liveBadge = '<span class="inline-flex items-center gap-1 ml-1.5 text-[9px] font-extrabold bg-amber-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider"><span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block"></span>Live</span>';
+        } else if (isUpcomingToday) {
+          inlineStyle += 'background:linear-gradient(90deg,#EFF6FF,#F0F9FF);box-shadow:inset 3px 0 0 #3B82F6;';
+          liveBadge = '<span class="inline-flex items-center gap-1 ml-1.5 text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Berikutnya</span>';
+        }
+        if (isFirstOfNewDay) inlineStyle += 'border-top:2px solid #F1F5F9;';
+        html += `<tr data-day="${escapeHtml(s.day_name)}" onclick="openMyScheduleDetailModal(${origIdx})" style="${inlineStyle}">
+        <td>
+          <span class="ms-day-badge" style="background:${dc.bg}; color:${dc.color}; border:1px solid ${dc.border};">
+            <span class="ms-day-dot" style="background:${dc.dot};"></span>
+            ${escapeHtml(s.day_name)}
+          </span>
+        </td>
+        <td>
+          <span style="font-family:monospace; font-size:0.75rem; color:#64748B; font-weight:600; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:3px 8px; display:inline-flex;align-items:center;gap:4px; white-space:nowrap;">
+            ${escapeHtml(String(s.time_start))}<span style="color:#CBD5E1;">&ndash;</span>${escapeHtml(String(s.time_end))}
+          </span>
+          ${liveBadge}
+        </td>
+        <td><span class="ms-class-badge">${escapeHtml(s.class_name)}</span></td>
+        <td class="ms-cell-clip" style="color:#334155; font-weight:500;" title="${escapeHtml(s.subject)}">${escapeHtml(s.subject)}</td>
+        <td style="text-align:center;"><span class="ms-jtm-badge">${escapeHtml(String(s.jtm_val || '0'))}</span></td>
+      </tr>`;
+      });
+      tbody.innerHTML = html;
+      const badgeCount = document.getElementById('badgeJadwalCount');
+      if (badgeCount) {
+        const totalJtmFiltered = filtered.reduce((s, x) => s + Number(x.jtm_val || 0), 0);
+        badgeCount.textContent = filtered.length + ' dari ' + all.length + ' sesi · ' + totalJtmFiltered + ' JTM';
+      }
+    }
+    function resetMyScheduleFilter() {
+      const inp = document.getElementById('msSearchInput');
+      const sel = document.getElementById('msDayFilter');
+      if (inp) inp.value = '';
+      if (sel) sel.value = '';
+      filterMySchedule();
+    }
+    function printMySchedule() {
+      const data = window._myWeeklyData;
+      if (!data || !Array.isArray(data.schedules)) {
+        showToast('Data belum siap untuk dicetak', 'error');
+        return;
+      }
+      const userName = localStorage.getItem('user_name') || 'Pengguna';
+      const today = new Date();
+      const dateStr = formatDateID(today);
+      const appVersion = (typeof globalConfig !== 'undefined' && globalConfig.app_version) ? globalConfig.app_version : '2.1.1';
+      const schoolName = (typeof globalConfig !== 'undefined' && globalConfig.school_name) ? globalConfig.school_name : 'MTs Nurul Falah';
+      const appName = (typeof globalConfig !== 'undefined' && globalConfig.app_name) ? globalConfig.app_name : 'Sistem Manajemen Guru';
+      const activeTP = (typeof globalConfig !== 'undefined' && globalConfig.tahun_pelajaran) ? globalConfig.tahun_pelajaran : '-';
+      const activeSem = (typeof globalConfig !== 'undefined' && globalConfig.semester) ? globalConfig.semester : '-';
+      const totalJtm = data.schedules.reduce((s, x) => s + Number(x.jtm_val || 0), 0);
+      let jadwalRows = '';
+      data.schedules.forEach((s, i) => {
+        const jtmTxt = (s.jtm_val === null || s.jtm_val === undefined || s.jtm_val === '') ? '0' : String(s.jtm_val);
+        jadwalRows += `<tr>
+          <td class="tc">${i + 1}</td>
+          <td>${escapeHtml(s.day_name)}</td>
+          <td class="mono">${escapeHtml(s.time_start)} &ndash; ${escapeHtml(s.time_end)}</td>
+          <td>${escapeHtml(s.class_name)}</td>
+          <td>${escapeHtml(s.subject)}</td>
+          <td class="tc">${escapeHtml(jtmTxt)}</td>
+        </tr>`;
+      });
+      const picketDays = Array.isArray(data.picket_days) ? data.picket_days : [];
+      let piketRows = '';
+      if (picketDays.length === 0) {
+        piketRows = '<tr><td colspan="2" class="empty">Tidak ada jadwal piket.</td></tr>';
+      } else {
+        picketDays.forEach((day, i) => {
+          piketRows += `<tr>
+            <td class="tc">${i + 1}</td>
+            <td>${escapeHtml(day)}</td>
+          </tr>`;
+        });
+      }
+      const ceremonies = Array.isArray(data.ceremony_assignments) ? data.ceremony_assignments : [];
+      let upacaraRows = '';
+      if (ceremonies.length === 0) {
+        upacaraRows = '<tr><td colspan="3" class="empty">Tidak ada jadwal sebagai pembina upacara.</td></tr>';
+      } else {
+        ceremonies.forEach((c, i) => {
+          let statusTxt, statusClass;
+          if (c.is_today) {
+            statusTxt = 'Hari Ini'; statusClass = 'badge-today';
+          } else if (c.is_past) {
+            statusTxt = c.is_confirmed ? 'Selesai ✓' : 'Tidak Hadir';
+            statusClass = c.is_confirmed ? 'badge-done' : 'badge-absent';
+          } else {
+            statusTxt = 'Mendatang'; statusClass = 'badge-upcoming';
+          }
+          upacaraRows += `<tr>
+            <td class="tc">${i + 1}</td>
+            <td>${escapeHtml(c.date_formatted || c.date)}</td>
+            <td class="tc"><span class="${statusClass}">${statusTxt}</span></td>
+          </tr>`;
+        });
+      }
+      const allowances = Array.isArray(data.allowances) ? data.allowances : [];
+      let tugasRows = '';
+      let totalAllowance = 0;
+      if (allowances.length === 0) {
+        tugasRows = '<tr><td colspan="3" class="empty">Tidak ada tugas tambahan.</td></tr>';
+      } else {
+        allowances.forEach((a, i) => {
+          const amtStr = a.amount && String(a.amount).trim() !== '' ? String(a.amount) : 'Rp 0';
+          const rawAmt = typeof a.raw_amount === 'number' ? a.raw_amount : (typeof a.amount === 'number' ? a.amount : (Number(String(a.amount).replace(/[^0-9]/g, '')) || 0));
+          totalAllowance += rawAmt;
+          tugasRows += `<tr>
+            <td class="tc">${i + 1}</td>
+            <td>${escapeHtml(a.duty_name || '-')}</td>
+            <td class="tr">${escapeHtml(amtStr)}<span style="color:#94A3B8;font-size:10px;"> /bulan</span></td>
+          </tr>`;
+        });
+      }
+      const totalAllowanceStr = totalAllowance > 0
+        ? 'Rp ' + totalAllowance.toLocaleString('id-ID')
+        : '';
+      const printWindow = window.open('', '_blank', 'width=900,height=750');
+      if (!printWindow) {
+        showToast('Pop-up diblokir browser. Mohon izinkan untuk mencetak.', 'error');
+        return;
+      }
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Jadwal Saya &mdash; ${escapeHtml(userName)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; padding: 28px 32px; color: #1E293B; font-size: 13px; }
+  .doc-header { display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 2.5px solid #1E3A5F; padding-bottom: 10px; margin-bottom: 22px; }
+  .doc-header h1 { color: #1E3A5F; margin: 0 0 3px; font-size: 18px; }
+  .doc-header .meta { color: #64748B; font-size: 11.5px; }
+  .section { margin-bottom: 26px; }
+  .section-title { font-size: 13.5px; font-weight: 700; color: #1E3A5F; border-left: 4px solid #1E3A5F; padding-left: 8px; margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #1E3A5F; color: #fff; padding: 8px 10px; text-align: left; font-weight: 700; border: 1px solid #1E3A5F; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+  td { padding: 7px 10px; border: 1px solid #D1D5DB; vertical-align: middle; }
+  tr:nth-child(even) td { background: #F8FAFC; }
+  .tc { text-align: center; }
+  .tr { text-align: right; }
+  .mono { font-family: 'Courier New', monospace; }
+  .summary { margin-top: 8px; padding: 8px 12px; background: #F1F5F9; border-radius: 6px; font-size: 12px; color: #475569; }
+  .summary strong { color: #1E3A5F; }
+  .empty { text-align: center; padding: 14px; color: #94A3B8; font-style: italic; }
+  .badge-today    { background:#DBEAFE; color:#1D4ED8; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .badge-done     { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .badge-absent   { background:#FFE4E6; color:#BE123C; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .badge-upcoming { background:#EDE9FE; color:#5B21B6; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; white-space:nowrap; }
+  .footer { margin-top: 28px; font-size: 10.5px; color: #94A3B8; text-align: center; border-top: 1px solid #E2E8F0; padding-top: 10px; }
+  @media print {
+    body { padding: 12mm 15mm; }
+    .section { page-break-inside: avoid; }
+  }
+</style></head>
+<body>
+<div class="doc-header">
+  <div>
+    <h1>Rekap Jadwal &amp; Tugas</h1>
+    <div class="meta"><strong>${escapeHtml(userName)}</strong> &nbsp;&middot;&nbsp; TA: ${escapeHtml(activeTP)} (SMT ${escapeHtml(activeSem)}) &nbsp;&middot;&nbsp; Dicetak: ${escapeHtml(dateStr)}</div>
+  </div>
+  <div style="text-align:right; color:#64748B; font-size:11px; line-height:1.6;">
+    <div style="font-weight:700; color:#1E3A5F; font-size:13px;">${escapeHtml(schoolName)}</div>
+    <div>${escapeHtml(appName)} (v${escapeHtml(appVersion)})</div>
+  </div>
+</div>
+<div class="section">
+  <p class="section-title">1. Jadwal Mengajar Mingguan</p>
+  <table>
+    <thead><tr><th style="width:36px;">No</th><th style="width:80px;">Hari</th><th style="width:110px;">Jam</th><th>Kelas</th><th>Mata Pelajaran</th><th style="width:44px;">JTM</th></tr></thead>
+    <tbody>${jadwalRows || '<tr><td colspan="6" class="empty">Tidak ada jadwal mengajar.</td></tr>'}</tbody>
+  </table>
+  <div class="summary">Total Sesi: <strong>${data.schedules.length}</strong> &nbsp;&middot;&nbsp; Total JTM / Minggu: <strong>${totalJtm}</strong></div>
+</div>
+<div class="section">
+  <p class="section-title">2. Jadwal Piket</p>
+  <table>
+    <thead><tr><th style="width:36px;">No</th><th>Hari Piket</th></tr></thead>
+    <tbody>${piketRows}</tbody>
+  </table>
+  ${picketDays.length > 0 ? `<div class="summary">Total Hari Piket / Minggu: <strong>${picketDays.length} hari</strong></div>` : ''}
+</div>
+<div class="section">
+  <p class="section-title">3. Jadwal Pembina Upacara</p>
+  <table>
+    <thead><tr><th style="width:36px;">No</th><th>Tanggal</th><th style="width:110px; text-align:center;">Status</th></tr></thead>
+    <tbody>${upacaraRows}</tbody>
+  </table>
+  ${ceremonies.length > 0 ? `<div class="summary">Total Penugasan: <strong>${ceremonies.length} kali</strong> &nbsp;&middot;&nbsp; Selesai: <strong>${ceremonies.filter(c => c.is_confirmed || c.is_today).length} kali</strong></div>` : ''}
+</div>
+<div class="section">
+  <p class="section-title">4. Tugas Tambahan</p>
+  <table>
+    <thead><tr><th style="width:36px;">No</th><th>Nama Tugas / Jabatan</th><th style="width:140px; text-align:right;">Tunjangan / Bulan</th></tr></thead>
+    <tbody>${tugasRows}</tbody>
+  </table>
+  ${allowances.length > 0 && totalAllowanceStr ? `<div class="summary">Total Tunjangan Tugas Tambahan: <strong>${escapeHtml(totalAllowanceStr)}</strong> / bulan</div>` : ''}
+</div>
+<div class="footer">${escapeHtml(appName)} (v${escapeHtml(appVersion)}) &mdash; ${escapeHtml(schoolName)} &mdash; Dokumen ini dicetak otomatis dari sistem</div>
+<script>window.onload = function() { setTimeout(function() { window.print(); }, 300); };<\/script>
+</body></html>`;
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+    function updatePicketBadge() {
+      const token = localStorage.getItem('auth_token');
+      const badge = document.getElementById('badgePicketNotification');
+      const badgeAdmin = document.getElementById('badgePicketNotification_Admin');
+      if (!badge && !badgeAdmin) return;
+      google.script.run.withSuccessHandler((res) => {
+        if (res.status === 'success' && res.is_picket) {
+          if (badge) badge.classList.remove('hidden');
+          if (badgeAdmin) badgeAdmin.classList.remove('hidden');
+        } else {
+          if (badge) badge.classList.add('hidden');
+          if (badgeAdmin) badgeAdmin.classList.add('hidden');
+        }
+      }).getPicketStatus(token);
+    }
+    function updateNotificationBadges() {
+      const role = localStorage.getItem('user_role');
+      if (String(role).toLowerCase() !== 'admin') return;
+      const token = localStorage.getItem('auth_token');
+      const badgeSidebar = document.getElementById('badgeResetRequest');
+      const badgeSettings = document.getElementById('badgeResetCount');
+      const badgeTabBtn = document.getElementById('badgeResetTabBtn');
+      google.script.run.withSuccessHandler((res) => {
+        if (res.status === 'success' && res.count > 0) {
+          if (badgeSidebar) {
+            badgeSidebar.innerText = res.count;
+            badgeSidebar.classList.remove('hidden');
+          }
+          if (badgeSettings) {
+            badgeSettings.innerText = res.count;
+            badgeSettings.classList.remove('hidden');
+          }
+          if (badgeTabBtn) {
+            badgeTabBtn.innerText = res.count;
+            badgeTabBtn.classList.remove('hidden');
+          }
+</script>
