@@ -1,0 +1,913 @@
+<script>
+      if (elInp) elInp.value = name;
+      if (elUsername) elUsername.value = username;
+      if (elRoleInp) elRoleInp.value = role;
+      const ptabGuru = document.getElementById('ptab-guru');
+      if (ptabGuru) {
+        if (String(role).toLowerCase() === 'guru') {
+          ptabGuru.style.display = '';
+        } else {
+          ptabGuru.style.display = 'none';
+        }
+      }
+      initPasswordValidation();
+      var oldPassEl = document.getElementById('inpOldPass');
+      var newPassEl = document.getElementById('inpNewPass');
+      if (oldPassEl) oldPassEl.value = '';
+      if (newPassEl) newPassEl.value = '';
+      var rulesBox = document.getElementById('val-rules');
+      if (rulesBox) rulesBox.classList.add('hidden');
+      if (forceSecQ) {
+        switchProfileTab('security-q');
+        setTimeout(() => {
+          if (!document.getElementById('secQuestionOverlay')) showSecurityQuestionOverlay();
+        }, 300);
+      }
+      var forceEmailVerify = localStorage.getItem('force_email_verify') === 'true' ||
+        localStorage.getItem('has_email_verified') === 'false';
+      if (!forceSecQ && forceEmailVerify) {
+        switchProfileTab('diri');
+      }
+      _refreshEmailVerifyBanner();
+      setTimeout(_fixMobileLayouts, 150);
+      if (token) {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res && res.status === 'success' && res.profile) {
+              var p = res.profile;
+              var phoneEl = document.getElementById('inpProfilePhone');
+              var emailEl = document.getElementById('inpProfileEmail');
+              var usernameEl = document.getElementById('inpProfileUsername');
+              var jarakEl = document.getElementById('inpGuruJarak');
+              var nipEl = document.getElementById('inpGuruNIP');
+              var listJabatanEl = document.getElementById('listGuruJabatan');
+              var listMapelEl = document.getElementById('listGuruMapel');
+              var statusEl = document.getElementById('inpGuruStatus');
+              var golonganEl = document.getElementById('inpGuruGolongan');
+              var alamatEl = document.getElementById('inpGuruAlamat');
+              if (phoneEl) phoneEl.value = p.phone || '';
+              if (emailEl) emailEl.value = p.email || '';
+              if (usernameEl) usernameEl.value = p.username || '';
+              if (jarakEl) jarakEl.value = p.km_distance ? (p.km_distance + ' km') : 'Belum diatur';
+              if (nipEl) nipEl.value = p.nip || 'Belum diatur';
+              if (statusEl) statusEl.value = p.status_kepegawaian || '';
+              if (golonganEl) golonganEl.value = p.golongan || '';
+              if (alamatEl) alamatEl.value = p.alamat || '';
+              if (listJabatanEl) {
+                if (Array.isArray(p.jabatan) && p.jabatan.length > 0) {
+                  listJabatanEl.innerHTML = '<ol class="list-decimal pl-4 space-y-1.5 text-sm">' + p.jabatan.map(j => '<li>' + escapeHtml(j) + '</li>').join('') + '</ol>';
+                } else {
+                  listJabatanEl.innerHTML = '<div class="text-slate-400 italic text-sm">Tidak ada tugas tambahan</div>';
+                }
+              }
+              if (listMapelEl) {
+                if (Array.isArray(p.mapel_diampu) && p.mapel_diampu.length > 0) {
+                  listMapelEl.innerHTML = '<ol class="list-decimal pl-4 space-y-1.5 text-sm">' + p.mapel_diampu.map(m => '<li>' + escapeHtml(m) + '</li>').join('') + '</ol>';
+                } else {
+                  listMapelEl.innerHTML = '<div class="text-slate-400 italic text-sm">Belum ada mata pelajaran</div>';
+                }
+              }
+              if (p.username) localStorage.setItem('user_username', p.username);
+              if (p.phone) localStorage.setItem('user_phone', p.phone);
+              if (p.email) localStorage.setItem('user_email', p.email);
+              else localStorage.removeItem('user_email');
+              var badge = document.getElementById('profileEmailVerifiedBadge');
+              if (badge) {
+                if (p.email) badge.classList.remove('hidden');
+                else badge.classList.add('hidden');
+              }
+              var hasEmail = !!(p.email && /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(p.email));
+              localStorage.setItem('has_email_verified', hasEmail ? 'true' : 'false');
+              if (hasEmail) localStorage.removeItem('force_email_verify');
+              _refreshEmailVerifyBanner();
+              if (typeof _setEmailFieldReadOnly === 'function') _setEmailFieldReadOnly(hasEmail);
+            }
+          })
+          .withFailureHandler(function () { })
+          .getMyProfile(token);
+        google.script.run
+          .withSuccessHandler((res) => {
+            const warnBanner = document.getElementById('sqWarningBanner');
+            const setBanner = document.getElementById('sqSetBanner');
+            const selQ = document.getElementById('inpSecurityQuestion');
+            const sqTabBadge = document.getElementById('sqTabBadge');
+            if (res && res.status === 'success' && res.question) {
+              if (selQ) selQ.value = res.question;
+              if (warnBanner) warnBanner.classList.add('hidden');
+              if (setBanner) setBanner.classList.remove('hidden');
+              if (sqTabBadge) sqTabBadge.classList.add('hidden');
+            } else {
+              if (warnBanner) warnBanner.classList.remove('hidden');
+              if (setBanner) setBanner.classList.add('hidden');
+              if (sqTabBadge) sqTabBadge.classList.remove('hidden');
+            }
+          })
+          .withFailureHandler(() => { })
+          .getMySecurityQuestion(token);
+      }
+    }
+    function initPasswordValidation() {
+      const inp = document.getElementById('inpNewPass');
+      const rulesBox = document.getElementById('val-rules');
+      const strengthWrap = document.getElementById('pwdStrengthWrap');
+      if (!inp || !rulesBox) return;
+      if (inp.dataset.pwdListenerAttached === 'true') return;
+      inp.dataset.pwdListenerAttached = 'true';
+      inp.addEventListener('input', function () {
+        const val = this.value;
+        const name = document.getElementById('inpProfileName').value || '';
+        const oldPassEl = document.getElementById('inpOldPass');
+        const oldVal = oldPassEl ? oldPassEl.value : '';
+        if (val.length > 0) {
+          rulesBox.classList.remove('hidden');
+          if (strengthWrap) strengthWrap.classList.remove('hidden');
+        } else {
+          rulesBox.classList.add('hidden');
+          if (strengthWrap) strengthWrap.classList.add('hidden');
+        }
+        const setStatus = (id, isValid) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          const dot = el.querySelector('.rule-dot') || el.querySelector('span');
+          if (isValid) {
+            el.classList.remove('text-slate-400', 'text-red-500', 'text-slate-500');
+            el.classList.add('text-green-600', 'font-medium');
+            if (dot) { dot.classList.remove('bg-slate-300', 'bg-red-500', 'bg-slate-200'); dot.classList.add('bg-green-600'); }
+          } else {
+            el.classList.remove('text-slate-400', 'text-green-600', 'font-medium');
+            el.classList.add('text-slate-500');
+            if (dot) { dot.classList.remove('bg-green-600'); dot.classList.add('bg-slate-300'); }
+          }
+        };
+        var checks = {
+          len: val.length >= 8,
+          upper: /[A-Z]/.test(val),
+          lower: /[a-z]/.test(val),
+          num: /[0-9]/.test(val),
+          spec: /[!@#$%^&*(),.?":{}|<>]/.test(val)
+        };
+        setStatus('rule-len', checks.len);
+        setStatus('rule-upper', checks.upper);
+        setStatus('rule-lower', checks.lower);
+        setStatus('rule-num', checks.num);
+        setStatus('rule-spec', checks.spec);
+        let nameValid = true;
+        if (name) {
+          const parts = name.split(' ').filter(p => p.length > 2);
+          for (let p of parts) {
+            if (val.toLowerCase().includes(p.toLowerCase())) {
+              nameValid = false; break;
+            }
+          }
+        }
+        var nameOK = nameValid && val.length > 0;
+        setStatus('rule-name', nameOK);
+        var differentOK = val.length > 0 && (oldVal === '' || val !== oldVal);
+        setStatus('rule-different', differentOK);
+        var passedCount = (checks.len ? 1 : 0) + (checks.upper ? 1 : 0) + (checks.lower ? 1 : 0) + (checks.num ? 1 : 0) + (checks.spec ? 1 : 0);
+        var bonus = val.length >= 12 ? 1 : 0;
+        var totalScore = Math.min(5, passedCount + bonus);
+        if (!nameOK && val.length > 0) totalScore = Math.max(0, totalScore - 1);
+        if (!differentOK && val.length > 0 && oldVal) totalScore = Math.max(0, totalScore - 2);
+        var fill = document.getElementById('pwdStrengthFill');
+        var label = document.getElementById('pwdStrengthText');
+        var score = document.getElementById('pwdStrengthScore');
+        if (fill) {
+          fill.classList.remove('s1', 's2', 's3', 's4', 's5');
+          if (totalScore > 0) fill.classList.add('s' + totalScore);
+          fill.style.width = (totalScore * 20) + '%';
+        }
+        if (label) {
+          var textMap = { 0: 'Belum diisi', 1: 'Sangat lemah', 2: 'Lemah', 3: 'Cukup', 4: 'Kuat', 5: 'Sangat kuat' };
+          var colorMap = {
+            0: '#94a3b8',
+            1: '#ef4444',
+            2: '#f97316',
+            3: '#eab308',
+            4: '#22c55e',
+            5: '#16a34a'
+          };
+          label.textContent = textMap[totalScore] || 'Belum diisi';
+          label.style.color = colorMap[totalScore] || '#94a3b8';
+        }
+        if (score) score.textContent = totalScore + '/5';
+      });
+      var oldInp = document.getElementById('inpOldPass');
+      if (oldInp && oldInp.dataset.pwdReevalAttached !== 'true') {
+        oldInp.dataset.pwdReevalAttached = 'true';
+        oldInp.addEventListener('input', function () {
+          try {
+            inp.dispatchEvent(new Event('input', { bubbles: true }));
+          } catch (_) {
+            var ev = document.createEvent('Event');
+            ev.initEvent('input', true, true);
+            inp.dispatchEvent(ev);
+          }
+        });
+      }
+    }
+    function copyUsernameAction() {
+      var inp = document.getElementById('inpProfileUsername');
+      var btn = document.getElementById('btnCopyUsername');
+      if (!inp || !inp.value) return;
+      var done = function () {
+        if (!btn) return;
+        var origHTML = btn.innerHTML;
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+        setTimeout(function () {
+          btn.classList.remove('copied');
+          btn.innerHTML = origHTML;
+        }, 1400);
+        showToast('Username disalin ke clipboard', 'success');
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(inp.value).then(done, function () {
+          try {
+            inp.select();
+            document.execCommand('copy');
+            done();
+          } catch (_) {
+            showToast('Gagal menyalin ke clipboard', 'error');
+          }
+        });
+      } else {
+        try {
+          inp.select();
+          document.execCommand('copy');
+          done();
+        } catch (_) {
+          showToast('Browser tidak mendukung salin otomatis', 'error');
+        }
+      }
+    }
+    function saveProfileName() {
+      const btn = document.getElementById('btnSaveProfile');
+      const newName = (document.getElementById('inpProfileName').value || '').trim();
+      var phoneEl = document.getElementById('inpProfilePhone');
+      const newPhoneRaw = (phoneEl ? phoneEl.value : '').trim();
+      const token = localStorage.getItem('auth_token');
+      if (!newName) {
+        showToast('Nama tidak boleh kosong', 'error');
+        var inp = document.getElementById('inpProfileName');
+        if (inp) try { inp.focus(); } catch (_) { }
+        return;
+      }
+      if (newName.length < 2) {
+        showToast('Nama minimal 2 karakter', 'error');
+        return;
+      }
+      var normalizedPhone = '';
+      if (newPhoneRaw) {
+        var pn = _normalizePhoneClient(newPhoneRaw);
+        if (!pn.valid) {
+          showToast(pn.message || 'Nomor HP tidak valid.', 'error');
+          if (phoneEl) try { phoneEl.focus(); } catch (_) { }
+          return;
+        }
+        normalizedPhone = pn.normalized;
+      }
+      var currentName = String(localStorage.getItem('user_name') || '').trim();
+      var currentPhone = String(localStorage.getItem('user_phone') || '').trim();
+      if (newName === currentName && normalizedPhone === currentPhone) {
+        showToast('Tidak ada perubahan untuk disimpan.', 'info');
+        return;
+      }
+      showConfirm('Simpan Profil', 'Simpan perubahan data diri Anda?', () => {
+        var restore = _busyButton(btn, 'Menyimpan...');
+        google.script.run.withSuccessHandler((res) => {
+          restore();
+          if (res && res.status === 'success') {
+            showToast('Profil berhasil diperbarui', 'success');
+            localStorage.setItem('user_name', newName);
+            if (res.phone !== undefined) {
+              localStorage.setItem('user_phone', String(res.phone || ''));
+              if (phoneEl) phoneEl.value = res.phone || '';
+            }
+            if (typeof updateNavbarUser === 'function') updateNavbarUser();
+            const elNameBig = document.getElementById('navUserName_Big');
+            const elInitBig = document.getElementById('divProfileInit');
+            if (elNameBig) elNameBig.innerText = newName;
+            if (elInitBig) elInitBig.innerText = newName.charAt(0).toUpperCase();
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan profil.', 'error');
+          }
+        }).withFailureHandler((err) => {
+          restore();
+          showToast('Gagal terhubung ke server: ' + (err && err.message ? err.message : err), 'error');
+        }).updateUserProfile(token, { full_name: newName, phone: newPhoneRaw });
+      });
+    }
+    function saveGuruProfileDetails() {
+      const btn = document.getElementById('btnSaveGuruProfileDetails');
+      const token = localStorage.getItem('auth_token');
+      const statusEl = document.getElementById('inpGuruStatus');
+      const golonganEl = document.getElementById('inpGuruGolongan');
+      const alamatEl = document.getElementById('inpGuruAlamat');
+      const payload = {
+        status_kepegawaian: statusEl ? statusEl.value : '',
+        golongan: golonganEl ? golonganEl.value : '',
+        alamat: alamatEl ? alamatEl.value : ''
+      };
+      showConfirm('Simpan Profil Guru', 'Simpan perubahan data profil guru Anda?', () => {
+        var restore = _busyButton(btn, 'Menyimpan...');
+        google.script.run.withSuccessHandler((res) => {
+          restore();
+          if (res && res.status === 'success') {
+            showToast('Profil guru berhasil diperbarui', 'success');
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan profil guru.', 'error');
+          }
+        }).withFailureHandler((err) => {
+          restore();
+          showToast('Gagal terhubung ke server: ' + (err && err.message ? err.message : err), 'error');
+        }).updateGuruProfileDetails(token, payload);
+      });
+    }
+    function _normalizePhoneClient(input) {
+      var s = String(input || '').trim();
+      if (!s) return { valid: true, normalized: '' };
+      s = s.replace(/[\s\-\(\)\.]/g, '');
+      if (s.indexOf('+') === 0) s = s.substring(1);
+      if (!/^\d+$/.test(s)) return { valid: false, message: 'Nomor HP hanya boleh mengandung angka.' };
+      if (s.charAt(0) === '0') s = '62' + s.substring(1);
+      else if (!(s.charAt(0) === '6' && s.charAt(1) === '2')) {
+        if (s.length >= 8 && s.length <= 13) s = '62' + s;
+      }
+      if (s.length < 10 || s.length > 15) {
+        return { valid: false, message: 'Nomor HP harus 10–15 digit (termasuk kode negara).' };
+      }
+      if (s.indexOf('62') !== 0) {
+        return { valid: false, message: 'Nomor HP harus menggunakan kode negara Indonesia (62).' };
+      }
+      return { valid: true, normalized: s };
+    }
+    function profile_normalizePhoneOnInput(el) {
+      if (!el) return;
+      var caret = el.selectionStart;
+      var oldVal = el.value;
+      var v = String(oldVal || '').replace(/[^\d+]/g, '');
+      if (v.indexOf('+') > 0) v = v.replace(/\+/g, function (m, idx) { return idx === 0 ? '+' : ''; });
+      if (v.charAt(0) === '0') v = '62' + v.substring(1);
+      if (v !== oldVal) {
+        el.value = v;
+        try { el.setSelectionRange(caret, caret); } catch (_) { }
+      }
+    }
+    var _profileOtpState = { sent: false, target: '', cooldownTimer: null, cooldownLeft: 0 };
+    function _refreshEmailVerifyBanner() {
+      var banner = document.getElementById('profileEmailVerifyBanner');
+      if (!banner) return;
+      var verified = localStorage.getItem('has_email_verified') === 'true';
+      if (!verified) banner.classList.remove('hidden');
+      else banner.classList.add('hidden');
+    }
+    function profile_focusEmailField() {
+      var el = document.getElementById('inpProfileEmail');
+      if (!el) return;
+      try { el.focus(); el.select(); } catch (_) { }
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) { }
+    }
+    function _setEmailFieldReadOnly(readOnly) {
+      var input = document.getElementById('inpProfileEmail');
+      var btnChange = document.getElementById('btnChangeEmail');
+      var btnCancel = document.getElementById('btnCancelChangeEmail');
+      var btnReq = document.getElementById('btnRequestEmailOtp');
+      var hint = document.getElementById('profileEmailHint');
+      if (!input) return;
+      if (readOnly) {
+        input.setAttribute('readonly', '');
+        input.style.background = '#f1f5f9';
+        input.style.color = '#64748b';
+        input.style.cursor = 'default';
+        if (btnChange) btnChange.classList.remove('hidden');
+        if (btnChange) btnChange.classList.add('inline-flex');
+        if (btnCancel) btnCancel.classList.add('hidden');
+        if (btnReq) {
+          btnReq.classList.remove('hidden');
+          btnReq.disabled = true;
+          btnReq.classList.add('opacity-50', 'cursor-not-allowed');
+          btnReq.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Email Terverifikasi';
+        }
+        if (hint) {
+          hint.textContent = 'Klik "Ganti Email" untuk mengubah alamat email Anda.';
+          hint.classList.remove('hidden');
+        }
+        _resetOtpUI();
+      } else {
+        input.removeAttribute('readonly');
+        input.style.background = '';
+        input.style.color = '';
+        input.style.cursor = '';
+        if (btnChange) {
+          btnChange.classList.add('hidden');
+          btnChange.classList.remove('inline-flex');
+        }
+        if (hint) {
+          hint.textContent = 'Email akan diverifikasi via kode OTP sebelum disimpan.';
+          hint.classList.remove('hidden');
+        }
+      }
+    }
+    function profile_startChangeEmail() {
+      var input = document.getElementById('inpProfileEmail');
+      var btnCancel = document.getElementById('btnCancelChangeEmail');
+      var verifiedBadge = document.getElementById('profileEmailVerifiedBadge');
+      if (!input) return;
+      showConfirm(
+        'Ganti Email',
+        'Anda akan mengubah alamat email akun. Email baru perlu diverifikasi via kode OTP sebelum disimpan. Lanjutkan?',
+        function () {
+          _setEmailFieldReadOnly(false);
+          if (btnCancel) {
+            btnCancel.classList.remove('hidden');
+            btnCancel.classList.add('inline-flex');
+          }
+          if (verifiedBadge) verifiedBadge.classList.add('hidden');
+          try { input.focus(); input.select(); } catch (_) { }
+          if (typeof profile_validateEmailOnInput === 'function') profile_validateEmailOnInput();
+        },
+        { type: 'info' }
+      );
+    }
+    function profile_cancelChangeEmail() {
+      var input = document.getElementById('inpProfileEmail');
+      var btnCancel = document.getElementById('btnCancelChangeEmail');
+      var savedEmail = String(localStorage.getItem('user_email') || '');
+      var verifiedBadge = document.getElementById('profileEmailVerifiedBadge');
+      if (!input) return;
+      input.value = savedEmail;
+      if (btnCancel) {
+        btnCancel.classList.add('hidden');
+        btnCancel.classList.remove('inline-flex');
+      }
+      if (verifiedBadge && savedEmail) verifiedBadge.classList.remove('hidden');
+      _setEmailFieldReadOnly(true);
+      var btnReq = document.getElementById('btnRequestEmailOtp');
+      if (btnReq) btnReq.classList.add('hidden');
+      var errEl = document.getElementById('profileEmailError');
+      if (errEl) errEl.classList.add('hidden');
+    }
+    function _isValidEmailClient(s) {
+      if (!s) return false;
+      return /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(String(s).trim());
+    }
+    function profile_validateEmailOnInput() {
+      var el = document.getElementById('inpProfileEmail');
+      var hint = document.getElementById('profileEmailHint');
+      var err = document.getElementById('profileEmailError');
+      var btnReq = document.getElementById('btnRequestEmailOtp');
+      var verifiedBadge = document.getElementById('profileEmailVerifiedBadge');
+      if (!el) return;
+      var val = String(el.value || '').trim().toLowerCase();
+      var savedEmail = String(localStorage.getItem('user_email') || '').toLowerCase();
+      var isSame = val === savedEmail && val !== '';
+      if (verifiedBadge) {
+        if (isSame) verifiedBadge.classList.remove('hidden');
+        else verifiedBadge.classList.add('hidden');
+      }
+      if (!val) {
+        if (err) err.classList.add('hidden');
+        if (hint) hint.classList.remove('hidden');
+        if (btnReq) btnReq.classList.add('hidden');
+        _resetOtpUI();
+        return;
+      }
+      var ok = _isValidEmailClient(val);
+      if (!ok) {
+        if (err) { err.textContent = 'Format email tidak valid (contoh: nama@domain.com).'; err.classList.remove('hidden'); }
+        if (hint) hint.classList.add('hidden');
+        if (btnReq) btnReq.classList.add('hidden');
+        _resetOtpUI();
+        return;
+      }
+      if (err) err.classList.add('hidden');
+      if (hint) hint.classList.remove('hidden');
+      if (btnReq) {
+        if (isSame) {
+          btnReq.classList.remove('hidden');
+          btnReq.disabled = true;
+          btnReq.classList.add('opacity-50', 'cursor-not-allowed');
+          btnReq.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Email Terverifikasi';
+          _resetOtpUI();
+        } else {
+          btnReq.classList.remove('hidden');
+          btnReq.disabled = false;
+          btnReq.classList.remove('opacity-50', 'cursor-not-allowed');
+          btnReq.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> Kirim Kode OTP ke Email';
+        }
+      }
+    }
+    function _resetOtpUI() {
+      _profileOtpState.sent = false;
+      _profileOtpState.target = '';
+      var wrap = document.getElementById('profileEmailOtpWrap');
+      var inp = document.getElementById('inpProfileEmailOtp');
+      if (wrap) wrap.classList.add('hidden');
+      if (inp) inp.value = '';
+      if (_profileOtpState.cooldownTimer) {
+        clearInterval(_profileOtpState.cooldownTimer);
+        _profileOtpState.cooldownTimer = null;
+      }
+    }
+    function profile_requestEmailOtp(isResend) {
+      var el = document.getElementById('inpProfileEmail');
+      var btnReq = document.getElementById('btnRequestEmailOtp');
+      var btnResend = document.getElementById('btnResendOtp');
+      var token = localStorage.getItem('auth_token');
+      if (!el) return;
+      var email = String(el.value || '').trim().toLowerCase();
+      if (!_isValidEmailClient(email)) {
+        showToast('Format email tidak valid.', 'error');
+        return;
+      }
+      var triggerBtn = isResend ? btnResend : btnReq;
+      var restore = (typeof _busyButton === 'function') ? _busyButton(triggerBtn, 'Mengirim...') : function () { };
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restore();
+          if (res && res.status === 'success') {
+            _profileOtpState.sent = true;
+            _profileOtpState.target = email;
+            var wrap = document.getElementById('profileEmailOtpWrap');
+            var info = document.getElementById('profileOtpTargetEmail');
+            if (wrap) wrap.classList.remove('hidden');
+            if (info) info.textContent = email;
+            showToast(res.message || 'Kode OTP telah dikirim.', 'success');
+            if (btnReq) btnReq.classList.add('hidden');
+            _startOtpCooldown(Number(res.cooldown || 60));
+            setTimeout(function () {
+              var inp = document.getElementById('inpProfileEmailOtp');
+              if (inp) try { inp.focus(); } catch (_) { }
+            }, 200);
+          } else {
+            showToast((res && res.message) || 'Gagal mengirim kode OTP.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          restore();
+          showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .requestEmailOTP(token, email);
+    }
+    function _startOtpCooldown(seconds) {
+      var btnResend = document.getElementById('btnResendOtp');
+      var spanCd = document.getElementById('profileOtpCooldown');
+      if (!btnResend || !spanCd) return;
+      if (_profileOtpState.cooldownTimer) clearInterval(_profileOtpState.cooldownTimer);
+      btnResend.disabled = true;
+      _profileOtpState.cooldownLeft = seconds;
+      spanCd.textContent = String(seconds);
+      _profileOtpState.cooldownTimer = setInterval(function () {
+        _profileOtpState.cooldownLeft--;
+        if (_profileOtpState.cooldownLeft <= 0) {
+          clearInterval(_profileOtpState.cooldownTimer);
+          _profileOtpState.cooldownTimer = null;
+          btnResend.disabled = false;
+          btnResend.innerHTML = 'Kirim ulang';
+        } else {
+          btnResend.innerHTML = 'Kirim ulang (<span id="profileOtpCooldown">' + _profileOtpState.cooldownLeft + '</span>s)';
+        }
+      }, 1000);
+    }
+    function profile_updateOtpVerifyButton() {
+      var inp = document.getElementById('inpProfileEmailOtp');
+      var btn = document.getElementById('btnVerifyEmailOtp');
+      if (!inp || !btn) return;
+      btn.disabled = !(/^\d{6}$/.test(String(inp.value || '').trim()));
+    }
+    function profile_verifyEmailOtp() {
+      var el = document.getElementById('inpProfileEmail');
+      var inp = document.getElementById('inpProfileEmailOtp');
+      var btn = document.getElementById('btnVerifyEmailOtp');
+      var token = localStorage.getItem('auth_token');
+      if (!el || !inp) return;
+      var email = String(el.value || '').trim().toLowerCase();
+      var code = String(inp.value || '').trim();
+      if (!_isValidEmailClient(email)) { showToast('Format email tidak valid.', 'error'); return; }
+      if (!/^\d{6}$/.test(code)) { showToast('Kode OTP harus 6 digit.', 'error'); return; }
+      var restore = (typeof _busyButton === 'function') ? _busyButton(btn, 'Memverifikasi...') : function () { };
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restore();
+          if (res && res.status === 'success') {
+            showToast(res.message || 'Email berhasil diverifikasi & disimpan.', 'success');
+            localStorage.setItem('user_email', email);
+            localStorage.setItem('has_email_verified', 'true');
+            localStorage.removeItem('force_email_verify');
+            _resetOtpUI();
+            var verifiedBadge = document.getElementById('profileEmailVerifiedBadge');
+            if (verifiedBadge) verifiedBadge.classList.remove('hidden');
+            var btnReq = document.getElementById('btnRequestEmailOtp');
+            if (btnReq) btnReq.classList.add('hidden');
+            var btnCancel = document.getElementById('btnCancelChangeEmail');
+            if (btnCancel) {
+              btnCancel.classList.add('hidden');
+              btnCancel.classList.remove('inline-flex');
+            }
+            _refreshEmailVerifyBanner();
+            if (typeof _setEmailFieldReadOnly === 'function') _setEmailFieldReadOnly(true);
+          } else {
+            showToast((res && res.message) || 'Gagal memverifikasi OTP.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          restore();
+          showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .verifyEmailOTP(token, email, code);
+    }
+    function changePasswordAction() {
+      const btn = document.getElementById('btnChangePass');
+      const oldPass = document.getElementById('inpOldPass').value;
+      const newPass = document.getElementById('inpNewPass').value;
+      const token = localStorage.getItem('auth_token');
+      if (!oldPass) { showToast('Masukkan password lama', 'error'); return; }
+      if (!newPass) { showToast('Masukkan password baru', 'error'); return; }
+      if (oldPass === newPass) {
+        showToast('Password baru harus berbeda dari password lama.', 'error');
+        return;
+      }
+      var fullName = String(localStorage.getItem('user_name') || '');
+      var username = String(localStorage.getItem('user_username') || '') ||
+        (document.getElementById('inpProfileUsername') ? document.getElementById('inpProfileUsername').value : '');
+      var localCheck = _checkPasswordRules(newPass, fullName, username);
+      if (!localCheck.valid) {
+        showToast(localCheck.message, 'error');
+        var elNew = document.getElementById('inpNewPass');
+        if (elNew) try { elNew.focus(); } catch (_) { }
+        return;
+      }
+      showConfirm('Ganti Password', 'Apakah Anda yakin ingin mengubah password akun Anda? Anda akan diminta login ulang setelah berhasil.', () => {
+        var restore = _busyButton(btn, 'Memvalidasi...');
+        google.script.run.withSuccessHandler((res) => {
+          restore();
+          if (res && res.status === 'success') {
+            showToast('Password berhasil diubah. Mengalihkan ke halaman login...', 'success');
+            document.getElementById('inpOldPass').value = '';
+            document.getElementById('inpNewPass').value = '';
+            var rulesBox = document.getElementById('val-rules');
+            if (rulesBox) rulesBox.classList.add('hidden');
+            setTimeout(() => {
+              if (token) {
+                try { google.script.run.logoutUser(token); } catch (_) { }
+              }
+              var keysToKeep = ['hide_honor_dashboard', 'hide_transport_dashboard'];
+              var keepValues = {};
+              keysToKeep.forEach(function (k) {
+                var v = localStorage.getItem(k);
+                if (v !== null) keepValues[k] = v;
+              });
+              localStorage.clear();
+              Object.keys(keepValues).forEach(function (k) {
+                localStorage.setItem(k, keepValues[k]);
+              });
+              loadPage('Page_Login');
+            }, 1500);
+          } else {
+            showToast((res && res.message) || 'Gagal mengubah password.', 'error');
+          }
+        }).withFailureHandler((err) => {
+          restore();
+          showToast('Gagal terhubung ke server: ' + (err && err.message ? err.message : err), 'error');
+        }).updateUserProfile(token, { old_password: oldPass, new_password: newPass });
+      });
+    }
+    function _checkPasswordRules(password, fullName, username) {
+      if (!password || password.length < 8) return { valid: false, message: 'Password baru minimal 8 karakter.' };
+      if (!/[A-Z]/.test(password)) return { valid: false, message: 'Password harus mengandung huruf besar.' };
+      if (!/[a-z]/.test(password)) return { valid: false, message: 'Password harus mengandung huruf kecil.' };
+      if (!/[0-9]/.test(password)) return { valid: false, message: 'Password harus mengandung angka.' };
+      if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) return { valid: false, message: 'Password harus mengandung simbol khusus.' };
+      var lower = password.toLowerCase();
+      if (username && lower.indexOf(String(username).toLowerCase()) !== -1) {
+        return { valid: false, message: 'Password tidak boleh mengandung username.' };
+      }
+      if (fullName) {
+        var parts = String(fullName).split(/\s+/).filter(function (p) { return p.length > 2; });
+        for (var i = 0; i < parts.length; i++) {
+          if (lower.indexOf(parts[i].toLowerCase()) !== -1) {
+            return { valid: false, message: 'Password tidak boleh mengandung unsur nama Anda (' + parts[i] + ').' };
+          }
+        }
+      }
+      return { valid: true };
+    }
+    function togglePassword(inputId, btn) {
+      const input = document.getElementById(inputId);
+      if (input.type === "password") {
+        input.type = "text";
+        btn.setAttribute('aria-label', 'Sembunyikan password');
+        btn.innerHTML = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"></path></svg>';
+      } else {
+        input.type = "password";
+        btn.setAttribute('aria-label', 'Tampilkan password');
+        btn.innerHTML = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
+      }
+    }
+    function showSecurityQuestionOverlay() {
+      if (document.getElementById('secQuestionOverlay')) return;
+      document.body.classList.add('overflow-hidden');
+      const overlay = document.createElement('div');
+      overlay.id = 'secQuestionOverlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;animation:dvFadeIn 0.25s ease both;';
+      overlay.innerHTML = '' +
+        '<div style="background:white;border-radius:20px;max-width:420px;width:100%;padding:0;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.3);animation:dvSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1) both;">' +
+        '<div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:20px 24px;position:relative;">' +
+        '<div style="position:absolute;right:16px;top:16px;">' +
+        '<button id="sqOverlayCloseBtn" type="button" style="background:rgba(255,255,255,0.18);color:white;border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.15s;" title="Tutup nanti">' +
+        '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>' +
+        '</button>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:12px;padding-right:36px;">' +
+        '<div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+        '<svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>' +
+        '</div>' +
+        '<div>' +
+        '<h3 style="color:white;font-weight:800;font-size:16px;margin:0;">Pertanyaan Keamanan Wajib</h3>' +
+        '<p style="color:rgba(255,255,255,0.85);font-size:12px;margin:3px 0 0;">Langkah keamanan sebelum menggunakan aplikasi</p>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="padding:20px 24px 24px;font-family:inherit;">' +
+        '<p style="color:#475569;font-size:13px;line-height:1.6;margin:0 0 16px;">Anda harus mengatur <strong>pertanyaan keamanan</strong> sebelum dapat mengakses halaman lain. Pertanyaan ini digunakan untuk verifikasi identitas ketika Anda lupa password.</p>' +
+        '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;margin-bottom:16px;">' +
+        '<p style="color:#92400e;font-size:12px;font-weight:600;margin:0;">⚠️ Akses ke halaman lain diblokir hingga Anda menyelesaikan pengaturan ini.</p>' +
+        '</div>' +
+        '<button id="sqOverlaySetupBtn" type="button" style="width:100%;padding:11px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform 0.15s;">' +
+        'Atur Sekarang' +
+        '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>' +
+        '</button>' +
+        '</div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+      var setupBtn = document.getElementById('sqOverlaySetupBtn');
+      if (setupBtn) {
+        setupBtn.onclick = function () {
+          overlay.style.animation = 'dvFadeIn 0.2s ease reverse both';
+          setTimeout(function () {
+            overlay.remove();
+            document.body.classList.remove('overflow-hidden');
+            if (typeof switchProfileTab === 'function') switchProfileTab('security-q');
+          }, 200);
+        };
+      }
+      var closeBtn = document.getElementById('sqOverlayCloseBtn');
+      if (closeBtn) {
+        closeBtn.onclick = function () {
+          overlay.style.animation = 'dvFadeIn 0.2s ease reverse both';
+          setTimeout(function () {
+            overlay.remove();
+            document.body.classList.remove('overflow-hidden');
+            if (typeof switchProfileTab === 'function') switchProfileTab('security-q');
+          }, 200);
+        };
+      }
+    }
+    function switchProfileTab(tabKey) {
+      document.querySelectorAll('.profile-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelectorAll('.profile-tab-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      const activeBtn = document.getElementById('ptab-' + tabKey);
+      const activePanel = document.getElementById('ppanel-' + tabKey);
+      if (activeBtn) activeBtn.classList.add('active');
+      if (activePanel) {
+        activePanel.classList.add('active');
+        activePanel.classList.remove('profile-page-enter');
+        void activePanel.offsetWidth;
+        activePanel.classList.add('profile-page-enter');
+        setTimeout(function () {
+          var focusMap = {
+            'diri': 'inpProfileName',
+            'keamanan': 'inpOldPass',
+            'security-q': 'inpSecurityQuestion'
+          };
+          var inp = document.getElementById(focusMap[tabKey]);
+          if (inp) try { inp.focus({ preventScroll: true }); } catch (_) { }
+        }, 200);
+      }
+    }
+    function saveSecurityQuestionAction() {
+      const btn = document.getElementById('btnSaveSecurityQ');
+      const q = document.getElementById('inpSecurityQuestion').value.trim();
+      const a = document.getElementById('inpSecurityAnswer').value.trim();
+      const token = localStorage.getItem('auth_token');
+      if (!q) {
+        showToast('Silakan pilih pertanyaan keamanan terlebih dahulu.', 'error');
+        var sel = document.getElementById('inpSecurityQuestion');
+        if (sel) try { sel.focus(); } catch (_) { }
+        return;
+      }
+      if (!a) {
+        showToast('Jawaban tidak boleh kosong.', 'error');
+        var ans = document.getElementById('inpSecurityAnswer');
+        if (ans) try { ans.focus(); } catch (_) { }
+        return;
+      }
+      if (a.length < 2) {
+        showToast('Jawaban terlalu pendek (minimal 2 karakter).', 'error');
+        return;
+      }
+      showConfirm(
+        'Simpan Pertanyaan Keamanan',
+        'Pastikan Anda mengingat jawaban ini. Jawaban akan digunakan untuk memverifikasi identitas Anda saat reset password.',
+        () => {
+          var restore = _busyButton(btn, 'Menyimpan...');
+          google.script.run
+            .withSuccessHandler((res) => {
+              restore();
+              if (res && res.status === 'success') {
+                showToast('Pertanyaan keamanan berhasil disimpan.', 'success');
+                document.getElementById('inpSecurityAnswer').value = '';
+                const warnBanner = document.getElementById('sqWarningBanner');
+                const setBanner = document.getElementById('sqSetBanner');
+                const sqTabBadge = document.getElementById('sqTabBadge');
+                if (warnBanner) warnBanner.classList.add('hidden');
+                if (setBanner) setBanner.classList.remove('hidden');
+                if (sqTabBadge) sqTabBadge.classList.add('hidden');
+                localStorage.setItem('has_security_question', 'true');
+                localStorage.removeItem('force_security_question');
+                const overlay = document.getElementById('secQuestionOverlay');
+                if (overlay) overlay.remove();
+              } else {
+                showToast((res && res.message) || 'Gagal menyimpan.', 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              restore();
+              showToast('Gagal terhubung ke server: ' + (err && err.message ? err.message : err), 'error');
+            })
+            .saveSecurityQuestion(token, q, a);
+        }
+      );
+    }
+    function exportElementToPDF(elementId, filename, orientation) {
+      var ev = (typeof event !== 'undefined') ? event : null;
+      var btnExport = (ev && (ev.currentTarget || ev.target)) ? (ev.currentTarget || ev.target) : null;
+      var originalBtnText = btnExport ? btnExport.innerText : "Export PDF";
+      var finalOrient = orientation || 'portrait';
+      var element = document.getElementById(elementId);
+      if (!element) return showToast("Element tidak ditemukan.", "error");
+      var isMobile = window.innerWidth < 768;
+      var finalScale = isMobile ? 1 : 2;
+      var finalQuality = isMobile ? 0.75 : 0.98;
+      var ownerPass = "SEC" + new Date().getTime();
+      showToast("Memproses PDF...", "info");
+      if (btnExport) {
+        btnExport.innerText = "⏳ Memproses...";
+        btnExport.disabled = true;
+      }
+      var opt = {
+        margin: 5,
+        filename: filename,
+        image: { type: 'jpeg', quality: finalQuality },
+        html2canvas: { scale: finalScale, useCORS: true, logging: false },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: finalOrient,
+          encryption: {
+            userPassword: "",
+            ownerPassword: ownerPass,
+            userPermissions: ["print", "copy", "accessibility"]
+          }
+        }
+      };
+      var onServerSuccess = function (url) {
+        if (url && url.indexOf("http") === 0) {
+          showToast("Berhasil! Membuka PDF...", "success");
+          setTimeout(function () { window.location.href = url; }, 1000);
+          if (btnExport) {
+            btnExport.innerText = "📂 Buka File PDF";
+            btnExport.disabled = false;
+            btnExport.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnExport.onclick = function () { window.location.href = url; };
+          }
+        } else {
+          showToast("Gagal: " + url, "error");
+          if (btnExport) {
+            btnExport.innerText = originalBtnText;
+            btnExport.disabled = false;
+          }
+        }
+      };
+      html2pdf().set(opt).from(element).toPdf().output('datauristring')
+        .then(function (pdfBase64) {
+          var cleanBase64 = pdfBase64.split(',')[1];
+          showToast("Mengupload ke Drive...", "info");
+          setTimeout(function () {
+            google.script.run
+              .withSuccessHandler(onServerSuccess)
+              .withFailureHandler(function (err) {
+                showToast("Gagal Upload: " + err, "error");
+                if (btnExport) {
+                  btnExport.innerText = originalBtnText;
+                  btnExport.disabled = false;
+                }
+              })
+              .savePdfToDrive(cleanBase64, filename);
+          }, 100);
+</script>

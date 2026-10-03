@@ -1,0 +1,825 @@
+<script>
+      var year  = yearSel  ? parseInt(yearSel.value)  : new Date().getFullYear();
+      var skeletonRow = '<tr class="border-b border-slate-100 animate-pulse">' +
+        Array(10).fill('<td class="py-3 px-4"><div class="h-4 bg-slate-200 rounded"></div></td>').join('') +
+        '</tr>';
+      tbody.innerHTML = skeletonRow.repeat(5);
+      var token = localStorage.getItem('auth_token');
+      var btn = document.getElementById('btnLoadSaHist');
+      if (btn) { btn.disabled = true; btn.innerText = 'Memuat...'; }
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) { btn.disabled = false; btn.innerText = 'Tampilkan'; }
+          if (!res || res.status !== 'success') {
+            tbody.innerHTML = '<tr><td colspan="10" class="py-12 text-center text-red-500 text-sm">' +
+              escapeHtml((res && res.message) || 'Gagal memuat data.') + '</td></tr>';
+            return;
+          }
+          renderStudentAttendanceHistoryTable(res);
+        })
+        .withFailureHandler(function(err) {
+          if (btn) { btn.disabled = false; btn.innerText = 'Tampilkan'; }
+          tbody.innerHTML = '<tr><td colspan="10" class="py-12 text-center text-red-500 text-sm">Koneksi gagal: ' +
+            escapeHtml(String(err)) + '</td></tr>';
+        })
+        .getStudentAttendanceHistory(token, { month: month, year: year });
+    }
+    function renderStudentAttendanceHistoryTable(res) {
+      var tbody = document.getElementById('saHistTableBody');
+      var colDiisiOleh = document.getElementById('saHistColDiisiOleh');
+      if (!tbody) return;
+      var isAdmin = !!(res && res.is_admin);
+      var records = (res && res.records) || [];
+      var colCount = isAdmin ? 10 : 9;
+      if (colDiisiOleh) colDiisiOleh.style.display = isAdmin ? '' : 'none';
+      if (!records.length) {
+        tbody.innerHTML = '<tr><td colspan="' + colCount + '" class="py-16 text-center text-slate-400 italic text-sm">Tidak ada data absensi untuk periode ini.</td></tr>';
+        return;
+      }
+      var html = '';
+      var monthsShort = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+      records.forEach(function(r, idx) {
+        var total = (r.hadir||0) + (r.sakit||0) + (r.izin||0) + (r.alpa||0);
+        var dateDisp = r.date || '-';
+        try {
+          var dObj = new Date(r.date + 'T00:00:00');
+          if (!isNaN(dObj.getTime())) {
+            dateDisp = dObj.getDate() + ' ' + monthsShort[dObj.getMonth()] + ' ' + dObj.getFullYear();
+          }
+        } catch(_e) {}
+        var diisiOlehCell = isAdmin
+          ? '<td class="py-3 px-4 text-sm text-slate-600">' + escapeHtml(r.submitted_by_name || '-') + '</td>'
+          : '';
+        html += '<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">' +
+          '<td class="py-3 px-4 text-sm text-slate-400 text-center">' + (idx + 1) + '</td>' +
+          '<td class="py-3 px-4 text-sm font-medium text-slate-700 whitespace-nowrap">' + escapeHtml(dateDisp) + '</td>' +
+          '<td class="py-3 px-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">' + escapeHtml(r.class_name || '-') + '</span></td>' +
+          '<td class="py-3 px-4 text-center"><span class="font-mono font-bold text-emerald-700">' + (r.hadir||0) + '</span></td>' +
+          '<td class="py-3 px-4 text-center"><span class="font-mono font-bold text-amber-600">' + (r.sakit||0) + '</span></td>' +
+          '<td class="py-3 px-4 text-center"><span class="font-mono font-bold text-blue-600">' + (r.izin||0) + '</span></td>' +
+          '<td class="py-3 px-4 text-center"><span class="font-mono font-bold text-red-600">' + (r.alpa||0) + '</span></td>' +
+          '<td class="py-3 px-4 text-center"><span class="font-mono font-semibold text-slate-700">' + total + '</span></td>' +
+          diisiOlehCell +
+          '<td class="py-3 px-4 text-sm text-slate-500 whitespace-nowrap font-mono">' + escapeHtml((r.submitted_at || '').substring(0, 5) || '-') + '</td>' +
+          '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+    var _picketCache = null;
+    var _subModalContext = null;
+    var _subSubmitInFlight = false;
+    function initPicket() {
+      const token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function(gateRes) {
+          if (gateRes && gateRes.status === 'success' && gateRes.redirect_needed) {
+            showToast('Harap lengkapi rekap absensi siswa terlebih dahulu sebelum mengakses halaman ini.', 'info', 5000);
+            handleNav('Page_StudentAttendanceInput');
+            return;
+          }
+          _doInitPicket(token);
+        })
+        .withFailureHandler(function() { _doInitPicket(token); })
+        .checkStudentAttendanceToday(token);
+    }
+    function _doInitPicket(token) {
+      const lblDate = document.getElementById('lblPicketTodayDate');
+      if (lblDate) lblDate.innerText = formatDateID(new Date());
+      _picketCache = null;
+      _subModalContext = null;
+      _subSubmitInFlight = false;
+      google.script.run
+        .withSuccessHandler((users) => {
+          allTeachersCache = (users || []).filter(u => String(u.role).toLowerCase() === 'guru' && String(u.username) !== 'PenjagaMadrasah');
+          _refreshSubModalTeacherSelect();
+          _refreshPicketAndCeremonySelects();
+        })
+        .withFailureHandler((err) => {
+          console.warn('getAllUsers gagal:', err);
+        })
+        .getAllUsers(token);
+      const tbodyPicket = document.getElementById('tbodyPicketSchedule');
+      const tbodyToday = document.getElementById('tbodyTodayPickets');
+      const tbodyStatusAdmin = document.getElementById('tbodyTeacherStatusAdmin');
+      const tbodyStatusPicket = document.getElementById('tbodyTeacherStatusPicket');
+      if (tbodyPicket) tbodyPicket.innerHTML = skeletonTableRows(3, 3);
+      if (tbodyToday) tbodyToday.innerHTML = skeletonTableRows(3, 3);
+      if (tbodyStatusAdmin) tbodyStatusAdmin.innerHTML = skeletonTableRows(5, 4);
+      if (tbodyStatusPicket) tbodyStatusPicket.innerHTML = skeletonTableRows(5, 4);
+      google.script.run.withSuccessHandler((res) => {
+        if (!res || res.status === 'error' || res.status === 'denied') {
+          showToast((res && res.message) || 'Gagal memuat data piket.', 'error');
+          if (res && res.message && (res.message.indexOf('Unauthorized') !== -1 || res.message.indexOf('Akses Ditolak') !== -1)) {
+            handleNav('Page_Dashboard');
+          }
+          return;
+        }
+        _picketCache = res;
+        if (!res.is_admin && !res.is_picket_today) {
+          showToast("Akses Ditolak: Anda tidak memiliki jadwal piket hari ini.", "error");
+          handleNav('Page_Dashboard');
+          return;
+        }
+        const viewAdmin = document.getElementById('viewAdminPicket');
+        const viewGuru = document.getElementById('viewTeacherPicket');
+        const sub = document.getElementById('pktHeroSubtitle');
+        if (sub) sub.innerText = res.is_admin
+          ? 'Pemantauan & manajemen tugas piket dan upacara'
+          : 'Tugas piket Anda hari ini';
+        _renderPicketHeaderStats(res);
+        if (res.is_admin) {
+          if (viewAdmin) viewAdmin.classList.remove('hidden');
+          if (viewGuru) viewGuru.classList.add('hidden');
+          renderPicketSchedule(res.picket_schedule);
+          renderTodayPickets(res.today_pickets);
+          renderCeremonyAdmin(res.ceremony_info);
+          renderDailyScheduleStatus(res.daily_schedules, true);
+          renderAdminPicketSubstitutes(res.today_picket_subs || [], res.today_pickets || []);
+          _refreshPicketAndCeremonySelects();
+          setTimeout(loadActiveSubstitutes, 100);
+          _restoreAdminPicketTab();
+        } else {
+          if (viewAdmin) viewAdmin.classList.add('hidden');
+          if (viewGuru) viewGuru.classList.remove('hidden');
+          const myPicketStatus = (res.today_pickets || []).find(p => String(p.user_id) === String(res.current_user_id));
+          const amIPicketToday = !!res.is_picket_today;
+          const mySubPicketStatus = (res.today_picket_subs || []).find(s => String(s.user_id) === String(res.current_user_id));
+          let isPicketConfirmed = false;
+          if (myPicketStatus) {
+            isPicketConfirmed = !!myPicketStatus.is_present;
+          } else if (mySubPicketStatus) {
+            isPicketConfirmed = !!mySubPicketStatus.is_confirmed;
+          } else if (amIPicketToday) {
+            // Guru penerima relokasi JTM piket (PARTIAL-SUB-PIKET):
+            // is_picket_today = true tapi tidak ada di today_pickets maupun today_picket_subs.
+            // Mereka sudah mendapat JTM → dianggap sudah terkonfirmasi agar tombol aksi aktif.
+            isPicketConfirmed = true;
+          }
+          const needsConfirmation = amIPicketToday && !isPicketConfirmed;
+          window.picketNeedsConfirmation = needsConfirmation;
+          const alertBox = document.getElementById('alertPicketUnconfirmed');
+          if (alertBox) alertBox.classList.toggle('hidden', !needsConfirmation);
+          if (typeof renderCeremonyPicket === "function") {
+            renderCeremonyPicket(res.ceremony_info, res.current_user_id);
+          }
+          renderDailyScheduleStatus(res.daily_schedules, isPicketConfirmed);
+          loadActiveSubstitutesForPicketTeacher();
+          loadExamPanitiaPanel();
+          const subPicketCard = document.getElementById('cardGuruSubPicketActive');
+          const subPicketList = document.getElementById('listGuruSubPicket');
+          const todaySubs = res.today_picket_subs || [];
+          if (subPicketCard && subPicketList) {
+            if (todaySubs.length > 0) {
+              subPicketCard.classList.remove('hidden');
+              let subHtml = '';
+              todaySubs.forEach(s => {
+                const initial = (s.name || '?').charAt(0).toUpperCase();
+                const safeName = escapeHtml(s.name || '-');
+                const safeOrigName = escapeHtml(s.original_name || '-');
+                const isConf = !!s.is_confirmed;
+                subHtml += `<div class="flex items-center justify-between p-3 bg-white rounded-xl border border-amber-200 shadow-sm gap-3 flex-wrap">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center text-xs font-bold text-amber-700 flex-shrink-0">${escapeHtml(initial)}</div>
+                    <div class="min-w-0">
+                      <p class="font-bold text-slate-800 text-sm truncate">${safeName}</p>
+                      <p class="text-xs text-slate-500 truncate">Menggantikan: <span class="font-medium">${safeOrigName}</span></p>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center gap-1 ${isConf ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'} border px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0">
+                    <span class="w-1.5 h-1.5 rounded-full ${isConf ? 'bg-emerald-500' : 'bg-amber-500'} inline-block"></span>${isConf ? 'Hadir' : 'Aktif'}
+                  </span>
+                </div>`;
+              });
+              subPicketList.innerHTML = subHtml;
+            } else {
+              subPicketCard.classList.add('hidden');
+            }
+          }
+        }
+      }).withFailureHandler((err) => {
+        if (tbodyStatusAdmin) tbodyStatusAdmin.innerHTML = errorTableRows(5, 'Koneksi gagal: ' + err, 'initPicket()');
+        if (tbodyStatusPicket) tbodyStatusPicket.innerHTML = errorTableRows(5, 'Koneksi gagal: ' + err, 'initPicket()');
+        showToast('Gagal memuat halaman piket: ' + err, 'error');
+      }).getPicketPageData(token);
+      setTimeout(_fixMobileLayouts, 300);
+    }
+    function refreshPicketPage() {
+      initPicket();
+    }
+    function _renderPicketHeaderStats(res) {
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+      if (!res) return;
+      const todayPickets = res.today_pickets || [];
+      const todayPicketSubs = res.today_picket_subs || [];
+      const subsCount = (res.daily_schedules || []).filter(s => s.substitute_info && s.substitute_info.name).length;
+      const dailySched = res.daily_schedules || [];
+      const piketHadir = todayPickets.filter(p => p.is_present).length
+        + todayPicketSubs.filter(s => s.is_confirmed).length;
+      const piketTotal = todayPickets.length + todayPicketSubs.length;
+      const kbmHadir = dailySched.filter(s => s.is_present || (s.substitute_info && s.substitute_info.name)).length;
+      const kbmTotal = dailySched.length;
+      set('pktStatPiketHadir', piketTotal === 0 ? '—' : (piketHadir + ' / ' + piketTotal));
+      set('pktStatSubActive', String(subsCount + todayPicketSubs.length));
+      set('pktStatKbm', kbmTotal === 0 ? '—' : (kbmHadir + ' / ' + kbmTotal));
+      const ci = res.ceremony_info || {};
+      if (!ci.is_ceremony_day) {
+        set('pktStatCeremony', '—');
+      } else if (!ci.data) {
+        set('pktStatCeremony', 'Kosong');
+      } else {
+        set('pktStatCeremony', ci.data.is_confirmed ? '✓' : 'Pending');
+      }
+      const subBadge = document.getElementById('badgeAdminPicketTab2');
+      if (subBadge) {
+        const total = subsCount + todayPicketSubs.length;
+        if (total > 0) {
+          subBadge.innerText = String(total);
+          subBadge.classList.remove('hidden');
+        } else {
+          subBadge.classList.add('hidden');
+        }
+      }
+    }
+    function _refreshSubModalTeacherSelect() {
+      const sel = document.getElementById('inpSubTeacher');
+      if (!sel) return;
+      const ctx = _subModalContext || {};
+      const exclude = new Set();
+      if (ctx.originalUserId) exclude.add(String(ctx.originalUserId));
+      if (ctx.type === 'ceremony' && _picketCache && _picketCache.ceremony_info && _picketCache.ceremony_info.data) {
+        exclude.add(String(_picketCache.ceremony_info.data.user_id));
+      }
+      let html = '<option value="">Pilih Guru...</option>';
+      (allTeachersCache || []).forEach(t => {
+        if (exclude.has(String(t.id))) return;
+        html += `<option value="${escapeHtml(t.id)}">${escapeHtml(t.full_name)}</option>`;
+      });
+      sel.innerHTML = html;
+    }
+    function _refreshPicketAndCeremonySelects() {
+      const selPicket = document.getElementById('inpPicketTeacher');
+      const selCer = document.getElementById('inpCeremonyTeacher');
+      if (selPicket) {
+        const dayEl = document.getElementById('inpPicketDay');
+        const dayIdx = dayEl ? parseInt(dayEl.value, 10) : 1;
+        const picketSched = (_picketCache && _picketCache.picket_schedule) || [];
+        const exclude = new Set(picketSched.filter(p => Number(p.day_index) === dayIdx).map(p => String(p.user_id)));
+        let html = '<option value="">Pilih Guru...</option>';
+        (allTeachersCache || []).forEach(t => {
+          if (exclude.has(String(t.id))) return;
+          html += `<option value="${escapeHtml(t.id)}">${escapeHtml(t.full_name)}</option>`;
+        });
+        selPicket.innerHTML = html;
+      }
+      if (selCer) {
+        let html = '<option value="">Pilih Guru...</option>';
+        (allTeachersCache || []).forEach(t => {
+          html += `<option value="${escapeHtml(t.id)}">${escapeHtml(t.full_name)}</option>`;
+        });
+        selCer.innerHTML = html;
+      }
+    }
+    function onPicketDayChange() {
+      _refreshPicketAndCeremonySelects();
+    }
+    function renderPicketSchedule(data) {
+      const tbody = document.getElementById('tbodyPicketSchedule');
+      if (!tbody) return;
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-400 italic text-sm">Belum ada jadwal piket.</td></tr>';
+        return;
+      }
+      let html = '';
+      data.forEach(p => {
+        const id = escapeHtml(p.id);
+        const day = escapeHtml(p.day_name || '-');
+        const name = escapeHtml(p.name || '-');
+        html += `
+           <tr class="border-b hover:bg-slate-50 transition-colors">
+             <td class="px-4 py-3 font-semibold text-slate-700">${day}</td>
+             <td class="px-4 py-3 text-slate-600">${name}</td>
+             <td class="px-4 py-3">
+               <div class="flex justify-center">
+                 ${actionBtn('delete', `deletePicketAction('${id}', this)`, 'Hapus Jadwal Piket')}
+               </div>
+             </td>
+           </tr>`;
+      });
+      tbody.innerHTML = html;
+    }
+    function revokePicketAction(userId, name, btnEl) {
+      showConfirm(
+        'Batalkan Kehadiran Piket',
+        `Apakah Anda yakin ingin membatalkan kehadiran ${name} sebagai Guru Piket? JTM piket akan dihapus.`,
+        () => {
+          const token = localStorage.getItem('auth_token');
+          const restoreBtn = _busyButton(btnEl, 'Membatalkan...');
+          const restoreRow = _setRowLoading(btnEl);
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (res && res.status === 'success') {
+                showToast("Kehadiran piket dibatalkan");
+              } else {
+                restoreBtn(); restoreRow();
+                showToast((res && res.message) || 'Gagal membatalkan piket', "error");
+              }
+              initPicket();
+            })
+            .withFailureHandler((err) => {
+              restoreBtn(); restoreRow();
+              showToast("Gagal memproses: " + err, "error");
+              initPicket();
+            })
+            .revokePicketDaily(token, userId);
+        }
+      );
+    }
+
+    function renderAdminPicketSubstitutes(substitutes, todayPickets) {
+      const panel = document.getElementById('panelPicketSubstitutes');
+      if (!panel) return;
+      if (!substitutes || substitutes.length === 0) {
+        panel.innerHTML = '<p class="text-slate-400 text-sm italic text-center py-4">Tidak ada guru piket pengganti hari ini.</p>';
+        return;
+      }
+      let html = '<div class="space-y-3">';
+      substitutes.forEach(s => {
+        const safeLogId = _jsStr(s.log_id);
+        const safeName  = _jsStr(s.name);
+        const safeUid   = _jsStr(s.user_id || '');
+        const dispName  = escapeHtml(s.name || '-');
+        const dispOrig  = escapeHtml(s.original_name || '-');
+        const trueSchedId = _jsStr(s.schedule_id || '');
+        const isConfirmed = !!s.is_confirmed;
+        const safeSchedId = 'PICKET-DUTY';
+        const sid = _jtmSid(safeSchedId + '_' + (s.user_id || ''));
+        const escSid = sid; // already safe after _jtmSid
+        const statusBadge = isConfirmed
+          ? `<span class="inline-flex justify-center items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-xs font-bold flex-1 sm:flex-none whitespace-nowrap">
+             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Hadir
+           </span>`
+          : `<span class="inline-flex justify-center items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full text-xs font-bold flex-1 sm:flex-none whitespace-nowrap">
+             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>Pengganti Piket
+           </span>`;
+        const hadirBtn = isConfirmed ? 
+          `<button onclick="revokePicketAction('${safeUid}', '${safeName}', this)"
+          class="inline-flex justify-center items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all flex-1 sm:flex-none whitespace-nowrap"
+          title="Batalkan kehadiran guru piket pengganti">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+          Batal
+        </button>` :
+          `<button onclick="confirmPicketSubPresence('${safeUid}', '${safeName}', this)"
+          class="inline-flex justify-center items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-all flex-1 sm:flex-none whitespace-nowrap"
+          title="Konfirmasi kehadiran guru piket pengganti">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Hadir
+        </button>`;
+        const jtmBtn = isConfirmed
+          ? `<button type="button" onclick="toggleJtmAdjustPanelSub('${safeSchedId}', '${safeUid}', '${sid}')"
+              class="inline-flex justify-center items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition-all flex-1 sm:flex-none whitespace-nowrap"
+              title="Sesuaikan JTM piket guru pengganti">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Atur JTM
+            </button>`
+          : '';
+        const jtmPanel = isConfirmed ? `
+          <div id="jtmAdjRow-${escSid}" class="hidden mt-2 rounded-lg border border-indigo-200 bg-white p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-indigo-700">Penyesuaian JTM — ${dispName}</span>
+              <span id="jtmAdjStatus-${escSid}" class="text-[11px] text-slate-400"></span>
+            </div>
+            <div class="flex flex-wrap items-end gap-3">
+              <div class="flex gap-3 text-xs">
+                <div class="text-center"><div class="text-slate-400">Terjadwal</div><div id="jtmSchedDisp-${escSid}" class="font-bold text-slate-700">-</div></div>
+                <div class="text-center"><div class="text-slate-400">Disesuaikan</div><div id="jtmAdjDisp-${escSid}" class="font-bold text-indigo-700">-</div></div>
+                <div class="text-center"><div class="text-slate-400">Selisih</div><div id="jtmDiffDisp-${escSid}" class="font-bold text-amber-600">-</div></div>
+              </div>
+              <div class="flex flex-col">
+                <label class="text-[11px] text-slate-500 mb-0.5">Adjusted JTM</label>
+                <input id="jtmAdjInput-${escSid}" type="number" step="1" min="0" inputmode="numeric"
+                  oninput="recomputeJtmDifferenceDisplay('${safeSchedId}_${safeUid}')"
+                  class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+              </div>
+              <div id="jtmReasonWrap-${escSid}" class="flex flex-col flex-1 min-w-[180px] hidden">
+                <label class="text-[11px] text-slate-500 mb-0.5">Alasan penyesuaian (wajib saat dikurangi)</label>
+                <textarea id="jtmReason-${escSid}" rows="2" maxlength="500"
+                  class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"
+                  placeholder="Tuliskan alasan pengurangan JTM..."></textarea>
+              </div>
+              <button type="button" onclick="saveJtmAdjustment('${safeSchedId}_${safeUid}', '${safeUid}', this)"
+                class="inline-flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-all shadow-sm">Simpan JTM</button>
+              <button type="button" id="jtmCancelBtn-${escSid}" onclick="cancelJtmAdjustment('${safeSchedId}_${safeUid}', this)"
+                class="hidden inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                Batalkan Penyesuaian</button>
+            </div>
+            <div id="jtmAllocPanel-${escSid}" data-original-uid="${escapeHtml(s.user_id || '')}" class="mt-3 pt-3 border-t border-indigo-100 hidden">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-emerald-700">Alokasi Piket Pengganti Sebagian</span>
+                <span class="text-[11px] text-slate-500">Sisa selisih: <span id="jtmRemainDisp-${escSid}" class="font-bold text-amber-600">-</span></span>
+              </div>
+              <div class="flex flex-wrap items-end gap-2 mb-2">
+                <div class="flex flex-col flex-1 min-w-[160px]">
+                  <label class="text-[11px] text-slate-500 mb-0.5">Guru piket pengganti lain</label>
+                  <select id="jtmAllocSelect-${escSid}" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"><option value="">Pilih Guru...</option></select>
+                </div>
+                <div class="flex flex-col">
+                  <label class="text-[11px] text-slate-500 mb-0.5">Alokasi JTM</label>
+                  <input id="jtmAllocInput-${escSid}" type="number" step="any" min="0" inputmode="decimal" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400">
+                </div>
+                <button type="button" onclick="addJtmAllocation('${safeSchedId}_${safeUid}', '${safeUid}', this)"
+                  class="inline-flex items-center gap-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all shadow-sm">Tambah Alokasi</button>
+              </div>
+              <div id="jtmAllocList-${escSid}" class="space-y-1"></div>
+            </div>
+          </div>` : '';
+        html += `<div class="bg-white rounded-xl border border-amber-200 shadow-sm p-3 gap-3">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <div class="min-w-0 flex-1 w-full sm:w-auto">
+            <p class="font-bold text-slate-800 text-sm truncate">${dispName}</p>
+            <p class="text-xs text-slate-500 truncate">Menggantikan: <span class="font-medium">${dispOrig}</span></p>
+          </div>
+          <div class="flex items-stretch sm:items-center gap-2 flex-wrap w-full sm:w-auto mt-2 sm:mt-0">
+            ${statusBadge}
+            ${hadirBtn}
+            ${jtmBtn}
+            <button onclick="revokeSubstituteAction('${trueSchedId}', '${safeName}', this)"
+              class="inline-flex justify-center items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all flex-1 sm:flex-none whitespace-nowrap">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              Batalkan
+            </button>
+          </div>
+        </div>
+        ${jtmPanel}
+      </div>`;
+      });
+      html += '</div>';
+      panel.innerHTML = html;
+    }
+    function confirmPicketSubPresence(userId, name, btnEl) {
+      showConfirm(
+        'Konfirmasi Kehadiran Piket Pengganti',
+        `Apakah Anda yakin ingin mengonfirmasi kehadiran <strong>${name}</strong> sebagai guru piket pengganti hari ini?`,
+        () => {
+          const token = localStorage.getItem('auth_token');
+          const restoreBtn = _busyButton(btnEl, 'Mengonfirmasi...');
+          const restoreBlock = _setBlockLoading(btnEl, '#panelPicketSubstitutes');
+          google.script.run
+            .withSuccessHandler((res) => {
+              restoreBtn(); restoreBlock();
+              if (res && res.status === 'success') {
+                showToast(`✅ Kehadiran ${name} berhasil dikonfirmasi`, 'success');
+                initPicket();
+              } else {
+                showToast((res && res.message) || 'Gagal mengonfirmasi', 'error');
+              }
+            })
+            .withFailureHandler((err) => {
+              restoreBtn(); restoreBlock();
+              showToast('Gagal: ' + err, 'error');
+            })
+            .confirmPicketSubPresenceBackend(token, userId);
+        }
+      );
+    }
+    function _jsStr(s) {
+      return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function renderTodayPickets(data) {
+      const tbody = document.getElementById('tbodyTodayPickets');
+      if (!tbody) return;
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-400 italic text-sm">Tidak ada piket hari ini.</td></tr>';
+        return;
+      }
+      let html = '';
+      data.forEach(p => {
+        const safeUid = _jsStr(p.user_id);
+        const safeName = _jsStr(p.name);
+        const dispName = escapeHtml(p.name || '-');
+        let btn = '';
+        if (p.is_present) {
+          btn = `<button onclick="revokePicketAction('${safeUid}', '${safeName}', this)"
+                class="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                Batalkan
+              </button>`;
+        } else {
+          btn = `
+                <div class="flex gap-1.5 justify-center">
+                  <button onclick="confirmPicketPresence('${safeUid}', '${safeName}', this)"
+                    class="inline-flex items-center gap-1 bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-700 transition-all shadow-sm">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Hadir
+                  </button>
+                  <button onclick="openSubModalPicket('${safeUid}', '${safeName}')"
+                    class="inline-flex items-center gap-1 bg-amber-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-600 transition-all shadow-sm">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    Ganti
+                  </button>
+                </div>`;
+        }
+        const statusBadge = p.is_present
+          ? `<span class="inline-flex items-center gap-1 text-emerald-700 text-xs font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Hadir</span>`
+          : `<span class="text-slate-400 text-xs">—</span>`;
+        html += `
+            <tr class="border-b hover:bg-slate-50 transition-colors">
+              <td class="px-4 py-3 font-semibold text-slate-700">${dispName}</td>
+              <td class="px-4 py-3 text-center">${statusBadge}</td>
+              <td class="px-4 py-3 text-center">${btn}</td>
+            </tr>`;
+      });
+      tbody.innerHTML = html;
+    }
+    function renderDailyScheduleStatus(data, isPicketConfirmed) {
+      var containerId = document.getElementById('viewAdminPicket') &&
+        !document.getElementById('viewAdminPicket').classList.contains('hidden')
+        ? 'tbodyTeacherStatusAdmin'
+        : 'tbodyTeacherStatusPicket';
+      var tbody = document.getElementById(containerId);
+      if (!tbody) {
+        console.error('Tabel status mengajar tidak ditemukan:', containerId);
+        return;
+      }
+      if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 italic text-sm">Tidak ada jadwal mengajar hari ini.</td></tr>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.length; i++) {
+        var s = data[i];
+        var timeParts = (s.time || '00:00-00:00').split('-');
+        var tStart = formatTimeID(timeParts[0]);
+        var tEnd = formatTimeID(timeParts[1]);
+        var hasSubstitute = s.substitute_info && s.substitute_info.name;
+        var substituteName = hasSubstitute ? s.substitute_info.name : null;
+        var actionBtn_ = '';
+        var statusBadge = '';
+        var disabledAttr = isPicketConfirmed ? '' : 'disabled';
+        var disabledClass = isPicketConfirmed ? '' : 'opacity-40 cursor-not-allowed';
+        var safeUid = _jsStr(s.user_id);
+        var safeSchedId = _jsStr(s.schedule_id);
+        var safeName = _jsStr(s.name);
+        var dispName = escapeHtml(s.name || '-');
+        var dispCls = escapeHtml(s.class_name || '-');
+        var dispSubj = escapeHtml(s.subject || '-');
+        var sid = _jtmSid(s.schedule_id);
+        var escId = escapeHtml(sid);
+        var canAdjustJtm = !hasSubstitute && !!s.is_present;
+        var canAdjustSubJtm = hasSubstitute && !!s.substitute_info && !!s.substitute_info.user_id;
+        var jtmToggleBtn = '';
+        if (canAdjustJtm) {
+          jtmToggleBtn = '<button type="button" onclick="toggleJtmAdjustPanel(\'' + safeSchedId + '\', \'' + safeUid + '\')" ' +
+            'class="w-full lg:w-auto justify-center inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-indigo-100 transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
+            'Atur JTM</button>';
+        } else if (canAdjustSubJtm) {
+          var safeSubUid = _jsStr(s.substitute_info.user_id);
+          jtmToggleBtn = '<button type="button" onclick="toggleJtmAdjustPanel(\'' + safeSchedId + '\', \'' + safeSubUid + '\')" ' +
+            'class="w-full lg:w-auto justify-center inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-[11px] font-semibold hover:bg-indigo-100 transition-colors focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
+            'Atur JTM Pengganti</button>';
+        }
+        if (s.is_present) {
+          statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-700 text-xs font-semibold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Hadir</span>';
+          actionBtn_ = '<button onclick="revokePresenceAction(\'' + safeUid + '\', \'' + safeSchedId + '\', \'' + safeName + '\', this)" ' + disabledAttr + ' ' +
+            'class="w-full lg:w-auto justify-center inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1 ' + disabledClass + '">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+            'Batalkan</button>';
+        } else if (hasSubstitute) {
+          statusBadge = '<span class="inline-flex items-center gap-1 text-amber-700 text-xs font-semibold bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200"><span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>Diganti</span>';
+          var safeSubName = _jsStr(substituteName);
+          var dispSubName = escapeHtml(substituteName);
+          actionBtn_ = '<div class="flex flex-col gap-1.5 items-center w-full lg:w-auto">' +
+            '<span class="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full font-semibold truncate max-w-[120px] sm:max-w-none" title="Oleh: ' + dispSubName + '">Oleh: ' + dispSubName + '</span>' +
+            '<button onclick="revokeSubstituteAction(\'' + safeSchedId + '\', \'' + safeSubName + '\', this)" ' + disabledAttr + ' ' +
+            'class="w-full lg:w-auto justify-center inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1 ' + disabledClass + '">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+            'Batal Ganti</button>' +
+            '</div>';
+        } else {
+          statusBadge = '<span class="inline-flex items-center gap-1 text-slate-400 text-xs font-medium bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200"><span class="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block"></span>Belum</span>';
+          actionBtn_ = '<div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto justify-center">' +
+            '<button onclick="confirmPresenceAction(\'' + safeUid + '\', \'' + safeSchedId + '\', \'' + safeName + '\', this)" ' + disabledAttr + ' ' +
+            'class="w-full sm:w-auto justify-center inline-flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors shadow-sm focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 ' + disabledClass + '">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>' +
+            'Hadir</button>' +
+            '<button onclick="openSubModal(\'' + safeSchedId + '\', \'' + _jsStr(s.name + ' \u2014 ' + s.class_name + ' (' + tStart + ')') + '\')" ' + disabledAttr + ' ' +
+            'class="w-full sm:w-auto justify-center inline-flex items-center gap-1.5 bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-amber-600 transition-colors shadow-sm focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 ' + disabledClass + '">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>' +
+            'Ganti</button>' +
+            '</div>';
+        }
+        html += '<tr class="border-b hover:bg-slate-50 transition-colors" data-schedule-id="' + escapeHtml(s.schedule_id) + '">' +
+          '<td class="px-4 py-3 font-mono text-xs text-slate-500">' + escapeHtml(tStart) + '-' + escapeHtml(tEnd) + '</td>' +
+          '<td class="px-4 py-3 text-sm">' +
+          '<div class="font-semibold text-slate-700"><span class="bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded text-xs">' + dispCls + '</span></div>' +
+          '<div class="text-xs text-slate-500 mt-0.5">' + dispSubj + '</div>' +
+          '</td>' +
+          '<td class="px-4 py-3 font-semibold text-slate-700">' +
+          dispName +
+          (hasSubstitute ? '<div class="text-[10px] text-slate-400 font-normal mt-0.5">Guru asli (digantikan)</div>' : '') +
+          '</td>' +
+          '<td class="px-4 py-3 text-center">' + statusBadge + '</td>' +
+          '<td class="px-4 py-3 align-middle text-center">' +
+            '<div class="flex flex-col xl:flex-row items-center justify-center gap-2">' +
+              actionBtn_ + (jtmToggleBtn ? jtmToggleBtn : '') +
+            '</div>' +
+          '</td>' +
+          '</tr>';
+        if (canAdjustJtm) {
+          html += '<tr id="jtmAdjRow-' + escId + '" class="hidden bg-indigo-50/40 border-b">' +
+            '<td colspan="5" class="px-4 py-3">' +
+              '<div class="rounded-lg border border-indigo-200 bg-white p-3">' +
+                '<div class="flex items-center justify-between mb-2">' +
+                  '<span class="text-xs font-bold text-indigo-700">Penyesuaian JTM</span>' +
+                  '<span id="jtmAdjStatus-' + escId + '" class="text-[11px] text-slate-400"></span>' +
+                '</div>' +
+                '<div class="flex flex-wrap items-end gap-3">' +
+                  '<div class="flex gap-3 text-xs">' +
+                    '<div class="text-center"><div class="text-slate-400">Terjadwal</div><div id="jtmSchedDisp-' + escId + '" class="font-bold text-slate-700">-</div></div>' +
+                    '<div class="text-center"><div class="text-slate-400">Disesuaikan</div><div id="jtmAdjDisp-' + escId + '" class="font-bold text-indigo-700">-</div></div>' +
+                    '<div class="text-center"><div class="text-slate-400">Selisih</div><div id="jtmDiffDisp-' + escId + '" class="font-bold text-amber-600">-</div></div>' +
+                  '</div>' +
+                  '<div class="flex flex-col">' +
+                    '<label class="text-[11px] text-slate-500 mb-0.5">Adjusted JTM</label>' +
+                    '<input id="jtmAdjInput-' + escId + '" type="number" step="1" min="0" inputmode="numeric" oninput="recomputeJtmDifferenceDisplay(\'' + safeSchedId + '\')" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" ' + disabledAttr + '>' +
+                  '</div>' +
+                  '<div id="jtmReasonWrap-' + escId + '" class="flex flex-col flex-1 min-w-[180px] hidden">' +
+                    '<label class="text-[11px] text-slate-500 mb-0.5">Alasan penyesuaian (wajib saat dikurangi)</label>' +
+                    '<textarea id="jtmReason-' + escId + '" rows="2" maxlength="500" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" placeholder="Tuliskan alasan pengurangan JTM..." ' + disabledAttr + '></textarea>' +
+                  '</div>' +
+                  '<button type="button" onclick="saveJtmAdjustment(\'' + safeSchedId + '\', \'' + safeUid + '\', this)" ' + disabledAttr + ' ' +
+                    'class="inline-flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-all shadow-sm ' + disabledClass + '">Simpan JTM</button>' +
+                  '<button type="button" id="jtmCancelBtn-' + escId + '" onclick="cancelJtmAdjustment(\'' + safeSchedId + '\', this)" ' + disabledAttr + ' ' +
+                    'class="hidden inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all ' + disabledClass + '">' +
+                    '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+                    'Batalkan Penyesuaian</button>' +
+                '</div>' +
+                '<div id="jtmAllocPanel-' + escId + '" data-original-uid="' + escapeHtml(s.user_id) + '" class="mt-3 pt-3 border-t border-indigo-100 hidden">' +
+                  '<div class="flex items-center justify-between mb-2">' +
+                    '<span class="text-xs font-bold text-emerald-700">Alokasi Pengganti Sebagian</span>' +
+                    '<span class="text-[11px] text-slate-500">Sisa selisih: <span id="jtmRemainDisp-' + escId + '" class="font-bold text-amber-600">-</span></span>' +
+                  '</div>' +
+                  '<div class="flex flex-wrap items-end gap-2 mb-2">' +
+                    '<div class="flex flex-col flex-1 min-w-[160px]">' +
+                      '<label class="text-[11px] text-slate-500 mb-0.5">Guru pengganti</label>' +
+                      '<select id="jtmAllocSelect-' + escId + '" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" ' + disabledAttr + '><option value="">Pilih Guru...</option></select>' +
+                    '</div>' +
+                    '<div class="flex flex-col">' +
+                      '<label class="text-[11px] text-slate-500 mb-0.5">Alokasi JTM</label>' +
+                      '<input id="jtmAllocInput-' + escId + '" type="number" step="any" min="0" inputmode="decimal" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" ' + disabledAttr + '>' +
+                    '</div>' +
+                    '<button type="button" onclick="addJtmAllocation(\'' + safeSchedId + '\', \'' + safeUid + '\', this)" ' + disabledAttr + ' ' +
+                      'class="inline-flex items-center gap-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all shadow-sm ' + disabledClass + '">Tambah Alokasi</button>' +
+                  '</div>' +
+                  '<div id="jtmAllocList-' + escId + '" class="space-y-1"></div>' +
+                '</div>' +
+              '</div>' +
+            '</td>' +
+            '</tr>';
+        }
+        if (canAdjustSubJtm) {
+          var safeSubUidPanel = _jsStr(s.substitute_info.user_id);
+          html += '<tr id="jtmAdjRow-' + escId + '" class="hidden bg-indigo-50/40 border-b">' +
+            '<td colspan="5" class="px-4 py-3">' +
+              '<div class="rounded-lg border border-indigo-200 bg-white p-3">' +
+                '<div class="flex items-center justify-between mb-2">' +
+                  '<span class="text-xs font-bold text-indigo-700">Penyesuaian JTM — Guru Pengganti: ' + escapeHtml(s.substitute_info.name || '-') + '</span>' +
+                  '<span id="jtmAdjStatus-' + escId + '" class="text-[11px] text-slate-400"></span>' +
+                '</div>' +
+                '<div class="flex flex-wrap items-end gap-3">' +
+                  '<div class="flex gap-3 text-xs">' +
+                    '<div class="text-center"><div class="text-slate-400">Terjadwal</div><div id="jtmSchedDisp-' + escId + '" class="font-bold text-slate-700">-</div></div>' +
+                    '<div class="text-center"><div class="text-slate-400">Disesuaikan</div><div id="jtmAdjDisp-' + escId + '" class="font-bold text-indigo-700">-</div></div>' +
+                    '<div class="text-center"><div class="text-slate-400">Selisih</div><div id="jtmDiffDisp-' + escId + '" class="font-bold text-amber-600">-</div></div>' +
+                  '</div>' +
+                  '<div class="flex flex-col">' +
+                    '<label class="text-[11px] text-slate-500 mb-0.5">Adjusted JTM</label>' +
+                    '<input id="jtmAdjInput-' + escId + '" type="number" step="1" min="0" inputmode="numeric" oninput="recomputeJtmDifferenceDisplay(\'' + safeSchedId + '\')" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" ' + disabledAttr + '>' +
+                  '</div>' +
+                  '<div id="jtmReasonWrap-' + escId + '" class="flex flex-col flex-1 min-w-[180px] hidden">' +
+                    '<label class="text-[11px] text-slate-500 mb-0.5">Alasan penyesuaian (wajib saat dikurangi)</label>' +
+                    '<textarea id="jtmReason-' + escId + '" rows="2" maxlength="500" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" placeholder="Tuliskan alasan pengurangan JTM..." ' + disabledAttr + '></textarea>' +
+                  '</div>' +
+                  '<button type="button" onclick="saveJtmAdjustment(\'' + safeSchedId + '\', \'' + safeSubUidPanel + '\', this)" ' + disabledAttr + ' ' +
+                    'class="inline-flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-all shadow-sm ' + disabledClass + '">Simpan JTM</button>' +
+                  '<button type="button" id="jtmCancelBtn-' + escId + '" onclick="cancelJtmAdjustment(\'' + safeSchedId + '\', this)" ' + disabledAttr + ' ' +
+                    'class="hidden inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all ' + disabledClass + '">' +
+                    '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+                    'Batalkan Penyesuaian</button>' +
+                '</div>' +
+                '<div id="jtmAllocPanel-' + escId + '" data-original-uid="' + escapeHtml(s.substitute_info.user_id) + '" class="mt-3 pt-3 border-t border-indigo-100 hidden">' +
+                  '<div class="flex items-center justify-between mb-2">' +
+                    '<span class="text-xs font-bold text-emerald-700">Alokasi Pengganti Sebagian</span>' +
+                    '<span class="text-[11px] text-slate-500">Sisa selisih: <span id="jtmRemainDisp-' + escId + '" class="font-bold text-amber-600">-</span></span>' +
+                  '</div>' +
+                  '<div class="flex flex-wrap items-end gap-2 mb-2">' +
+                    '<div class="flex flex-col flex-1 min-w-[160px]">' +
+                      '<label class="text-[11px] text-slate-500 mb-0.5">Guru pengganti lain</label>' +
+                      '<select id="jtmAllocSelect-' + escId + '" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" ' + disabledAttr + '><option value="">Pilih Guru...</option></select>' +
+                    '</div>' +
+                    '<div class="flex flex-col">' +
+                      '<label class="text-[11px] text-slate-500 mb-0.5">Alokasi JTM</label>' +
+                      '<input id="jtmAllocInput-' + escId + '" type="number" step="any" min="0" inputmode="decimal" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400" ' + disabledAttr + '>' +
+                    '</div>' +
+                    '<button type="button" onclick="addJtmAllocation(\'' + safeSchedId + '\', \'' + safeSubUidPanel + '\', this)" ' + disabledAttr + ' ' +
+                      'class="inline-flex items-center gap-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all shadow-sm ' + disabledClass + '">Tambah Alokasi</button>' +
+                  '</div>' +
+                  '<div id="jtmAllocList-' + escId + '" class="space-y-1"></div>' +
+                '</div>' +
+              '</div>' +
+            '</td>' +
+            '</tr>';
+        }
+      } // end for loop
+      tbody.innerHTML = html;
+    }
+    /* =====================================================================
+     * JTM Adjustment — Frontend controls (Feature: jtm-adjustment, task 10.1)
+     * Per-occurrence KBM adjustment: Adjusted_JTM input, Reason textarea, and
+     * Scheduled / Adjusted / Difference display, wired to the backend handlers
+     * adjustOccurrenceJtm(token, payload) and
+     * getOccurrenceJtmState(token, 'KBM', schedule_id) via google.script.run.
+     * Client-side validation is for UX only; authoritative validation is in
+     * the backend.
+     * ===================================================================== */
+    function _jtmSid(scheduleId) {
+      return String(scheduleId == null ? '' : scheduleId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+    function toggleJtmAdjustPanel(scheduleId, userId) {
+      var sid = _jtmSid(scheduleId);
+      var row = document.getElementById('jtmAdjRow-' + sid);
+      if (!row) return;
+      if (row.classList.contains('hidden')) {
+        row.classList.remove('hidden');
+        loadJtmAdjustState(scheduleId);
+      } else {
+        row.classList.add('hidden');
+      }
+    }
+    function toggleJtmAdjustPanelSub(scheduleId, userId, sid) {
+      var row = document.getElementById('jtmAdjRow-' + sid);
+      if (!row) return;
+      if (row.classList.contains('hidden')) {
+        row.classList.remove('hidden');
+        // Bangun scheduleId yang akan dipakai untuk load state.
+        // sid = _jtmSid('PICKET-DUTY_' + userId) — ekstrak userId bersih dari prefix sid.
+        var isPiketSid = /^PICKET_DUTY_/.test(sid);
+        var loadId;
+        if (isPiketSid) {
+          // sid adalah PICKET_DUTY_<sanitizedUid>; susun ulang dengan userId asli
+          loadId = 'PICKET-DUTY_' + userId;
+        } else {
+          loadId = scheduleId + '_' + userId;
+        }
+        loadJtmAdjustState(loadId);
+      } else {
+        row.classList.add('hidden');
+      }
+    }
+    function loadJtmAdjustState(scheduleId) {
+      var sid = _jtmSid(scheduleId);
+      var token = localStorage.getItem('auth_token');
+      var statusEl = document.getElementById('jtmAdjStatus-' + sid);
+      if (statusEl) statusEl.textContent = 'Memuat...';
+      var isPiketLoad = /^PICKET-DUTY/.test(scheduleId);
+      if (isPiketLoad) {
+        var picketUidLoad = scheduleId.replace(/^PICKET-DUTY_?/, '');
+        var todayLoad = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' }).slice(0, 10);
+        var piketRef = picketUidLoad + '|' + todayLoad;
+        google.script.run
+          .withSuccessHandler(function (res) { _jtmAdjStateHandler(sid, scheduleId, res); })
+          .withFailureHandler(function (err) {
+            var _se = document.getElementById('jtmAdjStatus-' + sid);
+            if (_se) _se.textContent = 'Koneksi gagal: ' + err;
+          })
+          .getOccurrenceJtmState(token, 'PIKET', piketRef);
+      } else {
+        google.script.run
+          .withSuccessHandler(function (res) { _jtmAdjStateHandler(sid, scheduleId, res); })
+          .withFailureHandler(function (err) {
+            var _se = document.getElementById('jtmAdjStatus-' + sid);
+            if (_se) _se.textContent = 'Koneksi gagal: ' + err;
+          })
+          .getOccurrenceJtmState(token, 'KBM', scheduleId);
+      }
+    }
+    function _jtmAdjStateHandler(sid, scheduleId, res) {
+      var _statusEl = document.getElementById('jtmAdjStatus-' + sid);
+      if (!res || res.status !== 'success') {
+        var _errMsg = res ? (res.message || ('Status: ' + res.status)) : 'Response kosong dari server';
+        if (_statusEl) _statusEl.textContent = _errMsg;
+        return;
+      }
+      var schedEl = document.getElementById('jtmSchedDisp-' + sid);
+      var adjEl   = document.getElementById('jtmAdjDisp-'   + sid);
+      var diffEl  = document.getElementById('jtmDiffDisp-'  + sid);
+      var inputEl = document.getElementById('jtmAdjInput-'  + sid);
+      var reasonEl = document.getElementById('jtmReason-'   + sid);
+      if (schedEl) schedEl.textContent = res.scheduled_jtm;
+</script>

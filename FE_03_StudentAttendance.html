@@ -1,0 +1,346 @@
+<script>
+      if (adjEl)   adjEl.textContent   = res.adjusted_jtm;
+      if (diffEl)  diffEl.textContent  = res.jtm_difference;
+      if (inputEl) {
+        inputEl.value = res.adjusted_jtm;
+        inputEl.setAttribute('max', res.scheduled_jtm);
+        inputEl.dataset.scheduled = res.scheduled_jtm;
+      }
+      if (reasonEl) reasonEl.value = res.reason || '';
+      if (_statusEl) _statusEl.textContent = '';
+      recomputeJtmDifferenceDisplay(scheduleId);
+      var _cancelBtn = document.getElementById('jtmCancelBtn-' + sid);
+      if (_cancelBtn) {
+        var _hasAdj = (Number(res.adjusted_jtm) !== Number(res.scheduled_jtm))
+          || (res.reason && String(res.reason).trim().length > 0)
+          || (res.allocations && res.allocations.length > 0);
+        if (_hasAdj) _cancelBtn.classList.remove('hidden');
+        else         _cancelBtn.classList.add('hidden');
+      }
+      renderJtmAllocationPanel(scheduleId, res);
+    }
+    function recomputeJtmDifferenceDisplay(scheduleId) {
+      var sid = _jtmSid(scheduleId);
+      var inputEl = document.getElementById('jtmAdjInput-' + sid);
+      if (!inputEl) return;
+      var adjEl = document.getElementById('jtmAdjDisp-' + sid);
+      var diffEl = document.getElementById('jtmDiffDisp-' + sid);
+      var reasonWrap = document.getElementById('jtmReasonWrap-' + sid);
+      var scheduled = Number(inputEl.dataset.scheduled || inputEl.getAttribute('max') || 0);
+      var raw = String(inputEl.value).trim();
+      var val = Number(raw);
+      var isWholeInRange = raw !== '' && isFinite(val) && Math.floor(val) === val && val >= 0 && val <= scheduled;
+      if (isWholeInRange) {
+        if (adjEl) adjEl.textContent = val;
+        if (diffEl) diffEl.textContent = (scheduled - val);
+      }
+      if (reasonWrap) {
+        if (isWholeInRange && val < scheduled) reasonWrap.classList.remove('hidden');
+        else reasonWrap.classList.add('hidden');
+      }
+    }
+    function saveJtmAdjustment(scheduleId, userId, btnEl) {
+      var sid = _jtmSid(scheduleId);
+      var inputEl = document.getElementById('jtmAdjInput-' + sid);
+      var reasonEl = document.getElementById('jtmReason-' + sid);
+      var statusEl = document.getElementById('jtmAdjStatus-' + sid);
+      if (!inputEl) return;
+      var scheduled = Number(inputEl.dataset.scheduled || inputEl.getAttribute('max') || 0);
+      var raw = String(inputEl.value).trim();
+      var val = Number(raw);
+      if (raw === '' || !isFinite(val) || Math.floor(val) !== val) {
+        showToast('Adjusted JTM harus berupa bilangan bulat.', 'error');
+        return;
+      }
+      if (val < 0 || val > scheduled) {
+        showToast('Adjusted JTM harus di antara 0 dan ' + scheduled + '.', 'error');
+        return;
+      }
+      var reason = reasonEl ? String(reasonEl.value).trim() : '';
+      if (val < scheduled && reason.length === 0) {
+        showToast('Alasan penyesuaian wajib diisi saat mengurangi JTM.', 'error');
+        if (reasonEl) reasonEl.focus();
+        return;
+      }
+      if (reason.length > 500) {
+        showToast('Alasan penyesuaian maksimal 500 karakter.', 'error');
+        return;
+      }
+      var token = localStorage.getItem('auth_token');
+      var restoreBtn = _busyButton(btnEl, 'Menyimpan...');
+      var isPiket = /^PICKET-DUTY/.test(scheduleId);
+      var todayJkt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' }).slice(0, 10);
+      var payload = isPiket
+        ? {
+            occurrence_type: 'PIKET',
+            target_user_id: userId,
+            date: todayJkt,
+            adjusted_jtm: val,
+            reason: reason
+          }
+        : {
+            occurrence_type: 'KBM',
+            schedule_id: scheduleId,
+            target_user_id: userId,
+            adjusted_jtm: val,
+            reason: reason
+          };
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restoreBtn();
+          if (res && res.status === 'success') {
+            showToast('Penyesuaian JTM tersimpan.', 'success');
+            var _statusEl = document.getElementById('jtmAdjStatus-' + sid);
+            var schedEl = document.getElementById('jtmSchedDisp-' + sid);
+            var adjEl   = document.getElementById('jtmAdjDisp-'   + sid);
+            var diffEl  = document.getElementById('jtmDiffDisp-'  + sid);
+            if (schedEl) schedEl.textContent = res.scheduled_jtm;
+            if (adjEl)   adjEl.textContent   = res.adjusted_jtm;
+            if (diffEl)  diffEl.textContent  = res.jtm_difference;
+            if (_statusEl) _statusEl.textContent = '';
+            var _panel     = document.getElementById('jtmAllocPanel-' + sid);
+            var _listEl    = document.getElementById('jtmAllocList-'  + sid);
+            var _remainEl  = document.getElementById('jtmRemainDisp-' + sid);
+            var newDiff    = Number(res.jtm_difference) || 0;
+            var allocSum   = 0;
+            if (_listEl) {
+              var rows = _listEl.querySelectorAll('[data-alloc-jtm]');
+              for (var _i = 0; _i < rows.length; _i++) {
+                allocSum += Number(rows[_i].dataset.allocJtm) || 0;
+              }
+            }
+            var newRemaining = Math.max(0, newDiff - allocSum);
+            if (_remainEl) _remainEl.textContent = newRemaining;
+            if (_panel) {
+              _panel.dataset.remaining = newRemaining;
+              if (newDiff > 0) _panel.classList.remove('hidden');
+              else             _panel.classList.add('hidden');
+            }
+            var _cancelBtn = document.getElementById('jtmCancelBtn-' + sid);
+            if (_cancelBtn) _cancelBtn.classList.remove('hidden');
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan penyesuaian JTM.', 'error');
+            var _statusEl2 = document.getElementById('jtmAdjStatus-' + sid);
+            if (_statusEl2) _statusEl2.textContent = (res && res.message) || '';
+          }
+        })
+        .withFailureHandler(function (err) {
+          restoreBtn();
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+        .adjustOccurrenceJtm(token, payload);
+    }
+    /* =====================================================================
+     * JTM Adjustment — Partial_Substitute allocation panel
+     * (Feature: jtm-adjustment, task 10.2)
+     *
+     * Renders the allocation sub-panel inside the same jtmAdjRow-<sid> detail
+     * row added by task 10.1, using the state returned by
+     * getOccurrenceJtmState(token, 'KBM', schedule_id):
+     *   { scheduled_jtm, adjusted_jtm, jtm_difference, reason, allocations:[...] }
+     * Allocations are wired to reallocateJtmDifference / removeReallocation via
+     * google.script.run. Client-side checks are UX only; the backend remains
+     * authoritative.
+     * ===================================================================== */
+    function _jtmTeacherName(userId) {
+      var id = String(userId == null ? '' : userId);
+      var list = allTeachersCache || [];
+      for (var i = 0; i < list.length; i++) {
+        if (String(list[i].id) === id) return list[i].full_name || id;
+      }
+      return id;
+    }
+    function _jtmPopulateAllocSelect(sid, originalUserId) {
+      var sel = document.getElementById('jtmAllocSelect-' + sid);
+      if (!sel) return;
+      var prev = sel.value;
+      var origId = String(originalUserId == null ? '' : originalUserId);
+      var html = '<option value="">Pilih Guru...</option>';
+      (allTeachersCache || []).forEach(function (t) {
+        if (String(t.id) === origId) return; // exclude the original teacher
+        html += '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.full_name) + '</option>';
+      });
+      sel.innerHTML = html;
+      if (prev) sel.value = prev;
+    }
+    function _jtmRenderAllocList(scheduleId, allocations) {
+      var sid = _jtmSid(scheduleId);
+      var listEl = document.getElementById('jtmAllocList-' + sid);
+      if (!listEl) return;
+      var allocs = allocations || [];
+      if (allocs.length === 0) {
+        listEl.innerHTML = '<div class="text-[11px] text-slate-400 italic">Belum ada alokasi.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < allocs.length; i++) {
+        var a = allocs[i] || {};
+        var name = escapeHtml(_jtmTeacherName(a.substitute_user_id));
+        var jtm = escapeHtml(a.allocated_jtm);
+        var safeReallocId = _jsStr(a.id);
+        html += '<div class="flex items-center justify-between bg-emerald-50/60 border border-emerald-100 rounded-lg px-2.5 py-1.5"' +
+          ' data-realloc-id="' + escapeHtml(a.id) + '" data-alloc-jtm="' + escapeHtml(a.allocated_jtm) + '">' +
+          '<span class="text-xs text-slate-700"><span class="font-semibold">' + name + '</span> ' +
+          '<span class="text-emerald-700 font-bold">+' + jtm + ' JTM</span></span>' +
+          '<button type="button" onclick="removeJtmAllocation(\'' + _jsStr(scheduleId) + '\', \'' + safeReallocId + '\', this)" ' +
+          'class="inline-flex items-center gap-1 text-red-600 hover:text-red-700 text-[11px] font-semibold">' +
+          '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
+          'Hapus</button>' +
+          '</div>';
+      }
+      listEl.innerHTML = html;
+    }
+    function renderJtmAllocationPanel(scheduleId, res) {
+      var sid = _jtmSid(scheduleId);
+      var panel = document.getElementById('jtmAllocPanel-' + sid);
+      if (!panel) return;
+      var scheduled = Number(res.scheduled_jtm) || 0;
+      var adjusted = Number(res.adjusted_jtm) || 0;
+      var difference = scheduled - adjusted;
+      var allocs = res.allocations || [];
+      var allocated = 0;
+      for (var i = 0; i < allocs.length; i++) {
+        allocated += Number((allocs[i] || {}).allocated_jtm) || 0;
+      }
+      var remaining = difference - allocated;
+      if (remaining < 0) remaining = 0;
+      if (difference > 0) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+      var remainEl = document.getElementById('jtmRemainDisp-' + sid);
+      if (remainEl) remainEl.textContent = remaining;
+      _jtmPopulateAllocSelect(sid, panel.dataset.originalUid);
+      _jtmRenderAllocList(scheduleId, allocs);
+      panel.dataset.remaining = remaining;
+    }
+    function addJtmAllocation(scheduleId, userId, btnEl) {
+      var sid = _jtmSid(scheduleId);
+      var selEl = document.getElementById('jtmAllocSelect-' + sid);
+      var inputEl = document.getElementById('jtmAllocInput-' + sid);
+      var panel = document.getElementById('jtmAllocPanel-' + sid);
+      if (!selEl || !inputEl) return;
+      var substituteUserId = String(selEl.value || '');
+      var raw = String(inputEl.value).trim();
+      var val = Number(raw);
+      if (!substituteUserId) {
+        showToast('Pilih guru pengganti terlebih dahulu.', 'error');
+        return;
+      }
+      if (raw === '' || !isFinite(val) || val <= 0) {
+        showToast('Alokasi JTM harus berupa angka lebih dari 0.', 'error');
+        return;
+      }
+      var remaining = panel ? Number(panel.dataset.remaining || 0) : 0;
+      if (val > remaining) {
+        showToast('Alokasi melebihi sisa selisih JTM (' + remaining + ').', 'error');
+        return;
+      }
+      var token = localStorage.getItem('auth_token');
+      var restoreBtn = _busyButton(btnEl, 'Menyimpan...');
+      var isPiketAlloc = /^PICKET-DUTY/.test(scheduleId);
+      var todayAllocJkt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' }).slice(0, 10);
+      var payload = isPiketAlloc
+        ? {
+            occurrence_type: 'PIKET',
+            occurrence_ref: scheduleId.replace(/^PICKET-DUTY_?/, '') + '|' + todayAllocJkt,
+            allocations: [{ substitute_user_id: substituteUserId, allocated_jtm: val }]
+          }
+        : {
+            occurrence_type: 'KBM',
+            occurrence_ref: scheduleId,
+            allocations: [{ substitute_user_id: substituteUserId, allocated_jtm: val }]
+          };
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restoreBtn();
+          if (res && res.status === 'success') {
+            showToast('Alokasi JTM pengganti tersimpan.', 'success');
+            if (inputEl) inputEl.value = '';
+            if (selEl) selEl.value = '';
+            var _panel = document.getElementById('jtmAllocPanel-' + sid);
+            var _remainEl = document.getElementById('jtmRemainDisp-' + sid);
+            var _newRemaining = Number(res.remaining_difference);
+            if (isNaN(_newRemaining)) _newRemaining = 0;
+            if (_remainEl) _remainEl.textContent = _newRemaining;
+            if (_panel) {
+              _panel.dataset.remaining = _newRemaining;
+              if (_newRemaining > 0) _panel.classList.remove('hidden');
+              else _panel.classList.add('hidden');
+            }
+            _jtmRenderAllocList(scheduleId, res.allocations || []);
+            _jtmPopulateAllocSelect(sid, _panel ? _panel.dataset.originalUid : '');
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan alokasi JTM.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          restoreBtn();
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+        .reallocateJtmDifference(token, payload);
+    }
+    function removeJtmAllocation(scheduleId, reallocationId, btnEl) {
+      var sid = _jtmSid(scheduleId);
+      var token = localStorage.getItem('auth_token');
+      var restoreBtn = _busyButton(btnEl, 'Menghapus...');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restoreBtn();
+          if (res && res.status === 'success') {
+            showToast('Alokasi JTM dihapus.', 'success');
+            var listEl = document.getElementById('jtmAllocList-' + sid);
+            var panel = document.getElementById('jtmAllocPanel-' + sid);
+            var removedJtm = 0;
+            if (btnEl) {
+              var rowEl = btnEl.closest
+                ? btnEl.closest('[data-realloc-id]')
+                : (function () {
+                  var el = btnEl;
+                  while (el && !el.dataset.reallocId) el = el.parentElement;
+                  return el;
+                })();
+              if (rowEl) {
+                removedJtm = Number(rowEl.dataset.allocJtm) || 0;
+                rowEl.parentNode && rowEl.parentNode.removeChild(rowEl);
+              }
+            }
+            var remainEl = document.getElementById('jtmRemainDisp-' + sid);
+            var currentRemaining = panel ? Number(panel.dataset.remaining || 0) : 0;
+            var newRemaining = currentRemaining + removedJtm;
+            if (remainEl) remainEl.textContent = newRemaining;
+            if (panel) {
+              panel.dataset.remaining = newRemaining;
+              if (newRemaining > 0) panel.classList.remove('hidden');
+            }
+          } else {
+            showToast((res && res.message) || 'Gagal menghapus alokasi JTM.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          restoreBtn();
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+        .removeReallocation(token, reallocationId);
+    }
+    function cancelJtmAdjustment(scheduleId, btnEl) {
+      showConfirm(
+        'Batalkan Penyesuaian JTM',
+        'Apakah Anda yakin? Semua penyesuaian dan alokasi pengganti sebagian untuk jadwal ini akan dihapus, dan JTM akan kembali ke nilai terjadwal.',
+        function () {
+          var sid = _jtmSid(scheduleId);
+          var token = localStorage.getItem('auth_token');
+          var restoreBtn = btnEl ? _busyButton(btnEl, 'Membatalkan...') : function () {};
+          function _onCancelSuccess(res) {
+            restoreBtn();
+            if (res && res.status === 'success') {
+              showToast(res.message || 'Penyesuaian JTM dibatalkan.', 'success');
+              loadJtmAdjustState(scheduleId);
+              var inputEl  = document.getElementById('jtmAdjInput-'   + sid);
+              var sched = inputEl ? Number(inputEl.dataset.scheduled || inputEl.getAttribute('max') || 0) : 0;
+              ['jtmSchedDisp-','jtmAdjDisp-'].forEach(function(p){
+                var e = document.getElementById(p+sid); if(e) e.textContent = sched;
+              });
+              var diffEl = document.getElementById('jtmDiffDisp-'+sid); if(diffEl) diffEl.textContent = 0;
+</script>

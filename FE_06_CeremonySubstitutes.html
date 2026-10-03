@@ -1,0 +1,169 @@
+<script>
+        }).catch(function (err) {
+          showToast("Gagal Render: " + err, "error");
+          if (btnExport) {
+            btnExport.innerText = originalBtnText;
+            btnExport.disabled = false;
+          }
+        });
+    }
+    function deleteSubjectAction(id, btnEl) {
+      showConfirm('Hapus Mapel', 'Yakin ingin menghapus mapel ini?', () => {
+        const token = localStorage.getItem('auth_token');
+        var restoreBtn = (typeof _busyButton === 'function') ? _busyButton(btnEl, '') : function () { };
+        var restoreRow = (typeof _setRowLoading === 'function') ? _setRowLoading(btnEl) : function () { };
+        google.script.run.withSuccessHandler((res) => {
+          if (res && res.status === 'success') {
+            showToast('Mapel dihapus', 'success');
+            initSettings();
+          } else {
+            restoreBtn(); restoreRow();
+            showToast((res && res.message) || 'Gagal menghapus mapel.', 'error');
+          }
+        }).withFailureHandler((err) => {
+          restoreBtn(); restoreRow();
+          showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+        }).deleteSubject(token, id);
+      });
+    }
+    function deleteAllowanceAction(id, btnEl) {
+      showConfirm('Hapus Tunjangan', 'Yakin ingin menghapus data tunjangan ini?', () => {
+        const token = localStorage.getItem('auth_token');
+        var restoreBtn = (typeof _busyButton === 'function') ? _busyButton(btnEl, '') : function () { };
+        var restoreRow = (typeof _setRowLoading === 'function') ? _setRowLoading(btnEl) : function () { };
+        google.script.run.withSuccessHandler((res) => {
+          if (res && res.status === 'success') {
+            showToast('Tunjangan dihapus', 'success');
+            initSettings();
+          } else {
+            restoreBtn(); restoreRow();
+            showToast((res && res.message) || 'Gagal menghapus.', 'error');
+          }
+        }).withFailureHandler((err) => {
+          restoreBtn(); restoreRow();
+          showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+        }).deleteAllowance(token, id);
+      });
+    }
+    /**
+     * Dipanggil oleh tombol "Isi Jurnal" di quick-action dashboard guru.
+     * Scroll halaman ke panel "Jadwal Mengajar Hari Ini" tanpa berpindah halaman.
+     */
+    function scrollToDashboardSchedule() {
+      var target = document.getElementById('panelJadwalMengajarHariIni');
+      if (!target) return;
+      function _findScrollParent(el) {
+        var parent = el.parentElement;
+        while (parent && parent !== document.body) {
+          var style = window.getComputedStyle(parent);
+          var overflow = style.overflowY;
+          if (overflow === 'auto' || overflow === 'scroll') return parent;
+          parent = parent.parentElement;
+        }
+        return window;
+      }
+      var scroller = _findScrollParent(target);
+      var offset = 72; // tinggi navbar kira-kira, agar tidak tertutup
+      if (scroller === window) {
+        var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+        window.scrollTo({ top: top, behavior: 'smooth' });
+      } else {
+        var containerTop = scroller.getBoundingClientRect().top;
+        var targetTop    = target.getBoundingClientRect().top;
+        var scrollTo     = scroller.scrollTop + (targetTop - containerTop) - offset;
+        scroller.scrollTo({ top: scrollTo, behavior: 'smooth' });
+      }
+    }
+    function initDashboard() {
+      const token = localStorage.getItem('auth_token');
+      const role = localStorage.getItem('user_role') || "guru";
+      const viewGuru = document.getElementById('viewGuruDashboard');
+      const viewAdmin = document.getElementById('viewAdminDashboard');
+      const today = new Date();
+      const dateStr = formatDateID(today);
+      setText('lblTodayDate', dateStr);
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      setText('lblMonth', months[today.getMonth()]);
+      if (document.getElementById('badgeDate')) setText('badgeDate', dateStr);
+      if (String(role).toLowerCase() === 'admin') {
+        if (viewAdmin) viewAdmin.classList.remove('hidden');
+        setText('lblRoleTitle', 'Administrator');
+        setTimeout(() => { renderGreetingCard(); }, 50);
+        initAdminDashboard();
+      } else {
+        if (viewGuru) viewGuru.classList.remove('hidden');
+        setTimeout(() => { renderGreetingCard(); }, 50);
+        loadGuruDashboardData(token);
+        setTimeout(() => { checkExamBannerForDashboard(); }, 200);
+      }
+      startDashboardLiveTicker();
+      setTimeout(() => { if (typeof _fixMobileLayouts === 'function') _fixMobileLayouts(); }, 300);
+    }
+    let _dashboardTickerId = null;
+    function startDashboardLiveTicker() {
+      if (_dashboardTickerId) clearInterval(_dashboardTickerId);
+      _dashboardTickerId = setInterval(() => {
+        const liveClock = document.getElementById('dashLiveClock');
+        if (liveClock) {
+          const now = new Date();
+          const hh = String(now.getHours()).padStart(2, '0');
+          const mm = String(now.getMinutes()).padStart(2, '0');
+          const ss = String(now.getSeconds()).padStart(2, '0');
+          liveClock.innerText = `${hh}:${mm}:${ss}`;
+        }
+        const viewGuru = document.getElementById('viewGuruDashboard');
+        const viewAdmin = document.getElementById('viewAdminDashboard');
+        const guruVisible = viewGuru && !viewGuru.classList.contains('hidden');
+        const adminVisible = viewAdmin && !viewAdmin.classList.contains('hidden');
+        if (!guruVisible && !adminVisible) {
+          clearInterval(_dashboardTickerId);
+          _dashboardTickerId = null;
+        }
+      }, 1000);
+    }
+    function refreshDashboard() {
+      const btn = document.getElementById('btnRefreshDashboard');
+      if (btn) {
+        btn.classList.add('rotating');
+        setTimeout(() => btn.classList.remove('rotating'), 800);
+      }
+      showToast('Memperbarui data dashboard...', 'info');
+      initDashboard();
+    }
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.innerText = text;
+    }
+    function initAdminDashboard() {
+      const token = localStorage.getItem('auth_token');
+      loadAdminDashboardData(token);
+      checkAdminAutoJurnalStatus(token);
+      loadAdminExtendedStats(token);
+      loadAdminDashboardPicket();
+      // Aktifkan marquee di elemen statis setelah render (elemen dinamis
+      // memanggil sendiri via _initDashboardMarquees setelah diisi)
+      setTimeout(_initDashboardMarquees, 400);
+    }
+    function checkAdminAutoJurnalStatus(token) {
+      google.script.run.withSuccessHandler((res) => {
+        const panel = document.getElementById('panelAutoJurnalAdmin');
+        const btnGenerate = document.getElementById('btnGenerateAutoJurnal');
+        const btnCancel = document.getElementById('btnCancelAutoJurnal');
+        const txtDate = document.getElementById('txtAdminLiburDate');
+        const resultDiv = document.getElementById('resultAutoJurnal');
+        const badgeStatus = document.getElementById('badgeAutoJurnalStatus');
+        if (!panel) return;
+        if (res && res.status === 'success' && res.is_holiday) {
+          panel.classList.remove('hidden');
+          loadAutoJurnalSchedulerStatus(token);
+          const today = new Date();
+          txtDate.innerText = formatDateID(today) + ' - ' + (res.holiday_description || 'Hari Libur');
+          if (res.has_auto_jurnal) {
+            btnGenerate.classList.add('hidden');
+            btnCancel.classList.remove('hidden');
+            resultDiv.classList.remove('hidden');
+            badgeStatus.classList.remove('hidden');
+            badgeStatus.innerText = '✅ AKTIF';
+            badgeStatus.className = 'text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-700';
+            showAutoJurnalResult({
+</script>
