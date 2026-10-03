@@ -1,0 +1,1250 @@
+<script>
+      counter.innerText = len + '/300';
+      counter.style.color = len > 270 ? '#DC2626' : (len > 220 ? '#D97706' : '#94A3B8');
+    }
+    function updateBapTotalIndicator() {
+      var inpH = document.getElementById('inpBapHadir');
+      var inpA = document.getElementById('inpBapAbsen');
+      var indicator = document.getElementById('bapTotalIndicator');
+      var totalEl = document.getElementById('bapTotalCount');
+      var rateEl = document.getElementById('bapAttendanceRate');
+      var hadirBar = document.getElementById('bapHadirBar');
+      var absenBar = document.getElementById('bapAbsenBar');
+      if (!inpH || !inpA || !indicator || !totalEl) return;
+      var h = parseInt(inpH.value || '0', 10) || 0;
+      var a = parseInt(inpA.value || '0', 10) || 0;
+      var total = h + a;
+      if (total > 0) {
+        indicator.classList.remove('hidden');
+        totalEl.innerText = total;
+        var hPct = Math.round((h / total) * 100);
+        var aPct = 100 - hPct;
+        if (rateEl) rateEl.textContent = hPct + '%';
+        if (hadirBar) hadirBar.style.width = hPct + '%';
+        if (absenBar) absenBar.style.width = aPct + '%';
+      } else {
+        indicator.classList.add('hidden');
+      }
+    }
+    function _bapBtnLabel(isEdit) {
+      return '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> ' + (isEdit ? 'Perbarui BAP' : 'Submit BAP');
+    }
+    window.gExam_submitBap = function () {
+      var token = localStorage.getItem('auth_token');
+      var supId = document.getElementById('inpBapSupervisorId').value;
+      var hadir = document.getElementById('inpBapHadir').value;
+      var absen = document.getElementById('inpBapAbsen').value;
+      var cat = document.getElementById('inpBapCatatan').value.trim();
+      if (hadir === '' || absen === '' || isNaN(Number(hadir)) || isNaN(Number(absen))) {
+        showToast('Jumlah peserta hadir dan tidak hadir wajib diisi', 'error');
+        return;
+      }
+      if (Number(hadir) < 0 || Number(absen) < 0) {
+        showToast('Jumlah peserta tidak boleh negatif', 'error');
+        return;
+      }
+      var btn = document.getElementById('btnSubmitBap');
+      var isEdit = btn && btn.dataset && btn.dataset.editMode === '1';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Menyimpan...';
+      }
+      if (typeof window.exam_showLoading === 'function') {
+        window.exam_showLoading(isEdit ? 'Menyimpan perubahan BAP...' : 'Mengirim BAP...');
+      }
+      var bapData = { peserta_hadir: Number(hadir), peserta_absen: Number(absen), catatan: cat };
+      var fn = isEdit ? 'editExamBAP' : 'submitExamBAP';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (typeof window.exam_hideLoading === 'function') {
+            window.exam_hideLoading();
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = _bapBtnLabel(isEdit);
+          }
+          if (res.status === 'success') {
+            showToast(res.message);
+            gExam_closeBapModal();
+            if (typeof refreshGuruDashboardCards === 'function') refreshGuruDashboardCards();
+            if (typeof checkExamBannerForDashboard === 'function') checkExamBannerForDashboard();
+            if (typeof checkExamForMySchedule === 'function' && document.getElementById('panelExamMySchedule')) checkExamForMySchedule();
+          } else {
+            showToast(res.message, 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          if (typeof window.exam_hideLoading === 'function') {
+            window.exam_hideLoading();
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = _bapBtnLabel(isEdit);
+          }
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+      [fn](token, supId, bapData);
+    };
+    function checkExamForMySchedule() {
+      var token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (!res || !res.is_exam_period) {
+            document.getElementById('panelExamMySchedule') &&
+              document.getElementById('panelExamMySchedule').classList.add('hidden');
+            return;
+          }
+          renderExamMyScheduleSection(res);
+        })
+        .withFailureHandler(function () { })
+        .getExamPageData(token);
+    }
+    function renderExamMyScheduleSection(data) {
+      var panel = document.getElementById('panelExamMySchedule');
+      if (!panel) return;
+      var today = _gExamToday();
+      var nowTime = _gExamNowTime();
+      var period = data.period || {};
+      var supDuties = data.supervisor_duties || [];
+      var comDuties = data.committee_duties || [];
+      var periodOver = today > period.date_end;
+      var html = '<div class="bg-gradient-to-r from-indigo-600 to-blue-700 rounded-2xl p-5 shadow-md overflow-hidden relative mb-1">'
+        + '<div class="absolute inset-0 opacity-10" style="background-image:radial-gradient(circle at 70% 50%,white 1px,transparent 1px); background-size:20px 20px;"></div>'
+        + '<div class="relative z-10 flex items-start gap-4 flex-wrap">'
+        + '<div class="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 text-2xl">🎓</div>'
+        + '<div class="flex-1 min-w-0">'
+        + '<p class="text-blue-100 text-xs font-semibold uppercase tracking-wider">Periode Ujian Aktif</p>'
+        + '<h3 class="text-white font-extrabold text-base leading-tight mt-0.5">' + _gExamEsc(period.name) + '</h3>'
+        + '<p class="text-blue-200 text-xs mt-1">' + _gExamFmtDate(period.date_start) + ' — ' + _gExamFmtDate(period.date_end)
+        + ' &nbsp;·&nbsp; Jadwal mengajar reguler tidak berlaku selama periode ini.</p>'
+        + '</div></div></div>';
+      if (!supDuties.length && !comDuties.length) {
+        html += '<div class="bg-sky-50 border border-sky-200 rounded-2xl p-5 text-center shadow-sm">'
+          + '<p class="text-4xl mb-3">🌟</p>'
+          + '<p class="text-slate-700 font-bold text-sm">Anda tidak memiliki tugas pada periode ujian ini</p>'
+          + '<p class="text-slate-500 text-xs mt-1">Hari ini adalah hari libur selama periode ujian berlangsung.</p>'
+          + '</div>';
+        panel.innerHTML = html;
+        panel.classList.remove('hidden');
+        var grid = panel.nextElementSibling;
+        if (grid) grid.classList.add('hidden');
+        return;
+      }
+      if (supDuties.length) {
+        html += '<div class="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">'
+          + '<div class="px-4 md:px-5 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">'
+          + '<svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>'
+          + '<span class="text-xs font-bold text-indigo-700 uppercase tracking-wider">Jadwal Pengawasan Ujian</span>'
+          + '</div>';
+        supDuties.forEach(function (d) {
+          var isConf = !!(d.confirmed_by && d.confirmed_by.trim());
+          var hasBap = d.has_bap;
+          var bapReady = isConf && nowTime >= d.bap_active_time;
+          var isToday = d.date === today;
+          var statusHtml;
+          if (!isConf) {
+            statusHtml = '<span class="inline-flex items-center text-[11px] md:text-xs text-slate-500 bg-slate-100 border border-slate-200 px-2 md:px-2.5 py-1 rounded-full font-semibold">⏳ Menunggu Konfirmasi</span>';
+          } else if (hasBap) {
+            statusHtml = '<span class="inline-flex items-center text-[11px] md:text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 md:px-2.5 py-1 rounded-full font-semibold">✓ BAP Terkirim</span>';
+          } else if (isToday && !bapReady) {
+            statusHtml = '<span class="inline-flex items-center text-[11px] md:text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 md:px-2.5 py-1 rounded-full font-semibold">✓ Hadir — BAP ' + d.bap_active_time + '</span>';
+          } else {
+            statusHtml = '<span class="inline-flex items-center text-[11px] md:text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 md:px-2.5 py-1 rounded-full font-semibold">✓ Siap Isi BAP</span>';
+          }
+          html += '<div class="px-4 md:px-5 py-4 border-t border-slate-100">'
+            + '<div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">'
+            + '<div class="flex-1 min-w-0">'
+            + '<div class="flex flex-wrap items-center gap-1.5 md:gap-2 mb-2">'
+            + '<span class="inline-flex items-center text-[11px] md:text-xs font-mono font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg shrink-0">' + d.time_start + '–' + d.time_end + '</span>'
+            + '<span class="text-xs md:text-sm font-bold text-slate-800">' + _gExamEsc(d.session_name) + '</span>'
+            + (d.is_substitute ? '<span class="inline-flex items-center text-[10px] md:text-xs text-amber-600 font-semibold bg-amber-50 border border-amber-200 px-1.5 md:px-2 py-0.5 rounded-full shrink-0">Pengganti</span>' : '')
+            + '</div>'
+            + '<div class="space-y-1">'
+            + '<p class="text-[11px] md:text-xs text-slate-500 flex items-center gap-1">'
+            + '<span class="shrink-0">🚪</span>'
+            + '<strong class="font-semibold">' + _gExamEsc(d.room_name) + '</strong>'
+            + '</p>'
+            + '<p class="text-[11px] md:text-xs text-slate-500">'
+            + _gExamEsc(d.subject) + ' · Kelas ' + _gExamEsc(d.class_name)
+            + '</p>'
+            + '<p class="text-[11px] md:text-xs text-slate-400">'
+            + '<span class="font-semibold text-slate-600">JTM: ' + d.jtm_val + '</span> · ' + _gExamFmtDate(d.date)
+            + '</p>'
+            + '</div>'
+            + '</div>'
+            + '<div class="flex flex-col gap-2 md:items-end md:shrink-0">'
+            + statusHtml;
+          if (isConf && !hasBap && bapReady && !periodOver) {
+            html += '<button onclick="gExam_openBapModal(\'' + d.supervisor_id + '\', false)" class="w-full md:w-auto text-xs md:text-sm font-bold text-white bg-blue-600 px-4 py-2.5 md:py-2 rounded-xl hover:bg-blue-700 active:scale-95 transition shadow-sm flex items-center justify-center gap-1.5">'
+              + '<svg class="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>'
+              + 'Isi BAP'
+              + '</button>';
+          } else if (isConf && hasBap && !periodOver) {
+            html += '<button onclick="gExam_openBapModal(\'' + d.supervisor_id + '\', true)" class="w-full md:w-auto text-xs md:text-sm font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-4 py-2.5 md:py-2 rounded-xl hover:bg-blue-100 active:scale-95 transition flex items-center justify-center gap-1.5">'
+              + '<svg class="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>'
+              + 'Lihat / Edit BAP'
+              + '</button>';
+          }
+          html += '</div>'
+            + '</div>'
+            + '</div>';
+        });
+        html += '</div>';
+      }
+      if (comDuties.length) {
+        html += '<div class="bg-white rounded-2xl border border-cyan-200 shadow-sm overflow-hidden">'
+          + '<div class="px-4 md:px-5 py-3 bg-cyan-50 border-b border-cyan-100 flex items-center gap-2">'
+          + '<svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>'
+          + '<span class="text-xs font-bold text-cyan-700 uppercase tracking-wider">Jadwal Panitia Ujian</span>'
+          + '</div>';
+        comDuties.forEach(function (d) {
+          var isConf = !!(d.confirmed_by && d.confirmed_by.trim());
+          html += '<div class="px-4 md:px-5 py-4 border-t border-slate-100">'
+            + '<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 md:gap-3">'
+            + '<div class="flex-1 min-w-0">'
+            + '<p class="text-sm md:text-base font-bold text-slate-800 mb-1">Panitia Ujian</p>'
+            + '<div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] md:text-xs text-slate-500">'
+            + '<span>' + _gExamFmtDate(d.date) + '</span>'
+            + '<span class="text-slate-300">·</span>'
+            + '<span class="font-semibold text-slate-600">JTM: ' + d.jtm_val + '</span>'
+            + (d.is_substitute ? '<span class="text-slate-300">·</span><span class="text-amber-600 font-semibold">Pengganti</span>' : '')
+            + '</div>'
+            + '</div>'
+            + '<div class="shrink-0">'
+            + (isConf
+              ? '<span class="inline-flex items-center text-[11px] md:text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 md:px-2.5 py-1 rounded-full font-semibold">✓ Dikonfirmasi</span>'
+              : '<span class="inline-flex items-center text-[11px] md:text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 md:px-2.5 py-1 rounded-full font-semibold">⏳ Menunggu Konfirmasi</span>')
+            + '</div>'
+            + '</div>'
+            + '</div>';
+        });
+        html += '</div>';
+      }
+      panel.innerHTML = html;
+      panel.classList.remove('hidden');
+      var grid = panel.nextElementSibling;
+      if (grid) grid.classList.add('hidden');
+    }
+    function loadExamPanitiaPanel() {
+      var token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (!res || !res.is_exam_period || !res.is_confirmed_panitia) {
+            var p = document.getElementById('panelExamPanitia');
+            if (p) p.classList.add('hidden');
+            return;
+          }
+          renderExamPanitiaPanel(res);
+        })
+        .withFailureHandler(function () { })
+        .getExamPageData(token);
+    }
+    function initExamPanitiaPage() {
+      var token = localStorage.getItem('auth_token');
+      var skel = document.getElementById('examPanitiaSkeleton');
+      var panel = document.getElementById('panelExamPanitia');
+      var noAccess = document.getElementById('examPanitiaNoAccess');
+      var noAccessTitle = document.getElementById('examPanitiaNoAccessTitle');
+      var noAccessMsg = document.getElementById('examPanitiaNoAccessMsg');
+      var periodInfo = document.getElementById('examPanitiaPeriodInfo');
+      var periodName = document.getElementById('examPanitiaPeriodName');
+      var periodRange = document.getElementById('examPanitiaPeriodRange');
+      var todayEl = document.getElementById('examPanitiaToday');
+      if (skel) skel.classList.remove('hidden');
+      if (panel) panel.classList.add('hidden');
+      if (noAccess) noAccess.classList.add('hidden');
+      if (periodInfo) periodInfo.classList.add('hidden');
+      if (todayEl && typeof formatDateID === 'function') {
+        try { todayEl.textContent = formatDateID(new Date()); } catch (_) { }
+      }
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (skel) skel.classList.add('hidden');
+          if (!res || res.status === 'error') {
+            if (noAccess) {
+              if (noAccessTitle) noAccessTitle.textContent = 'Gagal Memuat Data';
+              if (noAccessMsg) noAccessMsg.textContent = (res && res.message) || 'Tidak dapat memuat data ujian. Coba muat ulang.';
+              noAccess.classList.remove('hidden');
+            }
+            return;
+          }
+          if (res.is_exam_period && res.period) {
+            if (periodInfo) periodInfo.classList.remove('hidden');
+            if (periodName) periodName.textContent = res.period.name || '—';
+            if (periodRange && typeof formatDateID === 'function') {
+              try {
+                periodRange.textContent =
+                  formatDateID(res.period.date_start) + ' — ' + formatDateID(res.period.date_end);
+              } catch (_) {
+                periodRange.textContent = res.period.date_start + ' — ' + res.period.date_end;
+              }
+            }
+          }
+          if (!res.is_exam_period) {
+            if (noAccess) {
+              if (noAccessTitle) noAccessTitle.textContent = 'Tidak Ada Periode Ujian Aktif';
+              if (noAccessMsg) noAccessMsg.textContent =
+                'Saat ini tidak ada periode ujian yang sedang berlangsung. Halaman ini akan aktif saat periode ujian dimulai dan Anda dikonfirmasi sebagai panitia.';
+              noAccess.classList.remove('hidden');
+            }
+            if (typeof checkExamPanitiaAccess === 'function') {
+              try { sessionStorage.removeItem('_examPanitiaAccess'); } catch (_) { }
+              checkExamPanitiaAccess();
+            }
+            return;
+          }
+          if (!res.is_confirmed_panitia) {
+            if (noAccess) {
+              if (noAccessTitle) noAccessTitle.textContent = 'Belum Dikonfirmasi sebagai Panitia';
+              if (noAccessMsg) noAccessMsg.textContent =
+                'Halaman ini akan aktif setelah Anda dikonfirmasi sebagai panitia ujian oleh admin pada periode ujian aktif.';
+              noAccess.classList.remove('hidden');
+            }
+            return;
+          }
+          renderExamPanitiaPanel(res);
+          try { sessionStorage.removeItem('_examPanitiaAccess'); } catch (_) { }
+          if (typeof checkExamPanitiaAccess === 'function') checkExamPanitiaAccess();
+        })
+        .withFailureHandler(function (err) {
+          if (skel) skel.classList.add('hidden');
+          if (noAccess) {
+            if (noAccessTitle) noAccessTitle.textContent = 'Koneksi Gagal';
+            if (noAccessMsg) noAccessMsg.textContent =
+              'Tidak dapat memuat data: ' + (err && err.message ? err.message : err);
+            noAccess.classList.remove('hidden');
+          }
+        })
+        .getExamPageData(token);
+    }
+    function renderExamPanitiaPanel(data) {
+      var panel = document.getElementById('panelExamPanitia');
+      if (!panel) return;
+      var today = _gExamToday();
+      var period = data.period || {};
+      var toConf = data.supervisors_to_confirm || [];
+      var html = '<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">'
+        + '<div style="background:linear-gradient(135deg,#065f46,#0d9488);padding:16px 20px;display:flex;align-items:center;gap:12px;">'
+        + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+        + '<svg style="width:18px;height:18px;color:#fff;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+        + '</div>'
+        + '<div style="min-width:0;flex:1;">'
+        + '<p style="color:#a7f3d0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 2px 0;">Panel Panitia</p>'
+        + '<p style="color:#fff;font-size:14px;font-weight:700;margin:0;line-height:1.3;">Konfirmasi Kehadiran Pengawas</p>'
+        + '</div>'
+        + '<div style="text-align:right;flex-shrink:0;">'
+        + '<p style="color:#a7f3d0;font-size:10px;font-weight:600;margin:0 0 2px 0;">' + _gExamEsc(period.name || '') + '</p>'
+        + '<p style="color:rgba(255,255,255,0.75);font-size:11px;margin:0;">' + _gExamFmtDate(today) + '</p>'
+        + '</div>'
+        + '</div>';
+      if (!toConf.length) {
+        html += '<div style="padding:40px 24px;text-align:center;">'
+          + '<div style="width:48px;height:48px;border-radius:16px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">'
+          + '<svg style="width:22px;height:22px;color:#94a3b8;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'
+          + '</div>'
+          + '<p style="color:#64748b;font-size:14px;font-weight:600;margin:0 0 4px 0;">Tidak Ada Sesi Hari Ini</p>'
+          + '<p style="color:#94a3b8;font-size:12px;margin:0;">Belum ada sesi ujian hari ini, atau belum ada pengawas yang ditetapkan.</p>'
+          + '</div>';
+      } else {
+        toConf.forEach(function (entry, idx) {
+          var borderTop = idx === 0 ? '' : 'border-top:1px solid #f1f5f9;';
+          html += '<div style="' + borderTop + 'padding:16px 20px;">'
+          html += '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;">'
+            + '<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#065f46;background:#ecfdf5;border:1px solid #a7f3d0;padding:5px 10px;border-radius:20px;">'
+            + '<svg style="width:11px;height:11px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+            + _gExamEsc(entry.session_name) + ' &nbsp;' + entry.time_start + '–' + entry.time_end
+            + '</span>'
+            + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;padding:5px 10px;border-radius:20px;">'
+            + '<svg style="width:11px;height:11px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>'
+            + _gExamEsc(entry.room_name)
+            + '</span>'
+            + '<span style="font-size:12px;font-weight:600;color:#64748b;">' + _gExamEsc(entry.subject) + '</span>'
+            + '</div>';
+          entry.supervisors.forEach(function (sup) {
+            if (sup.status === 'cancelled') return;
+            if (sup.status === 'substituted') return;
+            var isConf = !!(sup.confirmed_by && sup.confirmed_by.trim());
+            html += '<div style="display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:12px;background:' + (isConf ? '#f0fdf4' : '#f8fafc') + ';border:1px solid ' + (isConf ? '#bbf7d0' : '#e2e8f0') + ';margin-bottom:8px;">'
+              + '<div>'
+              + '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:3px;">'
+              + '<span style="font-size:14px;font-weight:700;color:#0f172a;">' + _gExamEsc(sup.guru_name) + '</span>'
+              + (sup.is_substitute ? '<span style="font-size:10px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;padding:2px 7px;border-radius:20px;">Pengganti</span>' : '')
+              + (sup.has_bap ? '<span style="font-size:10px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;padding:2px 7px;border-radius:20px;">✓ BAP Terkirim</span>' : '')
+              + '</div>'
+              + (isConf
+                ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#16a34a;"><svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Sudah Hadir</span>'
+                : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;color:#94a3b8;"><svg style="width:10px;height:10px;" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></svg>Belum Hadir</span>')
+              + '</div>'
+              + '<div style="display:flex;flex-direction:column;gap:7px;">';
+            if (isConf) {
+              html += '<button onclick="gExam_picketRevokeSup(\'' + sup.supervisor_id + '\')" '
+                + 'style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:600;color:#dc2626;background:#fff;border:1px solid #fca5a5;padding:9px 14px;border-radius:9px;cursor:pointer;" '
+                + 'onmouseover="this.style.background=\'#fef2f2\'" onmouseout="this.style.background=\'#fff\'">'
+                + '<svg style="width:14px;height:14px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'
+                + 'Cabut Konfirmasi Kehadiran'
+                + '</button>';
+            } else {
+              html += '<button onclick="gExam_picketConfirmSup(\'' + sup.supervisor_id + '\')" '
+                + 'style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,#059669,#047857);border:none;padding:9px 14px;border-radius:9px;cursor:pointer;box-shadow:0 2px 6px rgba(5,150,105,.22);" '
+                + 'onmouseover="this.style.filter=\'brightness(1.07)\'" onmouseout="this.style.filter=\'brightness(1)\'">'
+                + '<svg style="width:14px;height:14px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>'
+                + 'Konfirmasi Kehadiran'
+                + '</button>';
+            }
+            if (!sup.is_substitute) {
+              html += '<button onclick="gExam_picketOpenSubst(\'' + sup.supervisor_id + '\', \'' + _gExamEsc(sup.guru_name) + '\')" '
+                + 'style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:600;color:#be185d;background:#fff;border:1px solid #fbcfe8;padding:9px 14px;border-radius:9px;cursor:pointer;" '
+                + 'onmouseover="this.style.background=\'#fdf2f8\'" onmouseout="this.style.background=\'#fff\'">'
+                + '<svg style="width:14px;height:14px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>'
+                + 'Ganti Pengawas'
+                + '</button>';
+            } else {
+              html += '<button onclick="gExam_picketCancelSubst(\'' + sup.supervisor_id + '\')" '
+                + 'style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:600;color:#c2410c;background:#fff;border:1px solid #fed7aa;padding:9px 14px;border-radius:9px;cursor:pointer;" '
+                + 'onmouseover="this.style.background=\'#fff7ed\'" onmouseout="this.style.background=\'#fff\'">'
+                + '<svg style="width:14px;height:14px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>'
+                + 'Batalkan Penggantian'
+                + '</button>';
+            }
+            var _jeSid = _jtmSid(sup.supervisor_id);
+            var _jeEscId = escapeHtml(_jeSid);
+            var _jeSupId = _jsStr(sup.supervisor_id);
+            var _jeUid = _jsStr(sup.user_id);
+            if (isConf) {
+              html += '<button type="button" onclick="toggleExamJtmPanel(\'' + _jeSupId + '\', \'' + _jeUid + '\')" '
+                + 'style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:600;color:#4338ca;background:#eef2ff;border:1px solid #c7d2fe;padding:9px 14px;border-radius:9px;cursor:pointer;" '
+                + 'onmouseover="this.style.background=\'#e0e7ff\'" onmouseout="this.style.background=\'#eef2ff\'">'
+                + '<svg style="width:14px;height:14px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>'
+                + 'Atur JTM'
+                + '</button>';
+            }
+            html += '</div>'; // close action buttons column
+            if (isConf) {
+            html += '<div id="jtmExamAdjRow-' + _jeEscId + '" class="hidden">'
+              + '<div class="rounded-lg border border-indigo-200 bg-white p-3 mt-1">'
+                + '<div class="flex items-center justify-between mb-2">'
+                  + '<span class="text-xs font-bold text-indigo-700">Penyesuaian JTM</span>'
+                  + '<span id="jtmExamAdjStatus-' + _jeEscId + '" class="text-[11px] text-slate-400"></span>'
+                + '</div>'
+                + '<div class="flex flex-wrap items-end gap-3">'
+                  + '<div class="flex gap-3 text-xs">'
+                    + '<div class="text-center"><div class="text-slate-400">Terjadwal</div><div id="jtmExamSchedDisp-' + _jeEscId + '" class="font-bold text-slate-700">-</div></div>'
+                    + '<div class="text-center"><div class="text-slate-400">Disesuaikan</div><div id="jtmExamAdjDisp-' + _jeEscId + '" class="font-bold text-indigo-700">-</div></div>'
+                    + '<div class="text-center"><div class="text-slate-400">Selisih</div><div id="jtmExamDiffDisp-' + _jeEscId + '" class="font-bold text-amber-600">-</div></div>'
+                  + '</div>'
+                  + '<div class="flex flex-col">'
+                    + '<label class="text-[11px] text-slate-500 mb-0.5">Adjusted JTM</label>'
+                    + '<input id="jtmExamAdjInput-' + _jeEscId + '" type="number" step="1" min="0" inputmode="numeric" oninput="recomputeExamJtmDiff(\'' + _jeSupId + '\')" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">'
+                  + '</div>'
+                  + '<div id="jtmExamReasonWrap-' + _jeEscId + '" class="flex flex-col flex-1 min-w-[180px] hidden">'
+                    + '<label class="text-[11px] text-slate-500 mb-0.5">Alasan penyesuaian (wajib saat dikurangi)</label>'
+                    + '<textarea id="jtmExamReason-' + _jeEscId + '" rows="2" maxlength="500" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" placeholder="Tuliskan alasan pengurangan JTM..."></textarea>'
+                  + '</div>'
+                  + '<button type="button" onclick="saveExamJtmAdjustment(\'' + _jeSupId + '\', \'' + _jeUid + '\', this)" '
+                    + 'class="inline-flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-all shadow-sm">Simpan JTM</button>'
+                  + '<button type="button" id="jtmExamCancelBtn-' + _jeEscId + '" onclick="cancelExamJtmAdjustment(\'' + _jeSupId + '\', this)" '
+                    + 'class="hidden inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition-all">'
+                    + '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'
+                    + 'Batalkan Penyesuaian</button>'
+                + '</div>'
+                + '<div id="jtmExamAllocPanel-' + _jeEscId + '" data-original-uid="' + escapeHtml(sup.user_id) + '" class="mt-3 pt-3 border-t border-indigo-100 hidden">'
+                  + '<div class="flex items-center justify-between mb-2">'
+                    + '<span class="text-xs font-bold text-emerald-700">Alokasi Pengganti Sebagian</span>'
+                    + '<span class="text-[11px] text-slate-500">Sisa selisih: <span id="jtmExamRemainDisp-' + _jeEscId + '" class="font-bold text-amber-600">-</span></span>'
+                  + '</div>'
+                  + '<div class="flex flex-wrap items-end gap-2 mb-2">'
+                    + '<div class="flex flex-col flex-1 min-w-[160px]">'
+                      + '<label class="text-[11px] text-slate-500 mb-0.5">Guru pengganti</label>'
+                      + '<select id="jtmExamAllocSelect-' + _jeEscId + '" class="w-full border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"><option value="">Pilih Guru...</option></select>'
+                    + '</div>'
+                    + '<div class="flex flex-col">'
+                      + '<label class="text-[11px] text-slate-500 mb-0.5">Alokasi JTM</label>'
+                      + '<input id="jtmExamAllocInput-' + _jeEscId + '" type="number" step="any" min="0" inputmode="decimal" class="w-24 border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400">'
+                    + '</div>'
+                    + '<button type="button" onclick="addExamJtmAllocation(\'' + _jeSupId + '\', \'' + _jeUid + '\', this)" '
+                      + 'class="inline-flex items-center gap-1 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-all shadow-sm">Tambah Alokasi</button>'
+                  + '</div>'
+                  + '<div id="jtmExamAllocList-' + _jeEscId + '" class="space-y-1"></div>'
+                + '</div>'
+              + '</div>'
+            + '</div>';
+            } // end if (isConf) — EXAM JTM adjustment panel
+            html += '</div>'; // close supervisor card
+          });
+          html += '</div>';
+        });
+      }
+      html += '</div>';
+      panel.innerHTML = html;
+      panel.classList.remove('hidden');
+    }
+    /* =====================================================================
+     * JTM Adjustment — EXAM supervisor frontend controls
+     * (Feature: jtm-adjustment, task 10.3)
+     *
+     * Mirrors the KBM Piket controls (tasks 10.1/10.2) for exam-supervisor
+     * confirmation rows in the Panitia view (renderExamPanitiaPanel). These
+     * use the EXAM backend contract:
+     *   adjustOccurrenceJtm(token, { occurrence_type:'EXAM', supervisor_id,
+     *                                adjusted_jtm, reason })
+     *   getOccurrenceJtmState(token, 'EXAM', supervisor_id)
+     *   reallocateJtmDifference(token, { occurrence_type:'EXAM',
+     *       occurrence_ref:supervisor_id,
+     *       allocations:[{ substitute_user_id, allocated_jtm }] })
+     *   removeReallocation(token, reallocation_id)
+     *
+     * Element ids are namespaced with a `jtmExam` prefix so they never collide
+     * with the KBM controls. The shared helpers `_jtmSid`, `_jtmTeacherName`,
+     * `_jsStr`, `escapeHtml`, `_busyButton`, and `showToast` are reused. Per
+     * Req 6.1/6.2 the supervisor Adjusted_JTM is validated the same as KBM
+     * (whole-number, 0..scheduled). Client-side validation is for UX only; the
+     * backend remains authoritative.
+     * ===================================================================== */
+    function _examJtmEnsureTeachers(cb) {
+      if (allTeachersCache && allTeachersCache.length) { cb(); return; }
+      var token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function (users) {
+          allTeachersCache = (users || []).filter(function (u) {
+            return String(u.role).toLowerCase() === 'guru' && String(u.username) !== 'PenjagaMadrasah';
+          });
+          cb();
+        })
+        .withFailureHandler(function () { cb(); })
+        .getAllUsers(token);
+    }
+    function toggleExamJtmPanel(supervisorId, userId) {
+      var sid = _jtmSid(supervisorId);
+      var row = document.getElementById('jtmExamAdjRow-' + sid);
+      if (!row) return;
+      if (row.classList.contains('hidden')) {
+        row.classList.remove('hidden');
+        loadExamJtmState(supervisorId);
+      } else {
+        row.classList.add('hidden');
+      }
+    }
+    function loadExamJtmState(supervisorId) {
+      var sid = _jtmSid(supervisorId);
+      var token = localStorage.getItem('auth_token');
+      var statusEl = document.getElementById('jtmExamAdjStatus-' + sid);
+      if (statusEl) statusEl.textContent = 'Memuat...';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          var _statusEl = document.getElementById('jtmExamAdjStatus-' + sid);
+          if (!res || res.status !== 'success') {
+            var _errMsg = res ? (res.message || ('Status: ' + res.status)) : 'Response kosong dari server';
+            if (_statusEl) _statusEl.textContent = _errMsg;
+            return;
+          }
+          var schedEl  = document.getElementById('jtmExamSchedDisp-' + sid);
+          var adjEl    = document.getElementById('jtmExamAdjDisp-'   + sid);
+          var diffEl   = document.getElementById('jtmExamDiffDisp-'  + sid);
+          var inputEl  = document.getElementById('jtmExamAdjInput-'  + sid);
+          var reasonEl = document.getElementById('jtmExamReason-'    + sid);
+          if (schedEl)  schedEl.textContent  = res.scheduled_jtm;
+          if (adjEl)    adjEl.textContent    = res.adjusted_jtm;
+          if (diffEl)   diffEl.textContent   = res.jtm_difference;
+          if (inputEl) {
+            inputEl.value = res.adjusted_jtm;
+            inputEl.setAttribute('max', res.scheduled_jtm);
+            inputEl.dataset.scheduled = res.scheduled_jtm;
+          }
+          if (reasonEl)  reasonEl.value  = res.reason || '';
+          if (_statusEl) _statusEl.textContent = '';
+          recomputeExamJtmDiff(supervisorId);
+          var _cancelBtn = document.getElementById('jtmExamCancelBtn-' + sid);
+          if (_cancelBtn) {
+            var _hasAdj = (Number(res.adjusted_jtm) !== Number(res.scheduled_jtm))
+              || (res.reason && String(res.reason).trim().length > 0)
+              || (res.allocations && res.allocations.length > 0);
+            if (_hasAdj) _cancelBtn.classList.remove('hidden');
+            else         _cancelBtn.classList.add('hidden');
+          }
+          renderExamJtmAllocPanel(supervisorId, res);
+        })
+        .withFailureHandler(function (err) {
+          var _statusEl = document.getElementById('jtmExamAdjStatus-' + sid);
+          if (_statusEl) _statusEl.textContent = 'Koneksi gagal: ' + err;
+        })
+        .getOccurrenceJtmState(token, 'EXAM', supervisorId);
+    }
+    function recomputeExamJtmDiff(supervisorId) {
+      var sid = _jtmSid(supervisorId);
+      var inputEl = document.getElementById('jtmExamAdjInput-' + sid);
+      if (!inputEl) return;
+      var adjEl = document.getElementById('jtmExamAdjDisp-' + sid);
+      var diffEl = document.getElementById('jtmExamDiffDisp-' + sid);
+      var reasonWrap = document.getElementById('jtmExamReasonWrap-' + sid);
+      var scheduled = Number(inputEl.dataset.scheduled || inputEl.getAttribute('max') || 0);
+      var raw = String(inputEl.value).trim();
+      var val = Number(raw);
+      var isWholeInRange = raw !== '' && isFinite(val) && Math.floor(val) === val && val >= 0 && val <= scheduled;
+      if (isWholeInRange) {
+        if (adjEl) adjEl.textContent = val;
+        if (diffEl) diffEl.textContent = (scheduled - val);
+      }
+      if (reasonWrap) {
+        if (isWholeInRange && val < scheduled) reasonWrap.classList.remove('hidden');
+        else reasonWrap.classList.add('hidden');
+      }
+    }
+    function saveExamJtmAdjustment(supervisorId, userId, btnEl) {
+      var sid = _jtmSid(supervisorId);
+      var inputEl = document.getElementById('jtmExamAdjInput-' + sid);
+      var reasonEl = document.getElementById('jtmExamReason-' + sid);
+      var statusEl = document.getElementById('jtmExamAdjStatus-' + sid);
+      if (!inputEl) return;
+      var scheduled = Number(inputEl.dataset.scheduled || inputEl.getAttribute('max') || 0);
+      var raw = String(inputEl.value).trim();
+      var val = Number(raw);
+      if (raw === '' || !isFinite(val) || Math.floor(val) !== val) {
+        showToast('Adjusted JTM harus berupa bilangan bulat.', 'error');
+        return;
+      }
+      if (val < 0 || val > scheduled) {
+        showToast('Adjusted JTM harus di antara 0 dan ' + scheduled + '.', 'error');
+        return;
+      }
+      var reason = reasonEl ? String(reasonEl.value).trim() : '';
+      if (val < scheduled && reason.length === 0) {
+        showToast('Alasan penyesuaian wajib diisi saat mengurangi JTM.', 'error');
+        if (reasonEl) reasonEl.focus();
+        return;
+      }
+      if (reason.length > 500) {
+        showToast('Alasan penyesuaian maksimal 500 karakter.', 'error');
+        return;
+      }
+      var token = localStorage.getItem('auth_token');
+      var restoreBtn = _busyButton(btnEl, 'Menyimpan...');
+      var payload = {
+        occurrence_type: 'EXAM',
+        supervisor_id: supervisorId,
+        adjusted_jtm: val,
+        reason: reason
+      };
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restoreBtn();
+          if (res && res.status === 'success') {
+            showToast('Penyesuaian JTM tersimpan.', 'success');
+            var _statusEl = document.getElementById('jtmExamAdjStatus-' + sid);
+            var schedEl = document.getElementById('jtmExamSchedDisp-' + sid);
+            var adjEl   = document.getElementById('jtmExamAdjDisp-'   + sid);
+            var diffEl  = document.getElementById('jtmExamDiffDisp-'  + sid);
+            if (schedEl) schedEl.textContent = res.scheduled_jtm;
+            if (adjEl)   adjEl.textContent   = res.adjusted_jtm;
+            if (diffEl)  diffEl.textContent  = res.jtm_difference;
+            if (_statusEl) _statusEl.textContent = '';
+            var _panel    = document.getElementById('jtmExamAllocPanel-' + sid);
+            var _listEl   = document.getElementById('jtmExamAllocList-'  + sid);
+            var _remainEl = document.getElementById('jtmExamRemainDisp-' + sid);
+            var newDiff   = Number(res.jtm_difference) || 0;
+            var allocSum  = 0;
+            if (_listEl) {
+              var rows = _listEl.querySelectorAll('[data-alloc-jtm]');
+              for (var _i = 0; _i < rows.length; _i++) {
+                allocSum += Number(rows[_i].dataset.allocJtm) || 0;
+              }
+            }
+            var newRemaining = Math.max(0, newDiff - allocSum);
+            if (_remainEl) _remainEl.textContent = newRemaining;
+            if (_panel) {
+              _panel.dataset.remaining = newRemaining;
+              if (newDiff > 0) _panel.classList.remove('hidden');
+              else             _panel.classList.add('hidden');
+            }
+            var _cancelBtnExam = document.getElementById('jtmExamCancelBtn-' + sid);
+            if (_cancelBtnExam) _cancelBtnExam.classList.remove('hidden');
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan penyesuaian JTM.', 'error');
+            var _statusEl2 = document.getElementById('jtmExamAdjStatus-' + sid);
+            if (_statusEl2) _statusEl2.textContent = (res && res.message) || '';
+          }
+        })
+        .withFailureHandler(function (err) {
+          restoreBtn();
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+        .adjustOccurrenceJtm(token, payload);
+    }
+    function _examJtmPopulateAllocSelect(sid, originalUserId) {
+      var sel = document.getElementById('jtmExamAllocSelect-' + sid);
+      if (!sel) return;
+      var prev = sel.value;
+      var origId = String(originalUserId == null ? '' : originalUserId);
+      var html = '<option value="">Pilih Guru...</option>';
+      (allTeachersCache || []).forEach(function (t) {
+        if (String(t.id) === origId) return; // exclude the original supervisor
+        html += '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.full_name) + '</option>';
+      });
+      sel.innerHTML = html;
+      if (prev) sel.value = prev;
+    }
+    function _examJtmRenderAllocList(supervisorId, allocations) {
+      var sid = _jtmSid(supervisorId);
+      var listEl = document.getElementById('jtmExamAllocList-' + sid);
+      if (!listEl) return;
+      var allocs = allocations || [];
+      if (allocs.length === 0) {
+        listEl.innerHTML = '<div class="text-[11px] text-slate-400 italic">Belum ada alokasi.</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < allocs.length; i++) {
+        var a = allocs[i] || {};
+        var name = escapeHtml(_jtmTeacherName(a.substitute_user_id));
+        var jtm = escapeHtml(a.allocated_jtm);
+        var safeReallocId = _jsStr(a.id);
+        html += '<div class="flex items-center justify-between bg-emerald-50/60 border border-emerald-100 rounded-lg px-2.5 py-1.5"' +
+          ' data-realloc-id="' + escapeHtml(a.id) + '" data-alloc-jtm="' + escapeHtml(a.allocated_jtm) + '">' +
+          '<span class="text-xs text-slate-700"><span class="font-semibold">' + name + '</span> ' +
+          '<span class="text-emerald-700 font-bold">+' + jtm + ' JTM</span></span>' +
+          '<button type="button" onclick="removeExamJtmAllocation(\'' + _jsStr(supervisorId) + '\', \'' + safeReallocId + '\', this)" ' +
+          'class="inline-flex items-center gap-1 text-red-600 hover:text-red-700 text-[11px] font-semibold">' +
+          '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
+          'Hapus</button>' +
+          '</div>';
+      }
+      listEl.innerHTML = html;
+    }
+    function renderExamJtmAllocPanel(supervisorId, res) {
+      var sid = _jtmSid(supervisorId);
+      var panel = document.getElementById('jtmExamAllocPanel-' + sid);
+      if (!panel) return;
+      var scheduled = Number(res.scheduled_jtm) || 0;
+      var adjusted = Number(res.adjusted_jtm) || 0;
+      var difference = scheduled - adjusted;
+      var allocs = res.allocations || [];
+      var allocated = 0;
+      for (var i = 0; i < allocs.length; i++) {
+        allocated += Number((allocs[i] || {}).allocated_jtm) || 0;
+      }
+      var remaining = difference - allocated;
+      if (remaining < 0) remaining = 0;
+      if (difference > 0) {
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+      var remainEl = document.getElementById('jtmExamRemainDisp-' + sid);
+      if (remainEl) remainEl.textContent = remaining;
+      _examJtmEnsureTeachers(function () {
+        _examJtmPopulateAllocSelect(sid, panel.dataset.originalUid);
+        _examJtmRenderAllocList(supervisorId, allocs);
+      });
+      panel.dataset.remaining = remaining;
+    }
+    function addExamJtmAllocation(supervisorId, userId, btnEl) {
+      var sid = _jtmSid(supervisorId);
+      var selEl = document.getElementById('jtmExamAllocSelect-' + sid);
+      var inputEl = document.getElementById('jtmExamAllocInput-' + sid);
+      var panel = document.getElementById('jtmExamAllocPanel-' + sid);
+      if (!selEl || !inputEl) return;
+      var substituteUserId = String(selEl.value || '');
+      var raw = String(inputEl.value).trim();
+      var val = Number(raw);
+      if (!substituteUserId) {
+        showToast('Pilih guru pengganti terlebih dahulu.', 'error');
+        return;
+      }
+      if (raw === '' || !isFinite(val) || val <= 0) {
+        showToast('Alokasi JTM harus berupa angka lebih dari 0.', 'error');
+        return;
+      }
+      var remaining = panel ? Number(panel.dataset.remaining || 0) : 0;
+      if (val > remaining) {
+        showToast('Alokasi melebihi sisa selisih JTM (' + remaining + ').', 'error');
+        return;
+      }
+      var token = localStorage.getItem('auth_token');
+      var restoreBtn = _busyButton(btnEl, 'Menyimpan...');
+      var payload = {
+        occurrence_type: 'EXAM',
+        occurrence_ref: supervisorId,
+        allocations: [{ substitute_user_id: substituteUserId, allocated_jtm: val }]
+      };
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restoreBtn();
+          if (res && res.status === 'success') {
+            showToast('Alokasi JTM pengganti tersimpan.', 'success');
+            if (inputEl) inputEl.value = '';
+            if (selEl) selEl.value = '';
+            var _panel    = document.getElementById('jtmExamAllocPanel-' + sid);
+            var _remainEl = document.getElementById('jtmExamRemainDisp-' + sid);
+            var _newRemaining = Number(res.remaining_difference);
+            if (isNaN(_newRemaining)) _newRemaining = 0;
+            if (_remainEl) _remainEl.textContent = _newRemaining;
+            if (_panel) {
+              _panel.dataset.remaining = _newRemaining;
+              if (_newRemaining > 0) _panel.classList.remove('hidden');
+              else _panel.classList.add('hidden');
+            }
+            _examJtmRenderAllocList(supervisorId, res.allocations || []);
+            _examJtmEnsureTeachers(function () {
+              _examJtmPopulateAllocSelect(sid, _panel ? _panel.dataset.originalUid : '');
+            });
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan alokasi JTM.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          restoreBtn();
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+        .reallocateJtmDifference(token, payload);
+    }
+    function removeExamJtmAllocation(supervisorId, reallocationId, btnEl) {
+      var sid = _jtmSid(supervisorId);
+      var token = localStorage.getItem('auth_token');
+      var restoreBtn = _busyButton(btnEl, 'Menghapus...');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          restoreBtn();
+          if (res && res.status === 'success') {
+            showToast('Alokasi JTM dihapus.', 'success');
+            var panel = document.getElementById('jtmExamAllocPanel-' + sid);
+            var removedJtm = 0;
+            if (btnEl) {
+              var rowEl = btnEl.closest
+                ? btnEl.closest('[data-realloc-id]')
+                : (function () {
+                  var el = btnEl;
+                  while (el && !el.dataset.reallocId) el = el.parentElement;
+                  return el;
+                })();
+              if (rowEl) {
+                removedJtm = Number(rowEl.dataset.allocJtm) || 0;
+                rowEl.parentNode && rowEl.parentNode.removeChild(rowEl);
+              }
+            }
+            var remainEl = document.getElementById('jtmExamRemainDisp-' + sid);
+            var currentRemaining = panel ? Number(panel.dataset.remaining || 0) : 0;
+            var newRemaining = currentRemaining + removedJtm;
+            if (remainEl) remainEl.textContent = newRemaining;
+            if (panel) {
+              panel.dataset.remaining = newRemaining;
+              if (newRemaining > 0) panel.classList.remove('hidden');
+            }
+          } else {
+            showToast((res && res.message) || 'Gagal menghapus alokasi JTM.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          restoreBtn();
+          showToast('Koneksi gagal: ' + err, 'error');
+        })
+        .removeReallocation(token, reallocationId);
+    }
+    function cancelExamJtmAdjustment(supervisorId, btnEl) {
+      showConfirm(
+        'Batalkan Penyesuaian JTM Ujian',
+        'Apakah Anda yakin? Semua penyesuaian dan alokasi pengganti sebagian untuk pengawas ini akan dihapus, dan JTM akan kembali ke nilai terjadwal.',
+        function () {
+          var sid = _jtmSid(supervisorId);
+          var token = localStorage.getItem('auth_token');
+          var restoreBtn = btnEl ? _busyButton(btnEl, 'Membatalkan...') : function () {};
+          google.script.run
+            .withSuccessHandler(function (res) {
+              restoreBtn();
+              if (res && res.status === 'success') {
+                showToast(res.message || 'Penyesuaian JTM ujian dibatalkan.', 'success');
+                var inputEl    = document.getElementById('jtmExamAdjInput-'    + sid);
+                var schedEl    = document.getElementById('jtmExamSchedDisp-'   + sid);
+                var adjEl      = document.getElementById('jtmExamAdjDisp-'     + sid);
+                var diffEl     = document.getElementById('jtmExamDiffDisp-'    + sid);
+                var reasonEl   = document.getElementById('jtmExamReason-'      + sid);
+                var allocPanel = document.getElementById('jtmExamAllocPanel-'  + sid);
+                var allocList  = document.getElementById('jtmExamAllocList-'   + sid);
+                var cancelBtn  = document.getElementById('jtmExamCancelBtn-'   + sid);
+                var remainEl   = document.getElementById('jtmExamRemainDisp-'  + sid);
+                var sched = inputEl ? Number(inputEl.dataset.scheduled || inputEl.getAttribute('max') || 0) : 0;
+                if (schedEl)  schedEl.textContent  = sched;
+                if (adjEl)    adjEl.textContent    = sched;
+                if (diffEl)   diffEl.textContent   = 0;
+                if (inputEl)  { inputEl.value = sched; }
+                if (reasonEl) reasonEl.value = '';
+                var reasonWrap = document.getElementById('jtmExamReasonWrap-' + sid);
+                if (reasonWrap)  reasonWrap.classList.add('hidden');
+                if (allocPanel) { allocPanel.classList.add('hidden'); allocPanel.dataset.remaining = 0; }
+                if (allocList)  allocList.innerHTML = '';
+                if (remainEl)   remainEl.textContent = 0;
+                if (cancelBtn)  cancelBtn.classList.add('hidden');
+              } else {
+                showToast((res && res.message) || 'Gagal membatalkan penyesuaian JTM.', 'error');
+              }
+            })
+            .withFailureHandler(function (err) {
+              restoreBtn();
+              showToast('Koneksi gagal: ' + err, 'error');
+            })
+            .resetOccurrenceJtm(token, { occurrence_type: 'EXAM', occurrence_ref: supervisorId });
+        },
+        { type: 'danger' }
+      );
+    }
+    window.gExam_picketConfirmSup = function (supId) {
+      var token = localStorage.getItem('auth_token');
+      if (typeof window.exam_showLoading === 'function') {
+        window.exam_showLoading('Mengonfirmasi kehadiran pengawas...');
+      }
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (typeof window.exam_hideLoading === 'function') {
+            window.exam_hideLoading();
+          }
+          if (res.status === 'success') { showToast(res.message); loadExamPanitiaPanel(); }
+          else showToast(res.message, 'error');
+        })
+        .withFailureHandler(function () {
+          if (typeof window.exam_hideLoading === 'function') {
+            window.exam_hideLoading();
+          }
+          showToast('Koneksi gagal', 'error');
+        })
+        .confirmSupervisorAttendance(token, supId);
+    };
+    window.gExam_picketRevokeSup = function (supId) {
+      showConfirm('Cabut Konfirmasi Pengawas',
+        'Jika BAP sudah disubmit, BAP akan terkunci dan JTM dihapus dari honorarium. Lanjutkan?',
+        function () {
+          var token = localStorage.getItem('auth_token');
+          if (typeof window.exam_showLoading === 'function') {
+            window.exam_showLoading('Memproses permintaan...');
+          }
+          google.script.run
+            .withSuccessHandler(function (res) {
+              if (typeof window.exam_hideLoading === 'function') {
+                window.exam_hideLoading();
+              }
+              if (res.status === 'confirm_required') {
+                showConfirm('⚠️ BAP Sudah Disubmit', res.message, function () {
+                  if (typeof window.exam_showLoading === 'function') {
+                    window.exam_showLoading('Mencabut konfirmasi pengawas...');
+                  }
+                  google.script.run
+                    .withSuccessHandler(function (r2) {
+                      if (typeof window.exam_hideLoading === 'function') {
+                        window.exam_hideLoading();
+                      }
+                      if (r2.status === 'success') { showToast(r2.message); loadExamPanitiaPanel(); }
+                      else showToast(r2.message, 'error');
+                    })
+                    .withFailureHandler(function () {
+                      if (typeof window.exam_hideLoading === 'function') {
+                        window.exam_hideLoading();
+                      }
+                      showToast('Koneksi gagal', 'error');
+                    })
+                    .revokeSupervisorAttendance(token, supId, true);
+                });
+              } else if (res.status === 'success') {
+                showToast(res.message); loadExamPanitiaPanel();
+              } else { showToast(res.message, 'error'); }
+            })
+            .withFailureHandler(function () {
+              if (typeof window.exam_hideLoading === 'function') {
+                window.exam_hideLoading();
+              }
+              showToast('Koneksi gagal', 'error');
+            })
+            .revokeSupervisorAttendance(token, supId, false);
+        }
+      );
+    };
+    window.gExam_picketOpenSubst = function (supId, guruName) {
+      var modal = document.getElementById('panitiSubstModal');
+      if (!modal) {
+        showToast('Modal tidak tersedia. Coba muat ulang halaman.', 'error');
+        return;
+      }
+      var idInp = document.getElementById('inpPanitiaSubstId');
+      if (idInp) idInp.value = supId;
+      var infoEl = document.getElementById('panitiSubstInfo');
+      if (infoEl) {
+        infoEl.innerHTML = '<div style="display:flex;align-items:flex-start;gap:8px;">'
+          + '<svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>'
+          + '<div><div style="font-weight:700;margin-bottom:2px;">Menggantikan: ' + (guruName || 'Pengawas') + '</div>'
+          + '<div style="color:#b45309;">Pilih guru yang akan menggantikan pengawas ini.</div></div>'
+          + '</div>';
+      }
+      var searchInp = document.getElementById('inpPanitiaSubstSearch');
+      if (searchInp) searchInp.value = '';
+      var sel = document.getElementById('inpPanitiaSubstTeacher');
+      if (sel) {
+        sel.innerHTML = '<option value="" disabled selected>Memuat daftar guru...</option>';
+      }
+      var token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (!sel) return;
+          sel.innerHTML = '';
+          var placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = '-- Pilih Guru Pengganti --';
+          sel.appendChild(placeholder);
+          if (Array.isArray(res)) {
+            res
+              .filter(function (u) { return u.role === 'guru'; })
+              .sort(function (a, b) { return (a.full_name || a.username || '').localeCompare(b.full_name || b.username || ''); })
+              .forEach(function (u) {
+                var opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = u.full_name || u.username || u.id;
+                sel.appendChild(opt);
+              });
+          } else {
+            sel.innerHTML = '<option value="" disabled>Gagal memuat daftar guru</option>';
+          }
+        })
+        .withFailureHandler(function () {
+          if (sel) sel.innerHTML = '<option value="" disabled>Koneksi gagal</option>';
+        })
+        .getAllUsers(token);
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      setTimeout(function () {
+        if (searchInp) searchInp.focus();
+      }, 150);
+    };
+    window.panitia_closeSubstModal = function () {
+      var modal = document.getElementById('panitiSubstModal');
+      if (modal) modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    };
+    window.panitia_filterSubstTeacher = function (query) {
+      var sel = document.getElementById('inpPanitiaSubstTeacher');
+      if (!sel) return;
+      var q = (query || '').toLowerCase().trim();
+      for (var i = 0; i < sel.options.length; i++) {
+        var opt = sel.options[i];
+        if (!opt.value) { opt.style.display = ''; continue; }
+        opt.style.display = (!q || opt.textContent.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+      }
+    };
+    window.panitia_saveSubst = function () {
+      var supId = (document.getElementById('inpPanitiaSubstId') || {}).value;
+      var newUserId = (document.getElementById('inpPanitiaSubstTeacher') || {}).value;
+      if (!supId) { showToast('ID pengawas tidak ditemukan.', 'error'); return; }
+      if (!newUserId) { showToast('Pilih guru pengganti terlebih dahulu.', 'warning'); return; }
+      var btn = document.getElementById('btnSavePanitiaSubst');
+      var origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg style="width:14px;height:14px;animation:spin 1s linear infinite;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Memproses...';
+      }
+      var token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+          if (res && res.status === 'success') {
+            panitia_closeSubstModal();
+            showToast(res.message || 'Pengawas berhasil diganti.');
+            loadExamPanitiaPanel();
+          } else {
+            showToast((res && res.message) || 'Gagal memproses penggantian.', 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+          showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .substituteExamSupervisor(token, supId, newUserId);
+    };
+    window.gExam_picketCancelSubst = function (supId, force) {
+      if (!force) {
+        showConfirm('Batalkan Penggantian', 'Guru asli akan dikembalikan ke jadwal. Lanjutkan?', function () {
+          gExam_picketCancelSubst(supId, true);
+        });
+        return;
+      }
+      var token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res.status === 'confirm_required') {
+            showConfirm('⚠️ ' + res.message.split('.')[0], res.message, function () {
+              google.script.run
+                .withSuccessHandler(function (r2) {
+                  if (r2.status === 'success') { showToast(r2.message); loadExamPanitiaPanel(); }
+                  else showToast(r2.message, 'error');
+                })
+                .withFailureHandler(function () { showToast('Koneksi gagal', 'error'); })
+                .cancelExamSupervisorSubstitution(token, supId, true);
+            });
+          } else if (res.status === 'success') {
+            showToast(res.message); loadExamPanitiaPanel();
+          } else { showToast(res.message, 'error'); }
+        })
+        .withFailureHandler(function () { showToast('Koneksi gagal', 'error'); })
+        .cancelExamSupervisorSubstitution(token, supId, false);
+    };
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        var modal = document.getElementById('panitiSubstModal');
+        if (modal && !modal.classList.contains('hidden')) {
+          panitia_closeSubstModal();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === 'NumpadEnter')) {
+        var modal = document.getElementById('panitiSubstModal');
+        if (modal && !modal.classList.contains('hidden')) {
+          e.preventDefault();
+          panitia_saveSubst();
+        }
+      }
+    });
+    let _attActiveTab = 'kehadiran';
+    function onAttendanceDateChange() {
+      _updateDateLabel();
+      if (_attActiveTab === 'kehadiran') _loadAttendanceList();
+    }
+    function refreshActiveAttendanceTab() {
+      if (_attActiveTab === 'kehadiran') _loadAttendanceList();
+      else initSchedTemplates();
+    }
+    function switchAttendanceTab(tab) {
+      if (_attActiveTab === tab) return;
+      _attActiveTab = tab;
+      var pKehadiran = document.getElementById('tabPanelKehadiran');
+      var pAturJadwal = document.getElementById('tabPanelAturJadwal');
+      if (pKehadiran) pKehadiran.classList.toggle('hidden', tab !== 'kehadiran');
+      if (pAturJadwal) pAturJadwal.classList.toggle('hidden', tab !== 'aturjadwal');
+      ['kehadiran', 'aturjadwal'].forEach(function(t) {
+        const btn = document.getElementById(t === 'kehadiran' ? 'tabBtnKehadiran' : 'tabBtnAturJadwal');
+        if (!btn) return;
+        if (t === tab) {
+          btn.classList.add('border-blue-600', 'text-blue-700', 'bg-blue-50/60');
+          btn.classList.remove('border-transparent', 'text-slate-600');
+        } else {
+          btn.classList.remove('border-blue-600', 'text-blue-700', 'bg-blue-50/60');
+          btn.classList.add('border-transparent', 'text-slate-600');
+        }
+      });
+      if (tab === 'kehadiran') _loadAttendanceList();
+      else initSchedTemplates();
+    }
+    function _initAttendancePage() {
+      const dateInput = document.getElementById('inpAttendanceDate');
+      if (dateInput && !dateInput.value) {
+        const today = new Date();
+        dateInput.value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      }
+      _updateDateLabel();
+      const isAdmin = String(localStorage.getItem('user_role') || '').toLowerCase() === 'admin';
+      if (dateInput) {
+        dateInput.disabled = !isAdmin;
+        dateInput.classList.toggle('hidden', !isAdmin);
+      }
+      const tabAdmin = document.getElementById('tabBtnAturJadwal');
+      if (tabAdmin) tabAdmin.classList.toggle('hidden', !isAdmin);
+      _attActiveTab = '';
+      switchAttendanceTab('kehadiran');
+    }
+    function _updateDateLabel() {
+      const dateInput = document.getElementById('inpAttendanceDate');
+      const label     = document.getElementById('attendanceDateLabel');
+      if (!dateInput || !label || !dateInput.value) return;
+      const d = new Date(dateInput.value + 'T00:00:00');
+      label.textContent = d.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    function initAttendance() {
+      const token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler(function(gateRes) {
+          if (gateRes && gateRes.status === 'success' && gateRes.redirect_needed) {
+            showToast('Harap lengkapi rekap absensi siswa terlebih dahulu sebelum mengakses halaman ini.', 'info', 5000);
+            handleNav('Page_StudentAttendanceInput');
+            return;
+          }
+          _initAttendancePage();
+        })
+        .withFailureHandler(function() { _initAttendancePage(); })
+        .checkStudentAttendanceToday(token);
+    }
+    function initMyAttendance() {
+      var monthSel = document.getElementById('mahMonth');
+      if (monthSel && monthSel.options.length === 0) {
+        var bulan = ['Januari','Februari','Maret','April','Mei','Juni',
+                     'Juli','Agustus','September','Oktober','November','Desember'];
+        bulan.forEach(function(n, i) {
+          var opt = document.createElement('option');
+          opt.value = i + 1;
+          opt.textContent = n;
+          monthSel.appendChild(opt);
+        });
+      }
+      var yearSel = document.getElementById('mahYear');
+      if (yearSel && yearSel.options.length === 0) {
+        var thisYear = new Date().getFullYear();
+        for (var y = thisYear; y >= thisYear - 3; y--) {
+          var opt = document.createElement('option');
+          opt.value = y;
+          opt.textContent = y;
+          yearSel.appendChild(opt);
+        }
+      }
+      var now = new Date();
+      if (monthSel) monthSel.value = now.getMonth() + 1;
+      if (yearSel)  yearSel.value  = now.getFullYear();
+      loadMyAttendanceHistory();
+    }
+    function loadMyAttendanceHistory() {
+      var monthSel = document.getElementById('mahMonth');
+      var yearSel  = document.getElementById('mahYear');
+      var container = document.getElementById('mahListContainer');
+      var summaryBar = document.getElementById('mahSummaryBar');
+      if (!monthSel || !yearSel || !container) return;
+      var month = parseInt(monthSel.value, 10);
+      var year  = parseInt(yearSel.value,  10);
+      var token = localStorage.getItem('auth_token');
+      if (!token) return;
+      summaryBar.style.display = 'none';
+      container.innerHTML = [1,2,3].map(function() {
+        return '<div class="mah-skeleton-card">' +
+          '<div class="mah-sk-line" style="width:35%"></div>' +
+          '<div class="mah-sk-line" style="width:65%"></div>' +
+          '<div class="mah-sk-line" style="width:50%"></div>' +
+          '</div>';
+      }).join('');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || res.status !== 'success') {
+            container.innerHTML = '<div class="mah-empty-state">' +
+              '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>' +
+              '<p>Gagal memuat data</p>' +
+              '<span>' + escapeHtml((res && res.message) || 'Coba lagi beberapa saat.') + '</span></div>';
+            return;
+          }
+          var days = res.days || [];
+          var sum  = res.summary || {};
+          if (days.length > 0) {
+            summaryBar.style.display = 'flex';
+            summaryBar.innerHTML =
+              _mahSumChip('🟢', sum.hadir || 0, 'Hadir') +
+              _mahSumChip('🔴', sum.tidak_hadir || 0, 'Tidak Hadir') +
+              _mahSumChip('⏰', sum.terlambat || 0, 'Terlambat') +
+              _mahSumChip('🏖️', sum.libur || 0, 'Hari Libur') +
+              _mahSumChip('📅', sum.total_days || 0, 'Total Hari');
+          } else {
+            summaryBar.style.display = 'none';
+            summaryBar.innerHTML = '';
+          }
+          if (days.length === 0) {
+            container.innerHTML = '<div class="mah-empty-state">' +
+              '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' +
+              '<p>Tidak ada data</p><span>Belum ada data kehadiran untuk periode ini.</span></div>';
+            return;
+          }
+          var html = '';
+          days.forEach(function(d) {
+            html += _mahRenderDay(d);
+          });
+          container.innerHTML = html;
+        })
+        .withFailureHandler(function() {
+          container.innerHTML = '<div class="mah-empty-state">' +
+            '<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728"/></svg>' +
+            '<p>Koneksi gagal</p><span>Periksa koneksi internet Anda.</span></div>';
+</script>
