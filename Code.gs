@@ -1,3 +1,39 @@
+const SS_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+const EXT_USERS_SS_ID = "1cnMeA7xinjvilVloS7A0_SFxzOBMON7DIiT7_cnnYUg";
+const EXT_USERS_SHEET = "Users";
+const SHEET_NAME = {
+  USERS: "Users",
+  SESSIONS: "Sessions",
+  SCHEDULES: "Schedules",
+  LOGS: "Teaching_Logs",
+  CONFIG: "Config",
+  CALENDAR: "Academic_Calendar",
+  HONOR_HISTORY: "Honor_History",
+  ALLOWANCES: "Allowances",
+  SUBJECTS: "Subjects",
+  RESET_REQUESTS: "Reset_Requests",
+  ATTENDANCE: "Daily_Attendance",
+  PICKET_SCHEDULES: "Picket_Schedules",
+  SUBSTITUTES: "Substitutes",
+  CEREMONY_SCHEDULES: "Ceremony_Schedules",
+  ANNOUNCEMENTS: "Announcements",
+  ATTENDANCE_SCHED_TEMPLATES: "Attendance_Sched_Templates",
+  ATTENDANCE_LEAVES: "Attendance_Leaves",
+  STUDENT_ATTENDANCE: "Student_Attendance",
+};
+const EXAM_SHEET = {
+  PERIODS: "Exam_Periods",
+  SESSIONS: "Exam_Sessions",
+  ROOMS: "Exam_Rooms",
+  SUPERVISORS: "Exam_Supervisors",
+  COMMITTEE: "Exam_Committee",
+  BAP: "Exam_BAP",
+};
+const EVENT_SHEET = {
+  DEFINITIONS: "Event_Definitions",
+  ATTENDANCE: "Event_Attendance",
+  JOURNALS: "Event_Journals",
+};
 function _validateEventDefinition(payload) {
   var name =
     payload && typeof payload.name === "string" ? payload.name.trim() : "";
@@ -2328,10306 +2364,1471 @@ function _notifFmtDateLongTime_(value) {
   var hhmm = Utilities.formatDate(info.d, "Asia/Jakarta", "HH:mm");
   return datePart + " " + hhmm;
 }
-function doGet(e) {
-  var template = HtmlService.createTemplateFromFile("Index");
-  
-  try {
-    var configRaw = getData("Config");
-    var config = {};
-    if (configRaw && configRaw.length) {
-      configRaw.forEach(function(c) {
-        config[c.key] = c.value;
-      });
-    }
-    template.serverConfig = JSON.stringify(config);
-  } catch(err) {
-    template.serverConfig = "{}";
+function _checkPasswordComplexity(password, fullName, username) {
+  if (password.length < 8) {
+    return { valid: false, message: "Password baru minimal harus 8 karakter." };
   }
-
-  return template
-    .evaluate()
-    .setTitle("SiM-Guru")
-    .addMetaTag(
-      "viewport",
-      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
-    )
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: "Password harus mengandung huruf besar." };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: "Password harus mengandung huruf kecil." };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: "Password harus mengandung angka." };
+  }
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    return {
+      valid: false,
+      message: "Password harus mengandung karakter khusus (simbol).",
+    };
+  }
+  const lowerPass = password.toLowerCase();
+  if (username && lowerPass.includes(username.toLowerCase())) {
+    return {
+      valid: false,
+      message: "Password tidak boleh mengandung username Anda.",
+    };
+  }
+  if (fullName) {
+    const nameParts = fullName.split(" ").filter((part) => part.length > 2);
+    for (let part of nameParts) {
+      if (lowerPass.includes(part.toLowerCase())) {
+        return {
+          valid: false,
+          message:
+            "Password tidak boleh mengandung unsur nama Anda (" + part + ").",
+        };
+      }
+    }
+  }
+  return { valid: true };
 }
-function _sidebar() {
-  return `<style>
-  #sidebar {
-    background: linear-gradient(180deg, #0F172A 0%, #1a2744 100%);
-    border-right: 1px solid rgba(255,255,255,0.06);
-    font-family: 'Inter', sans-serif;
-    width: 16rem;
-    flex-shrink: 0;
-    transition: transform 0.3s ease-in-out, width 0.32s cubic-bezier(0.4,0,0.2,1);
-    overflow: hidden; /* prevents content flash during width transition */
-  }
-  #sidebar-header {
-    background: rgba(0,0,0,0.2);
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    transition: padding 0.32s cubic-bezier(0.4,0,0.2,1);
-  }
-  .sidebar-label {
-    transition: opacity 0.2s ease, max-width 0.3s cubic-bezier(0.4,0,0.2,1);
-    max-width: 200px;
-    overflow: hidden;
-    white-space: nowrap;
-    display: inline-block;
-    vertical-align: middle;
-  }
-  #sidebarSearch {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #E2E8F0;
-    font-size: 0.78rem;
-    padding: 7px 10px 7px 32px;
-    border-radius: 9px;
-    width: 100%;
-    transition: border-color 0.18s, background 0.18s;
-    outline: none;
-  }
-  #sidebarSearch::placeholder { color: rgba(148,163,184,0.6); }
-  #sidebarSearch:focus {
-    background: rgba(255,255,255,0.09);
-    border-color: rgba(96,165,250,0.4);
-  }
-  #sidebarSearchWrap { position: relative; padding: 0 12px 8px; }
-  #sidebarSearchWrap svg {
-    position: absolute; left: 22px; top: 50%; transform: translateY(-60%);
-    pointer-events: none; color: rgba(148,163,184,0.7);
-  }
-  .nav-item.is-search-hidden { display: none !important; }
-  @media (min-width: 768px) {
-    /* Width — sidebar shrinks to icon-only strip; overflow hidden prevents
-       the collapsed content from leaking into page layout */
-    #sidebar.sidebar-collapsed { width: 4.5rem; overflow: hidden; }
-    /* Text labels: hide */
-    #sidebar.sidebar-collapsed .sidebar-label {
-      opacity: 0; max-width: 0; pointer-events: none;
-    }
-    /* Old section labels: collapse */
-    #sidebar.sidebar-collapsed .nav-section-label {
-      opacity: 0; height: 0; margin: 0; padding: 0; overflow: hidden;
-      transition: opacity 0.2s ease, height 0.3s ease, margin 0.3s ease;
-    }
-    /* Search: hide */
-    #sidebar.sidebar-collapsed #sidebarSearchWrap { display: none; }
-    /* Nav items: center icon only */
-    #sidebar.sidebar-collapsed .nav-item {
-      justify-content: center;
-      padding-left: 0.65rem;
-      padding-right: 0.65rem;
-    }
-    #sidebar.sidebar-collapsed .nav-item svg { flex-shrink: 0; margin: 0 auto; }
-    /* Badge positioning in collapsed state */
-    #sidebar.sidebar-collapsed .nav-badge-count {
-      position: absolute; top: 2px; right: 2px;
-      min-width: 15px; height: 15px; font-size: 0.5rem;
-    }
-    #sidebar.sidebar-collapsed .nav-dot-badge {
-      position: absolute; top: 4px; right: 5px;
-    }
-    /* Flex-1 spans inside buttons (e.g. "Piket & Upacara") must not take space */
-    #sidebar.sidebar-collapsed .nav-item .flex-1 {
-      flex: 0 0 auto; max-width: 0; overflow: hidden; opacity: 0;
-    }
-    /* Header: centered, logo hidden */
-    #sidebar.sidebar-collapsed #sidebar-header {
-      justify-content: center; padding-left: 0.5rem; padding-right: 0.5rem;
-    }
-    #sidebar.sidebar-collapsed #sidebarLogoBlock { display: none; }
-    #sidebar.sidebar-collapsed #btnCollapseDesktop { transform: rotate(180deg); }
-    /* Bottom section */
-    #sidebar.sidebar-collapsed #sidebar-bottom { padding: 0.5rem; }
-    #sidebar.sidebar-collapsed #btnSidebarProfile {
-      justify-content: center; padding: 0.5rem;
-    }
-    /* Hide name/role text and arrow in profile button */
-    #sidebar.sidebar-collapsed #btnSidebarProfile > div.flex-1 { display: none; }
-    #sidebar.sidebar-collapsed #btnSidebarProfile > svg { display: none; }
-    #sidebar.sidebar-collapsed #btnSidebarLogout {
-      justify-content: center; padding: 0.5rem 0.65rem;
-    }
-    /* Hide logout text, keep icon */
-    #sidebar.sidebar-collapsed #btnSidebarLogout .sidebar-label { display: none; }
-    /* Menu container: hide horizontal scroll but allow vertical scroll without visible scrollbar */
-    #sidebar.sidebar-collapsed #sidebarMenuContainer {
-      overflow-x: hidden;
-      overflow-y: auto;
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE/Edge */
-    }
-    #sidebar.sidebar-collapsed #sidebarMenuContainer::-webkit-scrollbar {
-      display: none; /* Chrome/Safari */
-    }
-    /* Guru/Admin sections: no extra top margin */
-    #sidebar.sidebar-collapsed #guru-section,
-    #sidebar.sidebar-collapsed #admin-section { margin-top: 0; }
-  }
-  #btnCollapseDesktop {
-    display: none;
-    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
-  }
-  @media (min-width: 768px) {
-    #btnCollapseDesktop { display: flex; }
-  }
-  .nav-section-label {
-    transition: opacity 0.2s ease, height 0.3s ease, margin 0.3s ease;
-  }
-  .nav-item {
-    position: relative;
-    color: #94A3B8 !important;
-    border-radius: 10px;
-    transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-  }
-  .nav-item:hover {
-    background: rgba(255,255,255,0.08) !important;
-    color: #E2E8F0 !important;
-    transform: translateX(2px);
-  }
-  .nav-item:hover svg { color: #93C5FD !important; }
-  .nav-item:focus-visible {
-    outline: 2px solid #60A5FA;
-    outline-offset: 2px;
-  }
-  .nav-item.bg-blue-50 {
-    background: linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(99,102,241,0.18) 100%) !important;
-    color: #BAC9FF !important;
-    box-shadow: inset 0 0 0 1px rgba(99,130,246,0.22), 0 2px 10px rgba(59,130,246,0.12);
-  }
-  .nav-item.bg-blue-50::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 18%; bottom: 18%;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: linear-gradient(180deg, #60A5FA, #818CF8);
-    box-shadow: 0 0 8px rgba(96,165,250,0.55);
-  }
-  .nav-item.bg-blue-50 svg { color: #60A5FA !important; }
-  .nav-item.text-blue-700 { color: #BAC9FF !important; }
-  .nav-section-label {
-    font-size: 0.625rem;
-    font-weight: 700;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    padding: 0 12px;
-    margin: 18px 0 5px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: opacity 0.2s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease;
-  }
-  .nav-section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(255,255,255,0.05);
-  }
-  #sidebar-bottom {
-    border-top: 1px solid rgba(255,255,255,0.06);
-    background: rgba(0,0,0,0.18);
-  }
-  #btnSidebarLogout {
-    background: rgba(239,68,68,0.08);
-    color: #FCA5A5;
-    border: 1px solid rgba(239,68,68,0.18);
-    border-radius: 10px;
-    transition: all 0.18s ease;
-    font-weight: 600;
-    font-size: 0.8rem;
-    letter-spacing: 0.01em;
-  }
-  #btnSidebarLogout:hover {
-    background: rgba(239,68,68,0.18);
-    color: #FECACA;
-    border-color: rgba(239,68,68,0.38);
-    box-shadow: 0 4px 12px rgba(239,68,68,0.15);
-  }
-  #sidebar .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-  #sidebar .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-  #sidebar .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
-  .nav-badge-count {
-    font-size: 0.6rem; font-weight: 800;
-    min-width: 18px; height: 18px; padding: 0 4px;
-    border-radius: 9px; background: #EF4444; color: white;
-    display: inline-flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 0 2px #0F172A, 0 0 8px rgba(239,68,68,0.4);
-  }
-  .nav-dot-badge {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #EF4444; flex-shrink: 0;
-    box-shadow: 0 0 0 2px #0F172A, 0 0 6px rgba(239,68,68,0.5);
-    animation: nav-dot-pulse 2s infinite;
-  }
-  @keyframes nav-dot-pulse {
-    0%, 100% { box-shadow: 0 0 0 2px #0F172A, 0 0 6px rgba(239,68,68,0.5); }
-    50%      { box-shadow: 0 0 0 2px #0F172A, 0 0 14px rgba(239,68,68,0.85); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .nav-dot-badge { animation: none; }
-  }
-  .nav-search-empty {
-    display: none;
-    color: rgba(148,163,184,0.7);
-    font-size: 0.72rem;
-    text-align: center;
-    padding: 16px 12px;
-    font-style: italic;
-  }
-  .nav-search-empty.is-visible { display: block; }
-  /* Accordion groups */
-  .nav-accordion-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 8px 6px 4px;
-    margin: 4px 0 2px 0;
-    border-radius: 8px;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.15s ease;
-    color: rgba(148,163,184,0.9);
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-  }
-  .nav-accordion-header:hover { background: rgba(255,255,255,0.06); color: rgba(203,213,225,0.95); }
-  .nav-accordion-header.is-open { color: #93C5FD; }
-  .nav-accordion-chevron {
-    width: 14px; height: 14px; flex-shrink: 0;
-    transition: transform 0.2s ease;
-    opacity: 0.6;
-  }
-  .nav-accordion-header.is-open .nav-accordion-chevron { transform: rotate(90deg); opacity: 1; }
-  .nav-accordion-body {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.22s cubic-bezier(0.4,0,0.2,1);
-  }
-  .nav-accordion-body.is-open { grid-template-rows: 1fr; }
-  .nav-accordion-inner { overflow: hidden; min-height: 0; }
-  /* ── Nested (level-2) accordion inside sidebar accordion ─────────────────── */
-  .nav-nested-accordion {
-    margin: 2px 0;
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .nav-nested-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 8px 7px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.15s ease;
-    color: rgba(148,163,184,0.85);
-    font-size: 11px; font-weight: 600;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05);
-    width: 100%;
-    text-align: left;
-  }
-  .nav-nested-header:hover { background: rgba(255,255,255,0.07); color: rgba(203,213,225,0.95); }
-  .nav-nested-header.is-open { background: rgba(99,102,241,0.12); color: #A5B4FC; border-color: rgba(99,102,241,0.2); }
-  .nav-nested-chevron {
-    width: 12px; height: 12px; flex-shrink: 0;
-    transition: transform 0.2s ease;
-    opacity: 0.5;
-  }
-  .nav-nested-header.is-open .nav-nested-chevron { transform: rotate(90deg); opacity: 0.8; }
-  .nav-nested-body {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.2s cubic-bezier(0.4,0,0.2,1);
-  }
-  .nav-nested-body.is-open { grid-template-rows: 1fr; }
-  .nav-nested-inner {
-    overflow: hidden; min-height: 0;
-    padding-left: 10px;
-    border-left: 2px solid rgba(99,102,241,0.25);
-    margin-left: 8px;
-  }
-  /* In collapsed sidebar, show nested headers as icon row; bypass grid transition */
-  @media (min-width: 768px) {
-    #sidebar.sidebar-collapsed .nav-nested-header { display: none; }
-    #sidebar.sidebar-collapsed .nav-nested-body { display: block; overflow: visible; }
-    #sidebar.sidebar-collapsed .nav-nested-inner { overflow: visible; min-height: unset; padding-left: 0; border-left: none; margin-left: 0; }
-    #sidebar.sidebar-collapsed .nav-nested-accordion { margin: 0; }
-  }
-  /* ── Collapsed sidebar: bypass accordion entirely ─────────────────────────
-     In icon-only mode the accordion concept doesn't apply — hide headers,
-     force bodies open, and let the existing icon-only nav-item rules take over.
-  ────────────────────────────────────────────────────────────────────────── */
-  @media (min-width: 768px) {
-    /* 1. Hide accordion headers completely */
-    #sidebar.sidebar-collapsed .nav-accordion-header {
-      display: none;
-    }
-    /* 2. Force all accordion bodies open so nav-items are reachable */
-    #sidebar.sidebar-collapsed .nav-accordion-body {
-      display: block;
-      overflow: visible;
-    }
-    #sidebar.sidebar-collapsed .nav-accordion-inner {
-      overflow: visible;
-      min-height: unset;
-    }
-    /* 3. Reset accordion wrapper spacing so items sit flush */
-    #sidebar.sidebar-collapsed .nav-accordion {
-      margin-bottom: 0;
-    }
-    /* 4. Thin divider between accordion groups for visual rhythm */
-    #sidebar.sidebar-collapsed .nav-accordion + .nav-accordion {
-      padding-top: 2px;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      margin-top: 2px;
-    }
-  }
-  @media (min-width: 768px) {
-    /* Tooltip positioning is handled by JS (#sidebarCollapsedTip div).
-       ::after and ::before pseudo-elements are not used for tooltips. */
-    #sidebar.sidebar-collapsed .nav-item { position: relative; }
-  }
-</style>
-<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 transform -translate-x-full transition-transform duration-300 ease-in-out md:translate-x-0 md:static flex flex-col h-full shadow-2xl">
-  <div id="sidebar-header" class="flex items-center justify-between h-16 px-5 shrink-0">
-    <div id="sidebarLogoBlock" class="flex items-center gap-3 min-w-0">
-      <div class="relative w-8 h-8 flex-shrink-0">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/50">
-          <svg width="15" height="15" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-          </svg>
-        </div>
-        <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0F172A]" title="Online"></div>
-      </div>
-      <div class="min-w-0">
-        <div class="text-sm font-bold text-white tracking-tight leading-none sidebar-label" id="sidebarAppName">SiM-Guru</div>
-        <div class="text-[10px] text-slate-500 mt-0.5 font-medium sidebar-label">Sistem Manajemen Guru</div>
-      </div>
-    </div>
-    <button id="btnCollapseDesktop" onclick="toggleSidebar()" title="Sembunyikan/Tampilkan Sidebar" aria-label="Toggle sidebar"
-      class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 transition-all flex items-center justify-center text-slate-400 hover:text-white flex-shrink-0">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-      </svg>
-    </button>
-    <button onclick="toggleSidebar()" aria-label="Tutup sidebar" class="md:hidden w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 transition flex items-center justify-center text-slate-400 hover:text-white">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-      </svg>
-    </button>
-  </div>
-  <div id="sidebarSearchWrap" class="pt-3">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-    </svg>
-    <input id="sidebarSearch" type="search" placeholder="Cari menu..." aria-label="Cari menu" oninput="filterSidebarMenu(this.value)" autocomplete="off">
-  </div>
-  <div class="flex-1 overflow-y-auto py-2 px-3 custom-scrollbar" id="sidebarMenuContainer">
-    <div class="nav-section-label">Menu Utama</div>
-    <button id="nav-Page_Dashboard" data-tooltip="Dashboard" data-search="dashboard beranda home" onclick="handleNav('Page_Dashboard')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-      <span class="sidebar-label">Dashboard</span>
-    </button>
-    <!-- GURU SECTION -->
-    <div id="guru-section" class="hidden">
-      <div class="nav-accordion" data-group="guru-kbm">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-kbm')" type="button" aria-expanded="false">
-          <span>KBM</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-guru-kbm">
-          <div class="nav-accordion-inner">
-      <button id="nav-Page_MySchedule" data-tooltip="Jadwal Saya" data-search="jadwal saya kbm mengajar" onclick="handleNav('Page_MySchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="sidebar-label">Jadwal Saya</span>
-      </button>
-      <button id="nav-Page_Journal" data-tooltip="Jurnal Mengajar" data-search="jurnal mengajar log" onclick="handleNav('Page_Journal')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-        <span class="sidebar-label">Jurnal Mengajar</span>
-      </button>
-          </div>
-        </div>
-      </div>
-      <div class="nav-accordion" data-group="guru-kehadiran">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-kehadiran')" type="button" aria-expanded="false">
-          <span>Kehadiran &amp; Tugas</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-guru-kehadiran">
-          <div class="nav-accordion-inner">
-      <!-- Nested accordion: Absensi Siswa (Guru) -->
-      <div class="nav-nested-accordion" data-nested-group="guru-absensi-siswa">
-        <button class="nav-nested-header" onclick="toggleNestedNavAccordion('guru-absensi-siswa')" type="button" aria-expanded="false" id="nested-header-guru-absensi-siswa" data-tooltip="Absensi Siswa" data-search="absensi siswa kelas rekap piket kehadiran riwayat input">
-          <span class="flex items-center gap-2">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            <span class="sidebar-label">Absensi Siswa</span>
-          </span>
-          <svg class="nav-nested-chevron sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-nested-body" id="nested-body-guru-absensi-siswa">
-          <div class="nav-nested-inner">
-      <button id="nav-Page_StudentAttendanceInput" data-tooltip="Input Absensi" data-search="input absensi siswa kelas rekap piket" onclick="handleNav('Page_StudentAttendanceInput')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-        <span class="sidebar-label">Input Absensi</span>
-      </button>
-      <button id="nav-Page_StudentAttendanceHistory" data-tooltip="Riwayat Absensi" data-search="riwayat absensi siswa histori history" onclick="handleNav('Page_StudentAttendanceHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="sidebar-label">Riwayat Absensi</span>
-      </button>
-          </div>
-        </div>
-      </div>
-      <button id="nav-Page_Picket" data-tooltip="Piket & Upacara" data-search="piket upacara absen kehadiran" onclick="handleNav('Page_Picket')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Piket &amp; Upacara</span>
-        <span id="badgePicketNotification" class="hidden nav-dot-badge"></span>
-      </button>
-      <button id="nav-Page_EventAttendance" data-tooltip="Kehadiran Acara" data-search="kehadiran acara kegiatan" onclick="handleNav('Page_EventAttendance')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        <span class="sidebar-label">Kehadiran Acara</span>
-      </button>
-      <button id="nav-Page_Attendance" data-tooltip="Kehadiran Harian" data-search="kehadiran harian absen absensi" onclick="handleNav('Page_Attendance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <span class="sidebar-label">Kehadiran Harian</span>
-      </button>
-      <button id="nav-Page_MyAttendance" data-tooltip="Riwayat Kehadiran" data-search="riwayat kehadiran absen jam masuk pulang histori" onclick="handleNav('Page_MyAttendance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <span class="sidebar-label">Riwayat Kehadiran</span>
-      </button>
-      <button id="nav-Page_ExamPanitia" data-tooltip="Panitia Ujian" data-search="panitia ujian pengawas bap" onclick="handleNav('Page_ExamPanitia')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Panitia Ujian</span>
-        <span id="badgeExamPanitiaNotification" class="hidden nav-dot-badge"></span>
-      </button>
-          </div>
-        </div>
-      </div>
-      <div class="nav-accordion" data-group="guru-jurnal-acara">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-jurnal-acara')" type="button" aria-expanded="false">
-          <span>Jurnal Acara</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-guru-jurnal-acara">
-          <div class="nav-accordion-inner">
-      <button id="nav-Page_EventJournal" data-tooltip="Jurnal Acara" data-search="jurnal acara kegiatan" onclick="handleNav('Page_EventJournal')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-        <span class="sidebar-label">Jurnal Acara</span>
-      </button>
-      <button id="nav-Page_EventJournalHistory" data-tooltip="Riwayat Jurnal Acara" data-search="riwayat jurnal acara kegiatan history" onclick="handleNav('Page_EventJournalHistory')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-        <span class="sidebar-label">Riwayat Jurnal Acara</span>
-      </button>
-          </div>
-        </div>
-      </div>
-      <div class="nav-accordion" data-group="guru-honorarium">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('guru-honorarium')" type="button" aria-expanded="false">
-          <span>Honorariumku</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-guru-honorarium">
-          <div class="nav-accordion-inner">
-      <button id="nav-Page_Honorarium" data-tooltip="Honorarium" data-search="honorarium gaji honor jtm" onclick="handleNav('Page_Honorarium')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="sidebar-label">Honorarium</span>
-      </button>
-      <button id="nav-Page_HonorariumHistory" data-tooltip="Arsip Honor" data-search="arsip honor riwayat history" onclick="handleNav('Page_HonorariumHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-        <span class="sidebar-label">Arsip Honor</span>
-      </button>
-
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- ADMIN SECTION -->
-    <div id="admin-section" class="hidden">
-      <div class="nav-accordion" data-group="admin-kehadiran">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-kehadiran')" type="button" aria-expanded="false">
-          <span>Kehadiran &amp; Absensi</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-admin-kehadiran">
-          <div class="nav-accordion-inner">
-      <!-- Nested accordion: Absensi Siswa (Admin) -->
-      <div class="nav-nested-accordion" data-nested-group="admin-absensi-siswa">
-        <button class="nav-nested-header" onclick="toggleNestedNavAccordion('admin-absensi-siswa')" type="button" aria-expanded="false" id="nested-header-admin-absensi-siswa" data-tooltip="Absensi Siswa" data-search="absensi siswa kelas rekap piket kehadiran riwayat input">
-          <span class="flex items-center gap-2">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            <span class="sidebar-label">Absensi Siswa</span>
-          </span>
-          <svg class="nav-nested-chevron sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-nested-body" id="nested-body-admin-absensi-siswa">
-          <div class="nav-nested-inner">
-      <button id="nav-Page_StudentAttendanceInput_Admin" data-tooltip="Input Absensi" data-search="input absensi siswa kelas rekap piket" onclick="handleNav('Page_StudentAttendanceInput')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-        <span class="sidebar-label">Input Absensi</span>
-      </button>
-      <button id="nav-Page_StudentAttendanceHistory_Admin" data-tooltip="Riwayat Absensi" data-search="riwayat absensi siswa histori history" onclick="handleNav('Page_StudentAttendanceHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="sidebar-label">Riwayat Absensi</span>
-      </button>
-          </div>
-        </div>
-      </div>
-      <button id="nav-Page_Picket_Admin" data-tooltip="Piket & Upacara" data-search="piket upacara absen kehadiran" onclick="handleNav('Page_Picket')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Piket &amp; Upacara</span>
-        <span id="badgePicketNotification_Admin" class="hidden nav-dot-badge"></span>
-      </button>
-      <button id="nav-Page_EventAttendance_Admin" data-tooltip="Kehadiran Acara" data-search="kehadiran acara kegiatan" onclick="handleNav('Page_EventAttendance')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        <span class="sidebar-label">Kehadiran Acara</span>
-      </button>
-      <!-- Nested accordion: Kehadiran Harian -->
-      <div class="nav-nested-accordion" data-nested-group="admin-kehadiran-harian">
-        <button class="nav-nested-header" onclick="toggleNestedNavAccordion('admin-kehadiran-harian')" type="button" aria-expanded="false" id="nested-header-admin-kehadiran-harian" data-tooltip="Kehadiran Harian" data-search="kehadiran harian absen absensi daftar atur jam jadwal">
-          <span class="flex items-center gap-2">
-            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-            <span class="sidebar-label">Kehadiran Harian</span>
-          </span>
-          <svg class="nav-nested-chevron sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-nested-body" id="nested-body-admin-kehadiran-harian">
-          <div class="nav-nested-inner">
-      <button id="nav-Page_AttendanceList" data-tooltip="Daftar Kehadiran" data-search="daftar kehadiran absen absensi harian guru" onclick="handleNav('Page_AttendanceList')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <span class="sidebar-label">Daftar Kehadiran</span>
-      </button>
-      <button id="nav-Page_AttendanceSchedule" data-tooltip="Atur Jam Jadwal" data-search="atur jam jadwal kehadiran template kbm ujian" onclick="handleNav('Page_AttendanceSchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="sidebar-label">Atur Jam Jadwal</span>
-      </button>
-          </div>
-        </div>
-      </div>
-          </div>
-        </div>
-      </div>
-      <div class="nav-accordion" data-group="admin-honorarium">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-honorarium')" type="button" aria-expanded="false">
-          <span>Honorarium</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-admin-honorarium">
-          <div class="nav-accordion-inner">
-      <button id="nav-Page_Honorarium_Admin" data-tooltip="Honorarium" data-search="honorarium gaji honor jtm" onclick="handleNav('Page_Honorarium')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="sidebar-label">Honorarium</span>
-      </button>
-      <button id="nav-Page_HonorariumHistory_Admin" data-tooltip="Arsip Honor" data-search="arsip honor riwayat history" onclick="handleNav('Page_HonorariumHistory')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-        <span class="sidebar-label">Arsip Honor</span>
-      </button>
-
-          </div>
-        </div>
-      </div>
-      <div class="nav-accordion" data-group="admin-manajemen">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-manajemen')" type="button" aria-expanded="false">
-          <span>Manajemen</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-admin-manajemen">
-          <div class="nav-accordion-inner">
-      <button id="nav-Page_Users" data-tooltip="Data Pengguna" data-search="data pengguna user akun guru admin" onclick="handleNav('Page_Users')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-        <span class="sidebar-label">Data Pengguna</span>
-      </button>
-      <button id="nav-Page_ManageSchedule" data-tooltip="Manajemen Jadwal" data-search="manajemen jadwal pelajaran kbm" onclick="handleNav('Page_ManageSchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        <span class="sidebar-label">Manajemen Jadwal</span>
-      </button>
-      <button id="nav-Page_ExamSchedule" data-tooltip="Jadwal Ujian" data-search="jadwal ujian periode sesi pengawas" onclick="handleNav('Page_ExamSchedule')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <span class="sidebar-label">Jadwal Ujian</span>
-      </button>
-      <button id="nav-Page_EventManagement" data-tooltip="Manajemen Acara" data-search="manajemen acara kegiatan" onclick="handleNav('Page_EventManagement')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
-        <span class="sidebar-label">Manajemen Acara</span>
-      </button>
-      <button id="nav-Page_AdminDailyAttendance" data-tooltip="Riwayat Kehadiran Harian" data-search="riwayat kehadiran harian absen absensi semua guru" onclick="handleNav('Page_AdminDailyAttendance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <span class="sidebar-label">Riwayat Kehadiran Harian</span>
-      </button>
-      <button id="nav-Page_EventJournalHistory_Admin" data-tooltip="Riwayat Jurnal Acara" data-search="riwayat jurnal acara kegiatan history admin" onclick="handleNav('Page_EventJournalHistory')" class="nav-item hidden relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-        <span class="sidebar-label">Riwayat Jurnal Acara</span>
-      </button>
-      <button id="nav-Page_Journal_Admin" data-tooltip="Riwayat Jurnal" data-search="riwayat jurnal mengajar log" onclick="handleNav('Page_Journal')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-        <span class="sidebar-label">Riwayat Jurnal Mengajar</span>
-      </button>
-          </div>
-        </div>
-      </div>
-      <div class="nav-accordion" data-group="admin-konfigurasi">
-        <button class="nav-accordion-header" onclick="toggleNavAccordion('admin-konfigurasi')" type="button" aria-expanded="false">
-          <span>Konfigurasi</span>
-          <svg class="nav-accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div class="nav-accordion-body" id="acc-body-admin-konfigurasi">
-          <div class="nav-accordion-inner">
-      <button id="nav-Page_Settings_Config" data-tooltip="Konfigurasi Umum" data-search="konfigurasi umum pengaturan" onclick="handleNav('Page_Settings_Config')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Konfigurasi Umum</span>
-      </button>
-      <button id="nav-Page_Settings_Kalender" data-tooltip="Kalender Libur" data-search="kalender libur tanggal" onclick="handleNav('Page_Settings_Kalender')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Kalender Libur</span>
-      </button>
-      <button id="nav-Page_Settings_Mapel" data-tooltip="Mata Pelajaran" data-search="mata pelajaran mapel subjek" onclick="handleNav('Page_Settings_Mapel')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-        <span class="flex-1 text-left sidebar-label">Mata Pelajaran</span>
-      </button>
-      <button id="nav-Page_Settings_Tunjangan" data-tooltip="Tunjangan" data-search="tunjangan tugas tambahan" onclick="handleNav('Page_Settings_Tunjangan')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Tunjangan</span>
-      </button>
-      <button id="nav-Page_Settings_Transportasi" data-tooltip="Transportasi Harian" data-search="tunjangan transportasi harian" onclick="handleNav('Page_Settings_Transportasi')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Transportasi</span>
-      </button>
-      <button id="nav-Page_Settings_Maintenance" data-tooltip="Mode Maintenance" data-search="mode maintenance pemeliharaan" onclick="handleNav('Page_Settings_Maintenance')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Maintenance</span>
-      </button>
-      <button id="nav-Page_Settings_Pengumuman" data-tooltip="Pengumuman" data-search="pengumuman informasi" onclick="handleNav('Page_Settings_Pengumuman')" class="nav-item relative w-full flex items-center gap-3 px-3 py-2.5 mb-0.5">
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-        <span class="flex-1 text-left sidebar-label">Pengumuman</span>
-      </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="sidebarSearchEmpty" class="nav-search-empty">Tidak ada menu yang cocok</div>
-  </div>
-  <div id="sidebar-bottom" class="p-3 space-y-2 shrink-0">
-    <button id="btnSidebarProfile" onclick="handleNav('Page_Profile')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/08 transition-all group" style="background:rgba(255,255,255,0.04);" title="Buka Profil Saya">
-      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-md group-hover:ring-2 group-hover:ring-blue-400/30 transition-all" id="sidebarUserInitial">U</div>
-      <div class="flex-1 text-left min-w-0 sidebar-label">
-        <div class="text-xs font-semibold text-slate-200 truncate" id="sidebarUserName">Memuat...</div>
-        <div class="text-[10px] text-slate-500 truncate capitalize" id="sidebarUserRole">—</div>
-      </div>
-      <svg class="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition flex-shrink-0 sidebar-label" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-      </svg>
-    </button>
-    <button id="btnSidebarLogout" onclick="actionLogout()" class="w-full flex items-center justify-center gap-2 py-2.5 px-3" title="Keluar dari aplikasi">
-      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-      <span class="sidebar-label">Keluar Aplikasi</span>
-    </button>
-  </div>
-</aside>
-<div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden backdrop-blur-sm"></div>`;
+function _extUsersSheet_() {
+  return SpreadsheetApp.openById(EXT_USERS_SS_ID).getSheetByName(
+    EXT_USERS_SHEET,
+  );
 }
-function _navbar() {
-  return `<style>
-  #app-navbar {
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
-    border-bottom: 1px solid rgba(226,232,240,0.8);
-    box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.03);
+function _extFindUserRow_(username) {
+  const sheet = _extUsersSheet_();
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]).trim() === String(username).trim()) {
+      return { rowIndex: i + 1, row: data[i] };
+    }
   }
-  #navHamburger {
-    width: 36px; height: 36px;
-    border-radius: 10px;
-    border: 1px solid #E2E8F0;
-    color: #64748B;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s ease;
-    cursor: pointer;
-    background: transparent;
-  }
-  #navHamburger:hover { background: #F1F5F9; color: #0F172A; border-color: #CBD5E1; }
-  @media (min-width: 768px) {
-    #navHamburger { display: none; }
-  }
-  #navUserPill {
-    display: flex; align-items: center; gap: 9px;
-    padding: 4px 10px 4px 4px;
-    border-radius: 40px;
-    border: 1px solid #E2E8F0;
-    background: #F8FAFC;
-    cursor: pointer;
-    transition: all 0.18s ease;
-  }
-  #navUserPill:hover { background: #F1F5F9; border-color: #CBD5E1; box-shadow: 0 2px 8px rgba(15,23,42,0.07); }
-  #navUserPill:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }
-  #navUserAvatar {
-    position: relative;
-    width: 30px; height: 30px; border-radius: 50%;
-    background: linear-gradient(135deg, #3B82F6, #6366F1);
-    color: white; font-size: 0.7rem; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 6px rgba(59,130,246,0.3); flex-shrink: 0;
-  }
-  #navUserAvatar::after {
-    content: '';
-    position: absolute; right: -1px; bottom: -1px;
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    background: #34D399;
-    border: 2px solid white;
-  }
-  #navUserName { font-size: 0.8rem; font-weight: 600; color: #0F172A; line-height: 1.1; }
-  #navUserRole { font-size: 0.67rem; color: #64748B; line-height: 1.1; text-transform: capitalize; }
-  #navClockBadge {
-    font-size: 0.72rem; font-weight: 600; color: #475569;
-    background: #F1F5F9; border: 1px solid #E2E8F0;
-    border-radius: 8px; padding: 4px 10px;
-    font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
-    min-width: 50px; text-align: center;
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  #navClockBadge svg { color: #94A3B8; }
-  #navDateBadge {
-    font-size: 0.7rem; font-weight: 600; color: #64748B;
-    display: none; align-items: center; gap: 5px;
-    padding: 4px 10px;
-    border-radius: 8px;
-  }
-  @media (min-width: 1024px) { #navDateBadge { display: inline-flex; } }
-  #navPageTitle {
-    font-size: 0.875rem; font-weight: 700; color: #0F172A;
-  }
-  #navBreadcrumb {
-    font-size: 0.7rem; color: #94A3B8; font-weight: 500;
-    display: none;
-  }
-  @media (min-width: 768px) { #navBreadcrumb { display: inline; } }
-  #navBreadcrumb a {
-    color: #64748B;
-    transition: color 0.15s;
-  }
-  #navBreadcrumb a:hover { color: #3B82F6; cursor: pointer; }
-  #navBreadcrumb-sep { color: #CBD5E1; margin: 0 6px; }
-  #navLoadingBar {
-    position: absolute;
-    left: 0; bottom: -1px;
-    height: 2px; width: 0%;
-    background: linear-gradient(to right, #3B82F6, #8B5CF6, #EC4899);
-    transition: width 0.32s ease, opacity 0.32s ease;
-    opacity: 0;
-    pointer-events: none;
-  }
-  #navLoadingBar.is-loading {
-    opacity: 1;
-    animation: nav-loading-stripe 1.2s linear infinite;
-    background-size: 200% 100%;
-  }
-  @keyframes nav-loading-stripe {
-    0%   { background-position: 100% 0%; }
-    100% { background-position: -100% 0%; }
-  }
-  @media (max-width: 480px) {
-    #navUserPill .nav-user-info,
-    #navUserPill .nav-user-chevron { display: none !important; }
-  }
-</style>
-<header id="app-navbar" class="sticky top-0 z-30 relative">
-  <div class="px-3 sm:px-6">
-    <div class="flex items-center justify-between h-14 gap-2">
-      <div class="flex items-center gap-3 min-w-0 flex-1">
-        <button id="navHamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar" title="Sembunyikan/Tampilkan Sidebar">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
-        </button>
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-1 h-5 rounded-full bg-gradient-to-b from-blue-400 to-indigo-500 hidden sm:block flex-shrink-0"></div>
-          <div class="min-w-0">
-            <div id="navBreadcrumb" class="truncate">
-              <a onclick="handleNav('Page_Dashboard')">Beranda</a>
-              <span id="navBreadcrumb-sep">›</span>
-              <span id="navBreadcrumbCurrent">Dashboard</span>
-            </div>
-            <div id="navPageTitle" class="truncate">Dashboard</div>
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <div id="navDateBadge">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-          </svg>
-          <span id="navDateText">—</span>
-        </div>
-        <div id="navClockBadge" title="Waktu sekarang (WIB)">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <span id="navClockText">--:--</span>
-        </div>
-        <button id="navUserPill" onclick="handleNav('Page_Profile')" type="button" aria-label="Buka profil saya" title="Profil Saya">
-          <div id="navUserAvatar"><span id="navUserInitial">U</span></div>
-          <div class="nav-user-info hidden sm:block text-left">
-            <div id="navUserName">Memuat...</div>
-            <div id="navUserRole">...</div>
-          </div>
-          <svg class="nav-user-chevron w-3 h-3 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
-  <div id="navLoadingBar"></div>
-</header>
-`;
+  return null;
 }
-function _footer() {
-  return `<style>
-  #app-footer {
-    background: linear-gradient(to bottom, #FFFFFF, #FAFBFC);
-    border-top: 1px solid #E2E8F0;
-    font-family: 'Inter', sans-serif;
-  }
-  #footerContent {
-    display: flex; flex-wrap: wrap;
-    align-items: center; justify-content: space-between;
-    gap: 10px;
-    padding: 12px 24px;
-  }
-  @media (max-width: 480px) {
-    #footerContent { padding: 10px 14px; gap: 6px; }
-  }
-  .footer-brand {
-    display: flex; align-items: center; gap: 8px;
-    min-width: 0;
-  }
-  .footer-brand-logo {
-    width: 18px; height: 18px;
-    border-radius: 5px;
-    background: linear-gradient(135deg, #3B82F6, #6366F1);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    box-shadow: 0 2px 5px rgba(59,130,246,0.25);
-  }
-  .footer-text {
-    font-size: 0.7rem; color: #64748B; line-height: 1.4;
-    min-width: 0;
-  }
-  .footer-text strong {
-    color: #334155; font-weight: 600;
-  }
-  .footer-meta {
-    display: flex; align-items: center; gap: 8px;
-    flex-shrink: 0;
-  }
-  .footer-version {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 9px;
-    background: #F1F5F9;
-    border: 1px solid #E2E8F0;
-    border-radius: 999px;
-    font-size: 0.66rem; color: #64748B; font-weight: 600;
-    transition: background 0.15s;
-  }
-  .footer-version:hover { background: #E2E8F0; }
-  .footer-version-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #34D399;
-    box-shadow: 0 0 6px rgba(52,211,153,0.5);
-  }
-  #btnFooterTop {
-    position: fixed;
-    right: 1.25rem;
-    bottom: 1.25rem;
-    width: 44px; height: 44px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, #3B82F6, #6366F1);
-    border: 1px solid rgba(255,255,255,0.18);
-    color: #FFFFFF;
-    display: inline-flex; align-items: center; justify-content: center;
-    box-shadow: 0 10px 25px -8px rgba(59,130,246,0.55), 0 4px 10px rgba(15,23,42,0.12);
-    cursor: pointer;
-    z-index: 35;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(8px) scale(0.92);
-    transition: opacity 0.22s ease, transform 0.22s ease, background 0.18s ease, box-shadow 0.18s ease;
-  }
-  #btnFooterTop.is-visible {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0) scale(1);
-  }
-  #btnFooterTop:hover {
-    background: linear-gradient(135deg, #2563EB, #4F46E5);
-    box-shadow: 0 14px 30px -8px rgba(37,99,235,0.65), 0 6px 14px rgba(15,23,42,0.18);
-    transform: translateY(-2px) scale(1.02);
-  }
-  #btnFooterTop:active {
-    transform: translateY(0) scale(0.96);
-  }
-  #btnFooterTop:focus-visible {
-    outline: 3px solid rgba(99,102,241,0.45);
-    outline-offset: 2px;
-  }
-  body.has-active-modal #btnFooterTop {
-    opacity: 0 !important;
-    pointer-events: none !important;
-    transform: translateY(8px) scale(0.92) !important;
-  }
-  @media (max-width: 480px) {
-    #btnFooterTop {
-      right: 1rem;
-      bottom: 1rem;
-      width: 42px; height: 42px;
-    }
-  }
-  @supports (padding: env(safe-area-inset-bottom)) {
-    #btnFooterTop {
-      bottom: calc(1.25rem + env(safe-area-inset-bottom));
-    }
-  }
-</style>
-<footer id="app-footer" class="mt-auto shrink-0">
-  <div id="footerContent">
-    <div class="footer-brand">
-      <div class="footer-brand-logo">
-        <svg width="9" height="9" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-        </svg>
-      </div>
-      <p class="footer-text">
-        &copy; <span id="txtFooterYear">2026</span>
-        <strong id="txtFooterSchoolName">MTs Nurul Falah</strong>
-        <span class="mx-1 text-slate-300">·</span>
-        <span class="hidden sm:inline">Dibuat dengan</span>
-        <span class="hidden sm:inline" aria-hidden="true">❤</span>
-        <span>SiM-Guru</span>
-      </p>
-    </div>
-    <div class="footer-meta">
-      <span class="footer-version" title="Versi aplikasi">
-        <span class="footer-version-dot"></span>
-        v<span id="txtFooterVersion">2.1.1</span>
-      </span>
-    </div>
-  </div>
-  <button id="btnFooterTop" type="button" onclick="footerScrollToTop()" aria-label="Kembali ke atas" title="Kembali ke atas">
-    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
-    </svg>
-  </button>
-</footer>`;
+function _extGetPassword_(username) {
+  const found = _extFindUserRow_(username);
+  return found ? String(found.row[2]) : null;
 }
-function _modal() {
-  return `<!-- Modal Manajemen Piket Dashboard Admin -->
-<div id="adminPicketModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(15,23,42,0.65); backdrop-filter:blur(4px);">
-  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" style="max-height:92vh; animation: apm-pop 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards;">
-    <!-- Header modal -->
-    <div class="bg-gradient-to-br from-amber-500 via-amber-600 to-orange-600 px-5 py-4 flex-shrink-0">
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 border border-white/30">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-            </svg>
-          </div>
-          <div>
-            <h3 class="text-white font-extrabold text-base leading-tight" id="apmModalTitle">Manajemen Piket</h3>
-            <p class="text-amber-100 text-xs mt-0.5" id="apmModalSubtitle">Guru Piket Hari Ini</p>
-          </div>
-        </div>
-        <button onclick="closeAdminPicketModal()" class="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition border border-white/20 flex-shrink-0" aria-label="Tutup">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- Info guru (sticky top inside body) -->
-    <div class="flex-shrink-0 px-5 pt-4 pb-3 border-b border-slate-100 bg-slate-50/60">
-      <div class="flex items-center gap-3">
-        <div id="apmGuruAvatar" class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 font-extrabold text-base flex-shrink-0 border-2 border-amber-200">?</div>
-        <div class="flex-1 min-w-0">
-          <p class="font-bold text-slate-800 text-sm truncate" id="apmGuruName">—</p>
-          <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
-            <span id="apmRoleBadge" class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>Guru Piket
-            </span>
-            <span id="apmConfirmBadge" class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" id="apmConfirmDot"></span>
-              <span id="apmConfirmText">Belum Dikonfirmasi</span>
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Konten scroll -->
-    <div class="overflow-y-auto flex-1 custom-scrollbar">
-      <!-- SECTION 1: Konfirmasi Kehadiran -->
-      <div class="px-5 pt-4 pb-3 border-b border-slate-100" id="apmSectionKonfirmasi">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">① Konfirmasi Kehadiran Piket</p>
-        <div class="flex items-center gap-3">
-          <div class="flex-1">
-            <p class="text-sm text-slate-600 leading-relaxed">Konfirmasi kehadiran guru piket untuk hari ini. Setelah dikonfirmasi, JTM piket (4 JTM) akan masuk ke sistem honorarium.</p>
-          </div>
-        </div>
-        <div class="flex gap-2 mt-3">
-          <button id="apmBtnKonfirmasi" onclick="apmDoKonfirmasi()"
-            class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-            Konfirmasi Hadir
-          </button>
-          <button id="apmBtnBatalKonfirmasi" onclick="apmDoRevokeKonfirmasi()"
-            class="hidden flex-1 items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-sm font-bold transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-            Batalkan Konfirmasi
-          </button>
-        </div>
-      </div>
-
-      <!-- SECTION 2: Tunjuk Pengganti -->
-      <div class="px-5 pt-4 pb-3 border-b border-slate-100" id="apmSectionPengganti">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">② Tunjuk Guru Piket Pengganti</p>
-        <div id="apmSubstInfo" class="hidden mb-3 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="w-7 h-7 rounded-lg bg-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-xs flex-shrink-0" id="apmSubstAvatar">?</div>
-              <div class="min-w-0">
-                <p class="text-xs font-bold text-indigo-800 truncate" id="apmSubstName">—</p>
-                <p class="text-[10px] text-indigo-500">Pengganti aktif</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-1.5">
-              <span id="apmSubstConfirmBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">Belum Konfirmasi</span>
-            </div>
-          </div>
-        </div>
-        <div id="apmSubstForm" class="space-y-2">
-          <div class="relative">
-            <select id="apmSubstSelect"
-              class="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 font-medium focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition cursor-pointer">
-              <option value="">— Pilih Guru Pengganti —</option>
-            </select>
-            <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-              <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-            </div>
-          </div>
-          <button id="apmBtnTunjukPengganti" onclick="apmDoTunjukPengganti()"
-            class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-            Tunjuk Sebagai Pengganti
-          </button>
-        </div>
-      </div>
-
-      <!-- SECTION 3: Input Jam Masuk & Pulang -->
-      <div class="px-5 pt-4 pb-5">
-        <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-3">③ Input Jam Masuk &amp; Pulang Riil</p>
-        <p class="text-xs text-slate-500 mb-3 leading-relaxed">Input jam kehadiran aktual guru piket / pengganti. Data ini digunakan untuk perhitungan tunjangan transportasi.</p>
-
-        <!-- Jam piket asli -->
-        <div id="apmJamOrigSection" class="mb-4">
-          <div class="flex items-center gap-2 mb-2">
-            <div class="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-3 h-3 text-amber-700" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-            </div>
-            <p class="text-xs font-bold text-slate-700" id="apmJamOrigLabel">Guru Piket Asli</p>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Masuk</label>
-              <div class="relative">
-                <input type="time" id="apmTimeInOrig"
-                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition">
-                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Pulang</label>
-              <div class="relative">
-                <input type="time" id="apmTimeOutOrig"
-                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition">
-                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-            </div>
-          </div>
-          <button onclick="apmDoSaveTimeOrig()"
-            class="mt-2.5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
-            id="apmBtnSaveTimeOrig">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-            Simpan Jam Piket Asli
-          </button>
-        </div>
-
-        <!-- Jam piket pengganti (muncul hanya jika ada pengganti) -->
-        <div id="apmJamSubstSection" class="hidden">
-          <div class="border-t border-dashed border-slate-200 pt-4 mb-3"></div>
-          <div class="flex items-center gap-2 mb-2">
-            <div class="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-3 h-3 text-indigo-700" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
-            </div>
-            <p class="text-xs font-bold text-slate-700" id="apmJamSubstLabel">Guru Piket Pengganti</p>
-          </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Masuk</label>
-              <div class="relative">
-                <input type="time" id="apmTimeInSubst"
-                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition">
-                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Jam Pulang</label>
-              <div class="relative">
-                <input type="time" id="apmTimeOutSubst"
-                  class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-mono font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition">
-                <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-            </div>
-          </div>
-          <button onclick="apmDoSaveTimeSubst()"
-            class="mt-2.5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold transition shadow-sm active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
-            id="apmBtnSaveTimeSubst">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
-            Simpan Jam Pengganti
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div class="flex-shrink-0 px-5 py-3.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
-      <button onclick="closeAdminPicketModal()"
-        class="px-5 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-100 transition active:scale-95">
-        Tutup
-      </button>
-    </div>
-  </div>
-</div>
-<!-- END Modal Manajemen Piket Dashboard Admin -->
-
-<!-- Student Attendance Input Modal -->
-<div id="studentAttendanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,0.6);">
-  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
-    <div class="bg-gradient-to-r from-teal-600 to-emerald-600 px-5 py-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-          </div>
-          <div>
-            <h3 class="text-white font-bold text-base" id="saModalTitle">Input Absensi Siswa</h3>
-            <p class="text-teal-100 text-xs">Rekap kehadiran hari ini</p>
-          </div>
-        </div>
-        <button onclick="closeStudentAttendanceModal()" class="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="p-5 space-y-3">
-      <input type="hidden" id="saInpClassName">
-      <input type="hidden" id="saInpStdSiswa" value="">
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
-          <label class="block text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-2">Hadir</label>
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="adjustSaInput('saInpHadir',-1)" class="w-7 h-7 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-lg flex items-center justify-center hover:bg-emerald-100 transition flex-shrink-0">-</button>
-            <input type="number" id="saInpHadir" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-emerald-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-emerald-400 outline-none">
-            <button type="button" onclick="adjustSaInput('saInpHadir',1)" class="w-7 h-7 rounded-lg bg-white border border-emerald-300 text-emerald-700 font-bold text-lg flex items-center justify-center hover:bg-emerald-100 transition flex-shrink-0">+</button>
-          </div>
-        </div>
-        <div class="bg-amber-50 rounded-xl p-3 border border-amber-200">
-          <label class="block text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-2">Sakit</label>
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="adjustSaInput('saInpSakit',-1)" class="w-7 h-7 rounded-lg bg-white border border-amber-300 text-amber-700 font-bold text-lg flex items-center justify-center hover:bg-amber-100 transition flex-shrink-0">-</button>
-            <input type="number" id="saInpSakit" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-amber-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-amber-400 outline-none">
-            <button type="button" onclick="adjustSaInput('saInpSakit',1)" class="w-7 h-7 rounded-lg bg-white border border-amber-300 text-amber-700 font-bold text-lg flex items-center justify-center hover:bg-amber-100 transition flex-shrink-0">+</button>
-          </div>
-        </div>
-        <div class="bg-blue-50 rounded-xl p-3 border border-blue-200">
-          <label class="block text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-2">Izin</label>
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="adjustSaInput('saInpIzin',-1)" class="w-7 h-7 rounded-lg bg-white border border-blue-300 text-blue-700 font-bold text-lg flex items-center justify-center hover:bg-blue-100 transition flex-shrink-0">-</button>
-            <input type="number" id="saInpIzin" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-blue-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-blue-400 outline-none">
-            <button type="button" onclick="adjustSaInput('saInpIzin',1)" class="w-7 h-7 rounded-lg bg-white border border-blue-300 text-blue-700 font-bold text-lg flex items-center justify-center hover:bg-blue-100 transition flex-shrink-0">+</button>
-          </div>
-        </div>
-        <div class="bg-red-50 rounded-xl p-3 border border-red-200">
-          <label class="block text-[11px] font-bold text-red-700 uppercase tracking-wider mb-2">Alpa</label>
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="adjustSaInput('saInpAlpa',-1)" class="w-7 h-7 rounded-lg bg-white border border-red-300 text-red-700 font-bold text-lg flex items-center justify-center hover:bg-red-100 transition flex-shrink-0">-</button>
-            <input type="number" id="saInpAlpa" value="0" min="0" max="999" oninput="updateSaTotal()" class="w-full text-center font-mono font-bold text-slate-800 bg-white border border-red-200 rounded-lg py-1.5 text-sm focus:ring-2 focus:ring-red-400 outline-none">
-            <button type="button" onclick="adjustSaInput('saInpAlpa',1)" class="w-7 h-7 rounded-lg bg-white border border-red-300 text-red-700 font-bold text-lg flex items-center justify-center hover:bg-red-100 transition flex-shrink-0">+</button>
-          </div>
-        </div>
-      </div>
-      <div id="saTotalDisplay" class="flex items-center justify-between rounded-xl px-4 py-2.5 border transition-colors duration-200 bg-slate-50 border-slate-200">
-        <div class="flex flex-col">
-          <span class="text-xs font-semibold text-slate-500">Total Siswa</span>
-          <span id="saTotalHint" class="text-[11px] text-slate-400 hidden"></span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="font-mono font-bold text-slate-800 text-base" id="saTotalCount">0</span>
-          <span id="saTotalStdBadge" class="hidden text-[11px] font-semibold px-2 py-0.5 rounded-full"></span>
-        </div>
-      </div>
-    </div>
-    <div class="px-5 pb-5 flex gap-3">
-      <button type="button" onclick="closeStudentAttendanceModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition">Batal</button>
-      <button type="button" id="btnSaveStudentAttendance" onclick="submitStudentAttendance()" class="flex-1 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none">Simpan</button>
-    </div>
-  </div>
-</div>
-<div id="confirmModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-  <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-    <div class="fixed inset-0 transition-opacity backdrop-blur-sm" style="background:rgba(15,23,42,0.55);" aria-hidden="true" onclick="closeConfirmModal()"></div>
-    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-    <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md w-full">
-      <div class="px-6 pt-6 pb-3 flex items-start gap-4">
-        <div id="confirmIconWrap" class="w-11 h-11 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-          <svg id="confirmIconSvg" class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-          </svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <h3 class="text-base font-extrabold text-slate-900 leading-tight" id="confirmTitle">Konfirmasi</h3>
-          <div class="text-sm text-slate-500 mt-1.5 leading-relaxed" id="confirmMessage">...</div>
-        </div>
-        <button type="button" onclick="closeConfirmModal()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="bg-slate-50 px-5 py-4 sm:flex sm:flex-row-reverse gap-2 border-t border-slate-100">
-        <button type="button" onclick="executeConfirm(); return false;"
-          class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-transparent shadow-sm px-5 py-2.5 bg-blue-600 text-sm font-bold text-white hover:bg-blue-700 sm:ml-3 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Ya, Lanjutkan
-        </button>
-        <button type="button" onclick="closeConfirmModal(); return false;"
-          class="mt-3 w-full sm:w-auto sm:mt-0 inline-flex justify-center rounded-xl border border-slate-200 shadow-sm px-5 py-2.5 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-slate-300">
-          Batal
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="userModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-center justify-center min-h-screen p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
-    <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-          </div>
-          <div>
-            <h3 class="text-white font-bold text-lg" id="titleUserModal">Tambah User</h3>
-            <p class="text-blue-100 text-xs">Kelola data akun pengguna</p>
-          </div>
-        </div>
-      </div>
-      <form id="formUser" onsubmit="event.preventDefault(); submitUser();" class="p-6 space-y-4">
-        <input type="hidden" id="inpUserId">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Lengkap</label>
-          <input type="text" id="inpNamaLengkap" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Masukkan nama lengkap">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIP</label>
-          <input type="text" id="inpNip" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono" placeholder="Nomor Induk Pegawai (opsional)">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Username</label>
-          <input type="text" id="inpUsernameUser" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Username untuk login">
-        </div>
-        <div id="divUserPassword">
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Password</label>
-          <input type="text" id="inpPasswordUser" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition font-mono" value="123456">
-          <p class="text-[11px] text-slate-400 mt-1">Password default: 123456 (wajib diganti saat login pertama)</p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Role</label>
-          <select id="inpRole" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
-            <option value="guru">Guru</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jarak ke Sekolah (km)</label>
-          <input type="number" id="inpKmDistance" step="0.01" min="0.01" max="999.99"
-            class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-            placeholder="10.25">
-          <p class="text-[11px] text-slate-400 mt-1">Opsional. Angka positif, maks 2 desimal (0,01–999,99). Kosongkan jika tidak ada tunjangan transportasi.</p>
-          <p id="errKmDistance" class="text-[11px] text-red-500 mt-1 hidden"></p>
-        </div>
-        <div class="flex gap-3 pt-2">
-          <button type="button" onclick="closeUserModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-          <button type="submit" id="btnSubmitUser" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-200">Simpan Data</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-<div id="scheduleModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="titleScheduleModal">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeScheduleModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
-      <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
-        <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0 pr-8">
-            <h3 class="text-white font-bold text-lg truncate" id="titleScheduleModal">Jadwal Pelajaran</h3>
-            <p class="text-emerald-100 text-xs">Isi data jadwal mengajar</p>
-          </div>
-          <button type="button" onclick="closeScheduleModal()" aria-label="Tutup"
-            class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/12 hover:bg-white/22 active:scale-95 flex items-center justify-center text-white transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-      </div>
-      <form id="formSchedule" onsubmit="event.preventDefault(); submitSchedule();" class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
-        <input type="hidden" id="inpSchedId">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Hari</label>
-            <select id="inpSchedDay" onchange="_schedCheckLocalConflict()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition">
-              <option value="1">Senin</option><option value="2">Selasa</option><option value="3">Rabu</option>
-              <option value="4">Kamis</option><option value="5">Jumat</option><option value="6">Sabtu</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">JTM</label>
-            <input type="number" id="inpSchedJTM" min="1" max="10" oninput="_schedAutoCalcEnd(); _schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition" placeholder="Mis: 2">
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5" title="Jam Mulai">Mulai</label>
-            <input type="time" id="inpSchedStart" oninput="_schedAutoCalcEnd(); _schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5" title="Waktu Istirahat (Menit)">Istirahat</label>
-            <input type="number" id="inpSchedRestTime" min="0" oninput="_schedAutoCalcEnd(); _schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition" placeholder="Menit">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5" title="Jam Selesai">Selesai</label>
-            <input type="time" id="inpSchedEnd" oninput="_schedUpdateDuration(); _schedCheckLocalConflict();" class="w-full border border-slate-200 rounded-xl px-2 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white transition">
-          </div>
-        </div>
-        <div id="schedDurationPreview" class="hidden text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex items-center gap-2">
-          <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <span id="schedDurationLabel">—</span>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Pengampu</label>
-          <select id="inpSchedTeacher" onchange="_schedCheckLocalConflict()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition"></select>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tahun Pelajaran</label>
-            <input type="text" id="inpSchedTP" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-slate-100 text-slate-500 cursor-not-allowed" placeholder="Cth: 2025/2026" readonly>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Semester</label>
-            <select id="inpSchedSem" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-slate-100 text-slate-500 cursor-not-allowed" disabled>
-              <option value="Ganjil">Ganjil</option>
-              <option value="Genap">Genap</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Kelas</label>
-            <select id="inpSchedClass" onchange="_schedCheckLocalConflict()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition"></select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mata Pelajaran</label>
-            <select id="inpSchedSubject" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition"></select>
-          </div>
-        </div>
-        <div id="schedConflictWarning" class="hidden text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
-          <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
-          <span id="schedConflictMessage">—</span>
-        </div>
-      </form>
-      <div class="px-5 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="closeScheduleModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 active:scale-95 rounded-xl font-semibold text-sm transition">Batal</button>
-        <button type="button" id="btnSaveSchedule" onclick="submitSchedule()"
-          class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 active:scale-95 transition shadow-md shadow-emerald-200 inline-flex items-center justify-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-          Simpan Jadwal
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="journalModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);"></div>
-    <div class="relative w-full max-w-lg overflow-hidden flex flex-col" style="background:#fff;border-top-left-radius:24px;border-top-right-radius:24px;border-bottom-left-radius:0;border-bottom-right-radius:0;box-shadow:0 -12px 48px rgba(0,0,0,0.22);max-height:92vh;" id="journalModalSheet">
-      <div style="background:linear-gradient(135deg,#312e81 0%,#4338ca 50%,#4f46e5 100%);padding:18px 22px 16px;position:relative;overflow:hidden;flex-shrink:0;">
-        <div style="position:absolute;top:-30px;right:-30px;width:160px;height:160px;background:rgba(255,255,255,0.05);border-radius:50%;"></div>
-        <div style="position:absolute;bottom:-50px;left:10%;width:220px;height:220px;background:rgba(255,255,255,0.03);border-radius:50%;"></div>
-        <button type="button" onclick="closeJournalModal()" aria-label="Tutup"
-          style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;z-index:2;"
-          onmouseover="this.style.background='rgba(255,255,255,0.22)';"
-          onmouseout="this.style.background='rgba(255,255,255,0.12)';">
-          <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div style="position:relative;z-index:1;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-            <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;">
-              <h3 id="journalModalTitle" style="color:white;font-weight:800;font-size:17px;font-family:'DM Sans',sans-serif;line-height:1.2;">Laporan Jurnal Mengajar</h3>
-              <p style="color:rgba(199,210,254,0.9);font-size:12px;margin-top:2px;font-family:'DM Sans',sans-serif;word-break:break-word;line-height:1.35;">
-                <span id="txtMapel">Mapel</span> &middot; <span id="txtKelas">Kelas</span>
-              </p>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;">
-              <svg width="13" height="13" fill="none" stroke="rgba(199,210,254,0.9)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              <span id="txtJam" style="color:white;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;">00:00</span>
-            </div>
-            <div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;">
-              <svg width="13" height="13" fill="none" stroke="rgba(199,210,254,0.9)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              <span id="txtJournalJTM" style="color:white;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:700;">0</span>
-              <span style="color:rgba(199,210,254,0.8);font-size:11px;font-family:'DM Sans',sans-serif;">JTM</span>
-            </div>
-            <div id="journalDurationBadge" style="display:none;align-items:center;gap:5px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;">
-              <svg width="13" height="13" fill="none" stroke="rgba(199,210,254,0.9)" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              <span id="txtJournalDuration" style="color:white;font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;">0 mnt</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <form id="formJournal" onsubmit="event.preventDefault(); submitJournal();" style="padding:18px 22px 4px;font-family:'DM Sans',sans-serif;overflow-y:auto;flex:1;">
-        <input type="hidden" id="inpScheduleId">
-        <input type="hidden" id="inpJournalDateHidden">
-        <input type="hidden" id="inpJournalLogId">
-        <div style="margin-bottom:14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-            <label for="inpMateri" style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;">
-              Materi Pembelajaran <span style="color:#F43F5E;">*</span>
-            </label>
-            <span id="materiCounter" style="font-size:10px;font-weight:600;color:#94A3B8;font-family:'JetBrains Mono',monospace;">0/500</span>
-          </div>
-          <textarea id="inpMateri" dir="auto" rows="3" maxlength="500" oninput="updateMateriCounter()"
-            class="db-modal-textarea"
-            style="width:100%;padding:11px 14px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical;min-height:74px;transition:border-color 0.15s,box-shadow 0.15s;box-sizing:border-box;color:#1E293B;line-height:1.55;"
-            placeholder="Tuliskan materi yang diajarkan hari ini... (Mendukung tulisan Arab &amp; Indonesia)"></textarea>
-          <p id="materiHint" style="display:none;font-size:10.5px;color:#F43F5E;margin-top:4px;font-weight:600;">Materi pembelajaran wajib diisi.</p>
-          <div id="journalEditNotice" style="display:none;margin-top:8px;padding:8px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;font-size:11.5px;color:#92400E;font-weight:600;">
-            <svg style="display:inline;vertical-align:-2px;margin-right:4px;" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 20h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.5 0l-7.1 13.25A2 2 0 005 20z"/></svg>
-            Mode Edit: perubahan akan menggantikan jurnal yang sudah ada.
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-          <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Siswa Hadir</label>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <button type="button" onclick="adjustNumberInput('inpHadir',-1)" tabindex="-1"
-                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#F8FAFC;color:#475569;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s,border-color 0.15s;flex-shrink:0;line-height:1;"
-                onmouseover="this.style.background='#E2E8F0';" onmouseout="this.style.background='#F8FAFC';">−</button>
-              <input type="number" id="inpHadir" min="0" max="200" value="0" inputmode="numeric"
-                style="width:100%;padding:10px 6px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:18px;font-weight:800;color:#059669;text-align:center;font-family:'JetBrains Mono',monospace;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;min-width:0;">
-              <button type="button" onclick="adjustNumberInput('inpHadir',1)" tabindex="-1"
-                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#F0FDF4;color:#059669;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s,border-color 0.15s;flex-shrink:0;line-height:1;"
-                onmouseover="this.style.background='#DCFCE7';" onmouseout="this.style.background='#F0FDF4';">+</button>
-            </div>
-          </div>
-          <div>
-            <label style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Sakit / Izin / Alfa</label>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <button type="button" onclick="adjustNumberInput('inpSakit',-1)" tabindex="-1"
-                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#F8FAFC;color:#475569;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s;flex-shrink:0;line-height:1;"
-                onmouseover="this.style.background='#E2E8F0';" onmouseout="this.style.background='#F8FAFC';">−</button>
-              <input type="number" id="inpSakit" min="0" max="200" value="0" inputmode="numeric"
-                style="width:100%;padding:10px 6px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:18px;font-weight:800;color:#E11D48;text-align:center;font-family:'JetBrains Mono',monospace;outline:none;box-sizing:border-box;transition:border-color 0.15s,box-shadow 0.15s;min-width:0;">
-              <button type="button" onclick="adjustNumberInput('inpSakit',1)" tabindex="-1"
-                class="jrn-stepper" style="width:36px;height:42px;border:1.5px solid #DDE1F0;border-radius:10px;background:#FFF1F2;color:#E11D48;font-weight:700;font-size:18px;cursor:pointer;transition:background 0.15s;flex-shrink:0;line-height:1;"
-                onmouseover="this.style.background='#FECDD3';" onmouseout="this.style.background='#FFF1F2';">+</button>
-            </div>
-          </div>
-        </div>
-        <div id="studentExpectedHint" style="display:none;margin-bottom:10px;padding:10px 14px;background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:7px;">
-              <div id="studentExpectedIcon" style="width:28px;height:28px;border-radius:8px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <svg width="14" height="14" fill="none" stroke="#2563EB" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
-              </div>
-              <div>
-                <p id="studentExpectedLabel" style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.06em;margin:0;">Standar Kelas</p>
-                <p style="font-size:13px;font-weight:800;color:#1E40AF;font-family:'JetBrains Mono',monospace;margin:0;">
-                  <span id="studentExpected">0</span> siswa
-                </p>
-              </div>
-            </div>
-            <div id="studentExpectedDeltaWrap" style="display:flex;align-items:center;gap:6px;">
-              <span id="studentExpectedDelta" style="font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;"></span>
-            </div>
-          </div>
-          <!-- Progress bar: hadir/absen vs standar -->
-          <div id="studentExpectedProgressWrap" style="display:none;margin-top:8px;">
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748B;font-weight:600;margin-bottom:3px;">
-              <span>Terisi: <span id="studentExpectedFilledCount" style="font-family:'JetBrains Mono',monospace;font-weight:800;">0</span></span>
-              <span id="studentExpectedSlotLabel" style="font-weight:700;"></span>
-            </div>
-            <div style="height:6px;border-radius:999px;overflow:hidden;background:#E2E8F0;position:relative;">
-              <div id="studentExpectedProgressBar" style="height:100%;border-radius:999px;transition:width 0.3s ease,background 0.3s;width:0%;background:#3B82F6;"></div>
-            </div>
-          </div>
-        </div>
-        <div id="studentTotalIndicator" style="display:none;margin-bottom:14px;padding:10px 14px;background:#EEF2FF;border:1.5px solid #C7D2FE;border-radius:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#4338CA;font-weight:600;margin-bottom:6px;">
-            <span>Total siswa terisi: <strong id="totalStudents" style="font-weight:800;font-family:'JetBrains Mono',monospace;">0</strong></span>
-            <span id="totalAttendanceRate" style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#1E40AF;">0%</span>
-          </div>
-          <div style="display:flex;height:6px;border-radius:999px;overflow:hidden;background:#E0E7FF;">
-            <span id="totalAttHadirBar" style="background:#10B981;display:block;height:100%;width:0%;transition:width 0.25s ease;"></span>
-            <span id="totalAttAbsenBar" style="background:#F43F5E;display:block;height:100%;width:0%;transition:width 0.25s ease;"></span>
-          </div>
-        </div>
-        <!-- Modal Konfirmasi Mismatch -->
-        <div id="mismatchAlertBox" style="display:none;margin-bottom:12px;border-radius:14px;overflow:hidden;border:2px solid #FEF08A;">
-          <div style="background:linear-gradient(135deg,#FEFCE8,#FEF9C3);padding:12px 14px;">
-            <div style="display:flex;align-items:flex-start;gap:10px;">
-              <div style="width:34px;height:34px;border-radius:10px;background:#FDE047;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
-                <svg width="17" height="17" fill="none" stroke="#713F12" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-              </div>
-              <div style="flex:1;min-width:0;">
-                <p style="font-weight:800;font-size:13px;color:#713F12;margin:0 0 3px;">Jumlah Siswa Tidak Sesuai</p>
-                <p id="mismatchAlertMsg" style="font-size:12px;color:#92400E;margin:0;line-height:1.5;"></p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style="margin-bottom:14px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px;flex-wrap:wrap;">
-            <label for="inpCatatan" style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;">
-              Catatan Tambahan <span style="color:#CBD5E1;font-weight:400;">(opsional)</span>
-            </label>
-            <span id="catatanCounter" style="font-size:10px;font-weight:600;color:#94A3B8;font-family:'JetBrains Mono',monospace;">0/200</span>
-          </div>
-          <input type="text" id="inpCatatan" maxlength="200" oninput="updateCatatanCounter()"
-            style="width:100%;padding:11px 14px;border:1.5px solid #DDE1F0;border-radius:12px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;color:#1E293B;transition:border-color 0.15s,box-shadow 0.15s;"
-            placeholder="Catatan kejadian khusus di kelas...">
-        </div>
-        <div id="modalLoading" class="hidden" style="margin-bottom:14px;">
-          <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;background:#EEF2FF;border-radius:12px;border:1px solid #C7D2FE;">
-            <div style="width:16px;height:16px;border:2.5px solid #4F46E5;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-            <span style="color:#4338CA;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;">Sedang mengirim laporan...</span>
-          </div>
-        </div>
-      </form>
-      <div style="padding:12px 22px 18px;border-top:1px solid #F1F5F9;background:#FAFBFD;flex-shrink:0;display:flex;gap:10px;flex-wrap:wrap;">
-        <button type="button" onclick="closeJournalModal()"
-          style="flex:1 1 120px;padding:11px;border:1.5px solid #E2E8F0;border-radius:12px;background:#FFFFFF;color:#475569;font-weight:700;font-size:13.5px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;"
-          onmouseover="this.style.background='#F1F5F9';" onmouseout="this.style.background='#FFFFFF';">
-          Batal
-        </button>
-        <button type="button" id="btnSubmitJournal" onclick="submitJournal()"
-          style="flex:1 1 160px;padding:11px;border:none;border-radius:12px;background:linear-gradient(135deg,#4338CA,#4F46E5);color:#fff;font-weight:800;font-size:13.5px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:box-shadow 0.18s, opacity 0.18s;box-shadow:0 4px 12px rgba(79,70,229,0.30);display:flex;align-items:center;justify-content:center;gap:7px;"
-          onmouseover="this.style.boxShadow='0 6px 18px rgba(79,70,229,0.40)';"
-          onmouseout="this.style.boxShadow='0 4px 12px rgba(79,70,229,0.30)';">
-          <svg id="iconSubmitJournal" width="15" height="15" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-          <span id="lblSubmitJournal">Kirim Laporan</span>
-          <span style="font-size:10.5px;opacity:0.75;font-weight:600;display:none;" id="submitShortcutHint">(Ctrl+↵)</span>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<style>
-  @media (min-width: 640px) {
-    #journalModal #journalModalSheet {
-      border-bottom-left-radius: 24px !important;
-      border-bottom-right-radius: 24px !important;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.22) !important;
+function _extSetPassword_(username, newPassword) {
+  const sheet = _extUsersSheet_();
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]).trim() === String(username).trim()) {
+      sheet.getRange(i + 1, 3).setValue(newPassword);
+      SpreadsheetApp.flush();
+      return true;
     }
   }
-</style>
-<div id="viewJournalModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-center justify-center min-h-screen p-4">
-    <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);"></div>
-    <div class="relative w-full max-w-md overflow-hidden" style="background:#fff;border-radius:24px;box-shadow:0 24px 64px rgba(0,0,0,0.22);">
-      <div style="background:linear-gradient(135deg,#0F172A 0%,#1E3A5F 100%);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="17" height="17" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          </div>
-          <div style="min-width:0;">
-            <h3 style="color:white;font-weight:800;font-size:15px;font-family:'DM Sans',sans-serif;">Detail Jurnal Mengajar</h3>
-            <p id="viewJournalSubtitle" style="color:rgba(148,163,184,0.85);font-size:11px;font-family:'DM Sans',sans-serif;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Rincian aktivitas pembelajaran</p>
-          </div>
-        </div>
-        <button onclick="closeViewJournalModal()" aria-label="Tutup"
-          style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.08);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;flex-shrink:0;"
-          onmouseover="this.style.background='rgba(255,255,255,0.16)';" onmouseout="this.style.background='rgba(255,255,255,0.08)';">
-          <svg width="16" height="16" fill="none" stroke="rgba(203,213,225,0.9)" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div style="padding:20px 22px 22px;font-family:'DM Sans',sans-serif;max-height:80vh;overflow-y:auto;">
-        <div id="viewJournalGuruRow" style="display:none;margin-bottom:12px;padding:10px 12px;background:linear-gradient(135deg,#F0F9FF,#E0F2FE);border:1px solid #BAE6FD;border-radius:12px;align-items:center;gap:10px;">
-          <div id="viewJournalGuruAvatar" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4338CA,#6366F1);color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">?</div>
-          <div style="min-width:0;flex:1;">
-            <p style="font-size:9px;font-weight:700;color:#0369A1;text-transform:uppercase;letter-spacing:0.07em;">Diisi oleh</p>
-            <p id="viewJournalGuruName" style="font-weight:700;color:#0C4A6E;font-size:13.5px;word-break:break-word;">—</p>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px;margin-bottom:10px;">
-          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;min-width:0;">
-            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Tanggal</p>
-            <p id="viewJournalDate" style="font-weight:700;color:#1E293B;font-size:13px;line-height:1.3;word-break:break-word;">...</p>
-          </div>
-          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;min-width:0;">
-            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Waktu</p>
-            <p id="viewJournalTime" style="font-weight:700;color:#1E293B;font-size:13px;font-family:'JetBrains Mono',monospace;">...</p>
-          </div>
-          <div style="background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:10px 12px;text-align:center;min-width:0;">
-            <p style="font-size:9px;font-weight:700;color:#818CF8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">JTM</p>
-            <p id="viewJournalJTM" style="font-weight:800;color:#4338CA;font-size:20px;font-family:'JetBrains Mono',monospace;line-height:1.1;">0</p>
-          </div>
-        </div>
-        <div style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF);border:1px solid #C7D2FE;border-radius:12px;padding:11px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px;">
-          <div style="width:32px;height:32px;background:#4F46E5;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-          </div>
-          <div style="min-width:0;flex:1;">
-            <p style="font-size:9px;font-weight:700;color:#818CF8;text-transform:uppercase;letter-spacing:0.07em;">Mapel &amp; Kelas</p>
-            <p id="viewJournalClassMapel" style="font-weight:700;color:#312E81;font-size:14px;margin-top:1px;word-break:break-word;">...</p>
-          </div>
-        </div>
-        <div style="background:#FAFBFF;border:1.5px solid #E8EAF0;border-radius:14px;padding:14px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;">
-            <p style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.07em;display:flex;align-items:center;gap:5px;">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-              Materi Pembelajaran
-            </p>
-            <button id="btnCopyMateri" type="button" onclick="copyJournalMateri()" title="Salin materi"
-              style="background:transparent;border:1px solid #DDE1F0;color:#64748B;border-radius:8px;padding:3px 8px;font-size:10.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background 0.15s,color 0.15s,border-color 0.15s;font-family:'DM Sans',sans-serif;"
-              onmouseover="this.style.background='#F1F5F9';this.style.color='#1E293B';"
-              onmouseout="this.style.background='transparent';this.style.color='#64748B';">
-              <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              Salin
-            </button>
-          </div>
-          <p id="viewJournalMateri" dir="auto" style="color:#374151;font-size:13.5px;line-height:1.6;font-weight:500;white-space:pre-wrap;word-break:break-word;">...</p>
-        </div>
-        <div style="background:linear-gradient(135deg,#F8FAFC,#F1F5F9);border:1px solid #E2E8F0;border-radius:14px;padding:12px 14px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:10.5px;color:#64748B;font-weight:700;">
-            <span style="text-transform:uppercase;letter-spacing:0.07em;">Tingkat Kehadiran</span>
-            <span id="viewJournalAttPct" style="font-family:'JetBrains Mono',monospace;font-weight:800;color:#1E293B;">0%</span>
-          </div>
-          <div style="display:flex;height:8px;border-radius:999px;overflow:hidden;background:#E2E8F0;margin-bottom:10px;">
-            <span id="viewJournalAttHadirBar" style="background:linear-gradient(90deg,#10B981,#34D399);display:block;height:100%;width:0%;transition:width 0.4s ease;"></span>
-            <span id="viewJournalAttAbsenBar" style="background:linear-gradient(90deg,#F43F5E,#FB7185);display:block;height:100%;width:0%;transition:width 0.4s ease;"></span>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:10px;text-align:center;">
-              <p style="font-size:10px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Hadir</p>
-              <p id="viewJournalPresent" style="font-weight:800;font-size:24px;color:#059669;font-family:'JetBrains Mono',monospace;line-height:1;">0</p>
-            </div>
-            <div style="background:#FFF1F2;border:1px solid #FECDD3;border-radius:10px;padding:10px;text-align:center;">
-              <p style="font-size:10px;font-weight:700;color:#F43F5E;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Absen</p>
-              <p id="viewJournalAbsent" style="font-weight:800;font-size:24px;color:#E11D48;font-family:'JetBrains Mono',monospace;line-height:1;">0</p>
-            </div>
-          </div>
-        </div>
-        <div id="viewJournalNotesWrap" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:14px;">
-          <p style="font-size:9px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;">Catatan Tambahan</p>
-          <p id="viewJournalNotes" style="color:#78350F;font-size:13px;font-style:italic;line-height:1.5;white-space:pre-wrap;word-break:break-word;">-</p>
-        </div>
-        <div id="viewJournalActionRow" style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button id="btnViewJournalEdit" type="button" onclick="editJournalFromView()"
-            style="flex:1 1 120px;padding:11px;border:1.5px solid #FDE68A;border-radius:12px;background:#FFFBEB;color:#92400E;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;"
-            onmouseover="this.style.background='#FEF3C7';" onmouseout="this.style.background='#FFFBEB';">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-            Edit
-          </button>
-          <button id="btnViewJournalDelete" type="button" onclick="deleteJournalFromView()"
-            style="flex:1 1 120px;padding:11px;border:1.5px solid #FECDD3;border-radius:12px;background:#FFF1F2;color:#BE123C;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;display:none;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;"
-            onmouseover="this.style.background='#FFE4E6';" onmouseout="this.style.background='#FFF1F2';">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            Hapus
-          </button>
-          <button onclick="closeViewJournalModal()"
-            style="flex:1 1 120px;padding:11px;border:1.5px solid #E2E8F0;border-radius:12px;background:#F8FAFC;color:#475569;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;display:flex;align-items:center;justify-content:center;gap:6px;"
-            onmouseover="this.style.background='#EEF2FF';this.style.borderColor='#C7D2FE';this.style.color='#4338CA';"
-            onmouseout="this.style.background='#F8FAFC';this.style.borderColor='#E2E8F0';this.style.color='#475569';">
-            Tutup
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="allowanceModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAllowanceModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-emerald-500 to-green-600 px-5 sm:px-6 py-4 flex items-center gap-3 flex-shrink-0">
-        <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <h3 class="text-white font-bold truncate" id="allowanceModalTitle">Tambah Tunjangan</h3>
-          <p class="text-emerald-100 text-xs">Tunjangan tetap per guru per jenis tugas</p>
-        </div>
-        <button type="button" onclick="closeAllowanceModal()" aria-label="Tutup"
-          class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <form id="formAllowance" onsubmit="event.preventDefault(); submitAllowance();" class="flex flex-col flex-1 min-h-0">
-        <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-          <input type="hidden" id="inpAllowanceId">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Tugas / Tunjangan <span class="text-red-500">*</span></label>
-            <input type="text" id="inpDutyName" list="dutySuggestions" maxlength="60" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition" placeholder="Contoh: Wali Kelas 7A, Pembina OSIS...">
-            <datalist id="dutySuggestions"></datalist>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Penerima <span class="text-red-500">*</span></label>
-            <select id="inpDutyTeacher" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"></select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nominal Tunjangan <span class="text-red-500">*</span></label>
-            <div class="relative">
-              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">Rp</span>
-              <input type="number" id="inpDutyAmount" min="0" oninput="_settingsPreviewAllowance()"
-                class="w-full pl-10 pr-3 border border-slate-200 rounded-xl py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition" placeholder="Contoh: 150000">
-            </div>
-            <p id="allowanceAmountPreview" class="hidden text-xs text-emerald-700 font-bold mt-1.5">—</p>
-          </div>
-        </div>
-        <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-          <button type="button" onclick="closeAllowanceModal()" class="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-100 transition active:scale-95">Batal</button>
-          <button type="submit" id="btnSubmitAllowance" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 active:scale-95">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-            Simpan
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-<div id="subjectModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSubjectModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-violet-600 to-purple-600 px-5 sm:px-6 py-4 flex items-center gap-3 flex-shrink-0">
-        <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <h3 class="text-white font-bold truncate" id="subjectModalTitle">Tambah Mata Pelajaran</h3>
-          <p class="text-violet-100 text-xs">Mata pelajaran untuk dipakai di jadwal mengajar</p>
-        </div>
-        <button type="button" onclick="closeSubjectModal()" aria-label="Tutup"
-          class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <form id="formSubject" onsubmit="event.preventDefault(); submitSubject();" class="flex flex-col flex-1 min-h-0">
-        <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-          <input type="hidden" id="inpSubjectId">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Mata Pelajaran <span class="text-red-500">*</span></label>
-            <input type="text" id="inpSubjectName" maxlength="50" oninput="_settingsUpdateSubjectCounter()"
-              class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition" placeholder="Contoh: Matematika, Bahasa Arab...">
-            <p class="text-xs text-slate-400 mt-1 flex items-center justify-between">
-              <span class="flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Tidak peka huruf besar/kecil</span>
-              <span id="subjectCharCounter" class="font-mono">0/50</span>
-            </p>
-          </div>
-        </div>
-        <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-          <button type="button" onclick="closeSubjectModal()" class="flex-1 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-100 transition active:scale-95">Batal</button>
-          <button type="submit" id="btnSubmitSubject" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-sm hover:bg-violet-700 transition shadow-lg shadow-violet-200 active:scale-95">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-            Simpan
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-<div id="forgotModal" class="hidden fixed inset-0 overflow-y-auto" style="z-index: 100000;">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-            <div class="h-1 bg-slate-100">
-                <div id="forgotProgressBar" class="h-1 bg-blue-500 transition-all duration-400" style="width:33%"></div>
-            </div>
-            <div class="p-6 text-center">
-                <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                </div>
-                <div id="forgotStep1">
-                    <h3 class="text-lg font-bold text-slate-800 mb-1">Lupa Password?</h3>
-                    <p class="text-sm text-slate-500 mb-4">Masukkan username Anda untuk melanjutkan verifikasi identitas.</p>
-                    <div class="flex items-center justify-center gap-2 mb-4">
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-blue-600 text-white">1</span>
-                        <div class="w-6 h-0.5 bg-slate-200"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-slate-100 text-slate-400">2</span>
-                        <div class="w-6 h-0.5 bg-slate-200"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-slate-100 text-slate-400">3</span>
-                    </div>
-                    <input type="text" id="inpForgotUsername" placeholder="Masukkan username Anda" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 mb-4 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" autocomplete="off"
-                      onkeydown="if(event.key==='Enter'){ event.preventDefault(); forgotNextStep(); }">
-                    <div class="flex gap-2">
-                        <button onclick="closeForgotModal()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">Batal</button>
-                        <button onclick="forgotNextStep()" id="btnForgotNext" class="flex-1 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">Lanjutkan →</button>
-                    </div>
-                </div>
-                <div id="forgotStepMethod" class="hidden">
-                    <h3 class="text-lg font-bold text-slate-800 mb-1">Pilih Metode Verifikasi</h3>
-                    <p class="text-xs text-slate-400 mb-4">Akun <strong id="txtForgotUsernameMethod" class="text-slate-600"></strong></p>
-                    <div class="flex items-center justify-center gap-2 mb-4">
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-blue-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-blue-600 text-white">2</span>
-                        <div class="w-6 h-0.5 bg-slate-200"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-slate-100 text-slate-400">3</span>
-                    </div>
-                    <div class="space-y-2 text-left mb-4">
-                        <button id="btnMethodSecQ" onclick="forgotChooseMethod('secq')" type="button"
-                          class="w-full border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition flex items-start gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
-                          <div class="w-9 h-9 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093V14m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                          </div>
-                          <div class="min-w-0 flex-1">
-                            <p class="font-bold text-slate-800 text-sm">Pertanyaan Keamanan</p>
-                            <p class="text-xs text-slate-500 mt-0.5" id="txtMethodSecQDesc">Jawab pertanyaan keamanan Anda.</p>
-                          </div>
-                          <svg class="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        </button>
-                        <button id="btnMethodOtp" onclick="forgotChooseMethod('otp')" type="button"
-                          class="w-full border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl px-4 py-3 transition flex items-start gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
-                          <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                          </div>
-                          <div class="min-w-0 flex-1">
-                            <p class="font-bold text-slate-800 text-sm">Kode OTP Email</p>
-                            <p class="text-xs text-slate-500 mt-0.5" id="txtMethodOtpDesc">Kirim kode 6 digit ke email terverifikasi.</p>
-                          </div>
-                          <svg class="w-4 h-4 text-slate-300 flex-shrink-0 mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        </button>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="forgotBackToStep1()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">← Kembali</button>
-                    </div>
-                </div>
-                <div id="forgotStep2" class="hidden">
-                    <h3 class="text-lg font-bold text-slate-800 mb-1">Verifikasi Identitas</h3>
-                    <p class="text-xs text-slate-400 mb-4">Jawab pertanyaan keamanan untuk akun <strong id="txtForgotUsername" class="text-slate-600"></strong></p>
-                    <div class="flex items-center justify-center gap-2 mb-4">
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-blue-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-blue-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-blue-600 text-white">3</span>
-                    </div>
-                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-3 text-left">
-                        <p class="text-xs text-slate-400 mb-1 font-medium uppercase tracking-wide">Pertanyaan Keamanan</p>
-                        <p id="txtSecurityQuestion" class="text-sm font-semibold text-slate-700 leading-snug"></p>
-                    </div>
-                    <input type="text" id="inpSecurityAnswerForgot" placeholder="Tulis jawaban Anda di sini" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 mb-1 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" autocomplete="off"
-                      onkeydown="if(event.key==='Enter'){ event.preventDefault(); submitForgotAction(); }">
-                    <p class="text-xs text-slate-400 mb-4">Jawaban tidak peka huruf besar/kecil</p>
-                    <div class="flex gap-2">
-                        <button onclick="forgotBackToMethod()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">← Kembali</button>
-                        <button onclick="submitForgotAction()" id="btnSubmitForgot" class="flex-1 py-2.5 text-sm bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">Verifikasi</button>
-                    </div>
-                </div>
-                <div id="forgotStep3Otp" class="hidden">
-                    <h3 class="text-lg font-bold text-slate-800 mb-1">Verifikasi Kode OTP</h3>
-                    <p class="text-xs text-slate-400 mb-4">Kode OTP dikirim ke <strong id="txtForgotOtpEmail" class="text-slate-600">—</strong></p>
-                    <div class="flex items-center justify-center gap-2 mb-4">
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-blue-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-blue-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-amber-500 text-white">3</span>
-                    </div>
-                    <input type="text" inputmode="numeric" maxlength="6" id="inpForgotOtp" placeholder="••••••" class="w-full border border-slate-200 rounded-xl px-4 py-3 mb-1 text-center text-lg font-mono font-bold tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-amber-300" autocomplete="one-time-code"
-                      oninput="this.value = this.value.replace(/\\D/g,'').slice(0,6); if(this.value.length===6){ var b=document.getElementById('btnSubmitForgotOtp'); if(b && !b.disabled){ b.classList.add('ring-2','ring-amber-300'); } } else { var b=document.getElementById('btnSubmitForgotOtp'); if(b){ b.classList.remove('ring-2','ring-amber-300'); } }"
-                      onkeydown="if(event.key==='Enter' && this.value.length===6){ event.preventDefault(); submitForgotOtpAction(); }">
-                    <div class="flex items-center justify-between text-[11px] gap-2 flex-wrap mt-1 mb-4">
-                        <p class="text-slate-400">Kode berlaku 10 menit</p>
-                        <button type="button" id="btnForgotResendOtp" onclick="forgotRequestOtp(true)" class="text-amber-600 hover:text-amber-800 font-bold transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>Kirim ulang</button>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="forgotBackToMethod()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">← Kembali</button>
-                        <button onclick="submitForgotOtpAction()" id="btnSubmitForgotOtp" class="flex-1 py-2.5 text-sm bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition">Verifikasi</button>
-                    </div>
-                </div>
-                <div id="forgotStepFinal" class="hidden text-left">
-                    <h3 class="text-lg font-bold text-slate-800 mb-1 text-center">Buat Password Baru</h3>
-                    <p class="text-xs text-slate-400 mb-4 text-center">Akun <strong id="txtForgotUsernameFinal" class="text-slate-600"></strong></p>
-                    <div class="flex items-center justify-center gap-2 mb-4">
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-green-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-green-500 text-white">✓</span>
-                        <div class="w-6 h-0.5 bg-green-400"></div>
-                        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-emerald-500 text-white">✓</span>
-                    </div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Password Baru</label>
-                    <div class="relative mb-1">
-                      <input type="password" id="inpForgotNewPass" placeholder="Min. 8 karakter" autocomplete="new-password"
-                        class="w-full border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                        oninput="forgotEvalPassword()">
-                      <button type="button" onclick="forgotTogglePassVis('inpForgotNewPass', this)" tabindex="-1"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 transition" aria-label="Toggle visibility">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                      </button>
-                    </div>
-                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
-                      <div id="forgotPassStrengthBar" class="h-full transition-all duration-300" style="width:0%; background:#E2E8F0;"></div>
-                    </div>
-                    <p id="forgotPassStrengthLabel" class="text-[11px] font-semibold text-slate-400 mb-3">Kekuatan: —</p>
-                    <ul id="forgotPassChecklist" class="text-[11px] grid grid-cols-2 gap-x-3 gap-y-1 mb-4">
-                      <li data-rule="length"  class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Min. 8 karakter</li>
-                      <li data-rule="upper"   class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Huruf besar</li>
-                      <li data-rule="lower"   class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Huruf kecil</li>
-                      <li data-rule="digit"   class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Angka</li>
-                      <li data-rule="symbol"  class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Karakter khusus</li>
-                      <li data-rule="noident" class="flex items-center gap-1.5 text-slate-400"><span class="rule-dot w-1.5 h-1.5 rounded-full bg-slate-300"></span>Tidak memuat username</li>
-                    </ul>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Konfirmasi Password Baru</label>
-                    <div class="relative mb-1">
-                      <input type="password" id="inpForgotConfirmPass" placeholder="Ulangi password baru" autocomplete="new-password"
-                        class="w-full border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                        oninput="forgotEvalPassword()"
-                        onkeydown="if(event.key==='Enter'){ event.preventDefault(); submitForgotNewPassword(); }">
-                      <button type="button" onclick="forgotTogglePassVis('inpForgotConfirmPass', this)" tabindex="-1"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 transition" aria-label="Toggle visibility">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                      </button>
-                    </div>
-                    <p id="forgotConfirmHint" class="text-[11px] text-slate-400 mb-4">Masukkan password yang sama persis.</p>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="closeForgotModal()" class="flex-1 py-2.5 text-sm text-slate-500 hover:bg-slate-50 rounded-xl border border-slate-200 transition">Batal</button>
-                        <button type="button" onclick="submitForgotNewPassword()" id="btnSubmitNewPass" class="flex-1 py-2.5 text-sm bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>Simpan Password</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="subModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);" onclick="closeSubModal()"></div>
-        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" style="box-shadow:0 24px 64px rgba(0,0,0,0.22);">
-            <div id="subModalHeader" style="background:linear-gradient(135deg,#B45309 0%,#D97706 50%,#F59E0B 100%);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-              <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
-                <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                  <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                </div>
-                <div style="min-width:0;flex:1;">
-                  <h3 id="subModalTitle" style="color:white;font-weight:800;font-size:16px;font-family:'DM Sans',sans-serif;line-height:1.2;">Tugaskan Guru Pengganti</h3>
-                  <p id="subModalSubtitle" style="color:rgba(255,255,255,0.85);font-size:11.5px;font-family:'DM Sans',sans-serif;margin-top:2px;">Pilih guru yang akan menggantikan tugas ini.</p>
-                </div>
-              </div>
-              <button type="button" onclick="closeSubModal()" aria-label="Tutup"
-                style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.16);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;flex-shrink:0;"
-                onmouseover="this.style.background='rgba(255,255,255,0.28)';" onmouseout="this.style.background='rgba(255,255,255,0.16)';">
-                <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <div style="padding:18px 22px 20px;font-family:'DM Sans',sans-serif;">
-              <div id="subModalDetailCard" style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:11px 14px;margin-bottom:14px;">
-                <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:4px;" id="subModalDetailLabel">Konteks</p>
-                <p id="txtSubDetails" style="font-weight:700;color:#1E293B;font-size:13px;word-break:break-word;line-height:1.45;">...</p>
-              </div>
-              <input type="hidden" id="inpSubScheduleId">
-              <input type="hidden" id="inpIsCeremonySub">
-              <input type="hidden" id="inpIsPicketSub">
-              <div style="margin-bottom:14px;">
-                <label for="inpSubTeacher" style="display:block;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Pilih Guru Pengganti <span style="color:#F43F5E;">*</span></label>
-                <select id="inpSubTeacher" style="width:100%;padding:10px 12px;border:1.5px solid #DDE1F0;border-radius:10px;font-size:13.5px;font-family:'DM Sans',sans-serif;background:#fff;color:#1E293B;outline:none;transition:border-color 0.15s,box-shadow 0.15s;"></select>
-                <p id="subTeacherHint" style="font-size:11px;color:#94A3B8;margin-top:5px;font-weight:500;">Daftar tidak menyertakan guru yang sedang ditugaskan pada konteks ini.</p>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button type="button" onclick="closeSubModal()"
-                  style="flex:1 1 110px;padding:11px;border:1.5px solid #E2E8F0;border-radius:11px;background:#F8FAFC;color:#475569;font-weight:700;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;"
-                  onmouseover="this.style.background='#F1F5F9';" onmouseout="this.style.background='#F8FAFC';">
-                  Batal
-                </button>
-                <button id="btnSubmitSubstitute" type="button" onclick="submitSubstitute()"
-                  style="flex:1 1 150px;padding:11px;border:none;border-radius:11px;background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;font-weight:800;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:box-shadow 0.18s,opacity 0.18s;box-shadow:0 4px 12px rgba(217,119,6,0.30);display:flex;align-items:center;justify-content:center;gap:6px;">
-                  <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                  <span id="lblSubmitSubstitute">Tetapkan Pengganti</span>
-                </button>
-              </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="rekapKelasModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapKelasModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
-      <div class="bg-gradient-to-r from-violet-600 to-purple-700 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3 min-w-0 flex-1">
-            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-white font-bold text-lg truncate">Rekap Jadwal per Kelas</h3>
-              <p class="text-violet-200 text-xs">Ringkasan semua jadwal dikelompokkan berdasarkan kelas</p>
-            </div>
-          </div>
-          <button onclick="closeRekapKelasModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-3" id="rekapKelasStats"></div>
-        <div class="mt-3 relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input type="text" id="rekapKelasSearch" oninput="_rekapFilter('rekapKelasBody', this.value)" placeholder="Cari kelas, guru, atau mapel..."
-            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
-        </div>
-      </div>
-      <div id="rekapKelasBody" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar"></div>
-      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
-        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
-        <button id="btnDlRekapKelas" onclick="downloadRekapDirectPDF('rekapKelasBody', 'Rekap_Jadwal_per_Kelas', this)"
-          class="ml-auto inline-flex items-center gap-2 bg-violet-600 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-violet-700 active:scale-95 transition shadow-md shadow-violet-200">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Unduh PDF
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="rekapGuruModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapGuruModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
-      <div class="bg-gradient-to-r from-teal-600 to-emerald-600 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3 min-w-0 flex-1">
-            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-white font-bold text-lg truncate">Rekap Jadwal per Guru</h3>
-              <p class="text-teal-100 text-xs">Ringkasan jadwal dikelompokkan per guru pengampu</p>
-            </div>
-          </div>
-          <button onclick="closeRekapGuruModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-3" id="rekapGuruStats"></div>
-        <div class="mt-3 relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input type="text" id="rekapGuruSearch" oninput="_rekapFilter('rekapGuruBody', this.value)" placeholder="Cari guru, kelas, atau mapel..."
-            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
-        </div>
-      </div>
-      <div id="rekapGuruBody" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar"></div>
-      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
-        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
-        <button id="btnDlRekapGuru" onclick="downloadRekapDirectPDF('rekapGuruBody', 'Rekap_Jadwal_per_Guru', this)"
-          class="ml-auto inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-teal-700 active:scale-95 transition shadow-md shadow-teal-200">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Unduh PDF
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="rekapHariModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapHariModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-      <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3 min-w-0 flex-1">
-            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-white font-bold text-lg truncate">Rekap Jadwal per Hari</h3>
-              <p class="text-amber-100 text-xs">Ringkasan jadwal dikelompokkan per hari</p>
-            </div>
-          </div>
-          <button onclick="closeRekapHariModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-3" id="rekapHariStats"></div>
-        <div class="mt-3 relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input type="text" id="rekapHariSearch" oninput="_rekapFilter('rekapHariBody', this.value)" placeholder="Cari hari, guru, kelas, atau mapel..."
-            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
-        </div>
-      </div>
-      <div id="rekapHariBody" class="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar"></div>
-      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
-        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
-        <button id="btnDlRekapHari" onclick="downloadRekapDirectPDF('rekapHariBody', 'Rekap_Jadwal_per_Hari', this)"
-          class="ml-auto inline-flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-amber-600 active:scale-95 transition shadow-md shadow-amber-200">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Unduh PDF
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="rekapKelasHariModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeRekapKelasHariModal()"></div>
-    <div class="relative bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-      <div class="bg-gradient-to-r from-sky-600 to-cyan-600 px-5 sm:px-6 py-4 sm:py-5 flex-shrink-0">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3 min-w-0 flex-1">
-            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-white font-bold text-lg truncate">Rekap Kelas × Hari</h3>
-              <p class="text-sky-100 text-xs">Jadwal tiap kelas diurutkan per hari</p>
-            </div>
-          </div>
-          <button onclick="closeRekapKelasHariModal()" aria-label="Tutup" class="text-white/70 hover:text-white active:scale-95 transition p-2 rounded-xl hover:bg-white/10 flex-shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="mt-4 flex flex-wrap gap-3" id="rekapKelasHariStats"></div>
-        <div class="mt-3 relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input type="text" id="rekapKelasHariSearch" oninput="_rekapFilter('rekapKelasHariBody', this.value)" placeholder="Cari kelas, hari, guru, atau mapel..."
-            class="w-full pl-9 pr-3 py-2 text-xs rounded-lg bg-white/10 border border-white/15 text-white placeholder:text-white/50 focus:bg-white/20 focus:border-white/30 outline-none transition">
-        </div>
-      </div>
-      <div id="rekapKelasHariBody" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar"></div>
-      <div class="px-5 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0 gap-3">
-        <p class="text-xs text-slate-400 hidden sm:block">Data dari jadwal aktif</p>
-        <button id="btnDlRekapKelasHari" onclick="downloadRekapDirectPDF('rekapKelasHariBody', 'Rekap_Jadwal_per_Kelas_per_Hari', this)"
-          class="ml-auto inline-flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm hover:bg-sky-700 active:scale-95 transition shadow-md shadow-sky-200">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Unduh PDF
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="slipModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="slipModalTitle">
-  <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity slip-modal-backdrop" onclick="closeSlipModal()"></div>
-  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col slip-modal-panel" style="max-height:92vh;">
-    <div class="bg-white border-b border-slate-200 px-5 sm:px-6 py-3.5 flex justify-between items-center z-10 rounded-t-2xl flex-shrink-0 gap-3 sticky top-0">
-      <div class="flex items-center gap-3 min-w-0 flex-1">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-        </div>
-        <div class="min-w-0 flex-1">
-          <h3 id="slipModalTitle" class="text-base font-bold text-slate-800 leading-tight truncate">Slip Honorarium</h3>
-          <p id="slipModalSubtitle" class="text-xs text-slate-400 mt-0.5 truncate"></p>
-        </div>
-      </div>
-      <button onclick="closeSlipModal()" type="button" aria-label="Tutup"
-        class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center text-slate-500 hover:text-slate-700 flex-shrink-0">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-    <div id="slipContent" class="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-50/40">
-      <div class="flex items-center justify-center gap-3 py-12">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span class="text-slate-500 font-medium">Memuat slip honorarium...</span>
-      </div>
-    </div>
-    <div class="bg-white border-t border-slate-200 px-5 sm:px-6 py-3 flex justify-between items-center gap-3 z-10 rounded-b-2xl flex-shrink-0 flex-wrap sticky bottom-0">
-      <p class="text-xs text-slate-400 hidden sm:block">
-        <svg class="inline w-3.5 h-3.5 -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        Data slip bersumber dari arsip yang telah difinalisasi
-      </p>
-      <div class="flex items-center gap-2 ml-auto">
-        <button onclick="closeSlipModal()" type="button"
-          class="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 hover:border-slate-300 rounded-lg transition active:scale-95">
-          Tutup
-        </button>
-        <button onclick="exportSlipToPDF()" id="btnExportSlipPDF" type="button"
-          class="hidden items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 active:scale-95 transition shadow-sm hover:shadow-md">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          Unduh PDF
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="examBapModal" class="hidden fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="examBapModalTitle">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="gExam_closeBapModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]">
-      <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="gExam_closeBapModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/12 hover:bg-white/22 active:scale-95 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-          </div>
-          <div class="flex-1 min-w-0 pr-8">
-            <h3 class="text-white font-bold text-lg" id="examBapModalTitle">Isi BAP Pengawas Ujian</h3>
-            <p class="text-blue-100 text-xs mt-0.5" id="examBapModalSub">Berita Acara Pelaksanaan</p>
-          </div>
-        </div>
-        <div id="examBapStatusBadge" class="hidden mt-3 inline-flex items-center gap-1.5 bg-white/15 border border-white/20 rounded-full px-2.5 py-1 text-[11px] font-bold text-white">
-          <span id="examBapStatusBadgeDot" class="w-1.5 h-1.5 rounded-full bg-white"></span>
-          <span id="examBapStatusBadgeLabel">—</span>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-b border-slate-200 px-5 sm:px-6 py-3 sm:py-4 grid grid-cols-2 gap-3 flex-shrink-0">
-        <div>
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            Tanggal
-          </p>
-          <p class="text-sm font-semibold text-slate-700" id="examBapInfoDate">—</p>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Sesi
-          </p>
-          <p class="text-sm font-semibold text-slate-700" id="examBapInfoSession">—</p>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-            Ruang
-          </p>
-          <p class="text-sm font-semibold text-slate-700" id="examBapInfoRoom">—</p>
-        </div>
-        <div>
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-            Mata Ujian
-          </p>
-          <p class="text-sm font-semibold text-slate-700" id="examBapInfoSubject">—</p>
-        </div>
-      </div>
-      <input type="hidden" id="inpBapSupervisorId">
-      <div class="p-5 sm:p-6 pb-32 sm:pb-6 space-y-4 overflow-y-auto flex-1">
-        <!-- Skeleton Loading -->
-        <div id="examBapSkeleton" class="hidden space-y-4">
-          <div class="grid grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <div class="skeleton h-4 w-24 mb-1.5 rounded"></div>
-              <div class="skeleton h-10 w-full rounded-xl"></div>
-            </div>
-            <div>
-              <div class="skeleton h-4 w-24 mb-1.5 rounded"></div>
-              <div class="skeleton h-10 w-full rounded-xl"></div>
-            </div>
-          </div>
-          <div class="skeleton h-16 w-full rounded-xl"></div>
-          <div>
-            <div class="skeleton h-4 w-32 mb-1.5 rounded"></div>
-            <div class="skeleton h-20 w-full rounded-xl"></div>
-          </div>
-        </div>
-        <!-- Content BAP (akan disembunyikan saat loading) -->
-        <div id="examBapContent" class="space-y-4">
-        <div class="grid grid-cols-2 gap-3 sm:gap-4">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Peserta Hadir <span class="text-red-500">*</span>
-            </label>
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="adjustNumberInput('inpBapHadir',-1)" tabindex="-1"
-                class="w-9 h-10 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-200 active:scale-95 text-slate-600 font-bold text-base transition flex-shrink-0">−</button>
-              <input id="inpBapHadir" type="number" min="0" max="200" placeholder="0"
-                inputmode="numeric"
-                oninput="updateBapTotalIndicator()"
-                class="db-modal-input w-full border border-slate-200 rounded-xl px-2 py-2.5 text-base font-bold text-center text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none">
-              <button type="button" onclick="adjustNumberInput('inpBapHadir',1)" tabindex="-1"
-                class="w-9 h-10 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 font-bold text-base transition flex-shrink-0">+</button>
-            </div>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Peserta Absen <span class="text-red-500">*</span>
-            </label>
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="adjustNumberInput('inpBapAbsen',-1)" tabindex="-1"
-                class="w-9 h-10 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-200 active:scale-95 text-slate-600 font-bold text-base transition flex-shrink-0">−</button>
-              <input id="inpBapAbsen" type="number" min="0" max="200" placeholder="0"
-                inputmode="numeric"
-                oninput="updateBapTotalIndicator()"
-                class="db-modal-input w-full border border-slate-200 rounded-xl px-2 py-2.5 text-base font-bold text-center text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none">
-              <button type="button" onclick="adjustNumberInput('inpBapAbsen',1)" tabindex="-1"
-                class="w-9 h-10 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-700 font-bold text-base transition flex-shrink-0">+</button>
-            </div>
-          </div>
-        </div>
-        <div id="bapTotalIndicator" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3">
-          <div class="flex items-center justify-between text-xs font-semibold text-indigo-700 mb-1.5">
-            <span>Total peserta tercatat: <strong id="bapTotalCount" class="font-extrabold font-mono">0</strong></span>
-            <span id="bapAttendanceRate" class="font-mono font-extrabold text-indigo-800">0%</span>
-          </div>
-          <div class="flex h-1.5 rounded-full overflow-hidden bg-indigo-100">
-            <span id="bapHadirBar" class="bg-emerald-500 block h-full" style="width:0%; transition: width 0.25s ease;"></span>
-            <span id="bapAbsenBar" class="bg-rose-500 block h-full" style="width:0%; transition: width 0.25s ease;"></span>
-          </div>
-        </div>
-        <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Catatan Kejadian Khusus <span class="text-slate-400 font-normal">(opsional)</span>
-            </label>
-            <span id="bapCatatanCounter" class="text-[10px] font-mono font-semibold text-slate-400">0/300</span>
-          </div>
-          <textarea id="inpBapCatatan" rows="3" maxlength="300"
-            oninput="updateBapCatatanCounter()"
-            placeholder="Tuliskan jika ada insiden, kecurangan, atau hal khusus..."
-            class="db-modal-textarea w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
-        </div>
-        <div id="examBapReadOnlyMsg" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 font-medium flex items-start gap-2">
-          <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
-          <span id="examBapReadOnlyMsgText">—</span>
-        </div>
-        </div>
-        <!-- End of examBapContent -->
-      </div>
-      <div id="examBapActions" class="px-5 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/60 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="gExam_closeBapModal()"
-          class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 active:scale-95 rounded-xl font-semibold text-sm transition">Tutup</button>
-        <button type="button" onclick="gExam_submitBap()" id="btnSubmitBap"
-          class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition shadow-md flex items-center justify-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          Submit BAP
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<style>
-  #msDetailModal .ms-detail-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px; margin-bottom: 10px;
-  }
-  #msDetailModal .ms-detail-grid > div { min-width: 0; }
-  #msDetailModal .ms-detail-grid p { word-break: break-word; }
-  @media (max-width: 360px) {
-    #msDetailModal .ms-detail-grid { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 480px) {
-    #msDetailModal > div > .relative > div:first-child { padding: 14px 16px !important; }
-    #msDetailModal > div > .relative > div:last-child { padding: 14px 16px 16px !important; }
-  }
-</style>
-<div id="msDetailModal" class="hidden fixed inset-0 z-[60] overflow-y-auto">
-  <div class="flex items-center justify-center min-h-screen p-4">
-    <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.65);" onclick="closeMyScheduleDetailModal()"></div>
-    <div class="relative w-full max-w-md overflow-hidden" style="background:#fff;border-radius:24px;box-shadow:0 24px 64px rgba(0,0,0,0.22);">
-      <div style="background:linear-gradient(135deg,#0F172A 0%,#1E3A5F 100%);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;">
-            <svg width="17" height="17" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          </div>
-          <div>
-            <h3 style="color:white;font-weight:800;font-size:15px;font-family:'DM Sans',sans-serif;">Detail Jadwal</h3>
-            <p style="color:rgba(148,163,184,0.8);font-size:11px;font-family:'DM Sans',sans-serif;margin-top:1px;">Rincian sesi mengajar</p>
-          </div>
-        </div>
-        <button onclick="closeMyScheduleDetailModal()" aria-label="Tutup"
-          style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.08);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;"
-          onmouseover="this.style.background='rgba(255,255,255,0.18)';" onmouseout="this.style.background='rgba(255,255,255,0.08)';">
-          <svg width="16" height="16" fill="none" stroke="rgba(203,213,225,0.9)" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div style="padding:18px 22px 20px;font-family:'DM Sans',sans-serif;">
-        <div class="ms-detail-grid">
-          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;">
-            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Hari</p>
-            <p id="msDetailDay" style="font-weight:700;color:#1E293B;font-size:13.5px;">—</p>
-          </div>
-          <div style="background:#F7F8FC;border:1px solid #E8EAF0;border-radius:12px;padding:10px 12px;">
-            <p style="font-size:9px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Jam</p>
-            <p id="msDetailTime" style="font-weight:700;color:#1E293B;font-size:13.5px;font-family:'JetBrains Mono',monospace;">—</p>
-          </div>
-        </div>
-        <div style="background:linear-gradient(135deg,#EEF2FF,#E0E7FF);border:1px solid #C7D2FE;border-radius:12px;padding:11px 14px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:32px;height:32px;background:#4F46E5;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              <svg width="15" height="15" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-            </div>
-            <div style="flex:1;min-width:0;">
-              <p style="font-size:9px;font-weight:700;color:#818CF8;text-transform:uppercase;letter-spacing:0.07em;">Mata Pelajaran</p>
-              <p id="msDetailSubject" style="font-weight:700;color:#312E81;font-size:14px;margin-top:1px;word-break:break-word;">—</p>
-            </div>
-          </div>
-        </div>
-        <div class="ms-detail-grid">
-          <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:11px 14px;text-align:center;">
-            <p style="font-size:9px;font-weight:700;color:#3B82F6;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Kelas</p>
-            <p id="msDetailClass" style="font-weight:800;color:#1D4ED8;font-size:18px;word-break:break-word;">—</p>
-          </div>
-          <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:12px;padding:11px 14px;text-align:center;">
-            <p style="font-size:9px;font-weight:700;color:#10B981;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">JTM</p>
-            <p id="msDetailJtm" style="font-weight:800;color:#059669;font-size:18px;font-family:'JetBrains Mono',monospace;">0</p>
-          </div>
-        </div>
-        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:10px 14px;margin-bottom:14px;text-align:center;">
-          <p style="font-size:9px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Durasi Sesi</p>
-          <p id="msDetailDuration" style="font-weight:700;color:#78350F;font-size:13px;">—</p>
-        </div>
-        <div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:11.5px;color:#0369A1;line-height:1.5;">
-          <strong>💡 Info:</strong> Anda dapat mengisi jurnal mengajar pada hari sesi ini berlangsung melalui halaman <strong>Dashboard</strong>, minimal 5 menit setelah jam pelajaran selesai.
-        </div>
-        <button onclick="closeMyScheduleDetailModal()"
-          style="width:100%;padding:11px;border:1.5px solid #E2E8F0;border-radius:12px;background:#F8FAFC;color:#475569;font-weight:700;font-size:13.5px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background 0.15s;"
-          onmouseover="this.style.background='#EEF2FF';this.style.borderColor='#C7D2FE';this.style.color='#4338CA';"
-          onmouseout="this.style.background='#F8FAFC';this.style.borderColor='#E2E8F0';this.style.color='#475569';">
-          Tutup
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<style>
-  #annModal {
-    z-index: 70;
-  }
-  #annModal .ann-card {
-    width: 100%;
-    max-width: 560px;
-    background: #fff;
-    border-radius: 22px;
-    overflow: hidden;
-    box-shadow: 0 30px 80px -20px rgba(15,23,42,0.55), 0 0 0 1px rgba(15,23,42,0.04);
-    transform: translateY(20px) scale(0.97);
-    opacity: 0;
-    transition: transform 0.32s cubic-bezier(0.34,1.56,0.64,1), opacity 0.22s ease;
-  }
-  #annModal.is-open .ann-card { transform: translateY(0) scale(1); opacity: 1; }
-  #annModal .ann-header {
-    position: relative;
-    padding: 22px 24px;
-    color: #fff;
-    overflow: hidden;
-  }
-  #annModal .ann-header::before {
-    content: ''; position: absolute; inset: -40% -20% auto auto;
-    width: 240px; height: 240px;
-    background: radial-gradient(closest-side, rgba(255,255,255,0.18), transparent 70%);
-    pointer-events: none;
-  }
-  #annModal .ann-header > * { position: relative; z-index: 1; }
-  #annModal .ann-header[data-severity="info"]     { background: linear-gradient(135deg,#3B82F6 0%,#1E40AF 100%); }
-  #annModal .ann-header[data-severity="success"]  { background: linear-gradient(135deg,#10B981 0%,#047857 100%); }
-  #annModal .ann-header[data-severity="warning"]  { background: linear-gradient(135deg,#F59E0B 0%,#B45309 100%); }
-  #annModal .ann-header[data-severity="critical"] { background: linear-gradient(135deg,#EF4444 0%,#991B1B 100%); }
-  #annModal .ann-icon {
-    width: 44px; height: 44px; border-radius: 14px;
-    background: rgba(255,255,255,0.2);
-    display:inline-flex; align-items:center; justify-content:center;
-    backdrop-filter: blur(6px);
-  }
-  #annModal .ann-eyebrow {
-    font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    font-weight: 700; opacity: 0.9; margin-bottom: 6px;
-  }
-  #annModal .ann-title {
-    font-size: 18px; font-weight: 800; line-height: 1.25;
-    word-break: break-word;
-  }
-  #annModal .ann-meta {
-    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
-  }
-  #annModal .ann-chip {
-    display:inline-flex; align-items:center; gap:6px;
-    background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.25);
-    color: #fff; font-size: 11px; font-weight: 600;
-    padding: 4px 10px; border-radius: 999px;
-  }
-  #annModal .ann-body {
-    padding: 22px 24px; max-height: 50vh; overflow-y: auto;
-    color: #334155; font-size: 14px; line-height: 1.65;
-  }
-  #annModal .ann-body p { margin: 0 0 10px; }
-  #annModal .ann-body a { color: #2563EB; text-decoration: underline; }
-  #annModal .ann-body ul, #annModal .ann-body ol { margin: 6px 0 12px 22px; padding-left: 4px; }
-  #annModal .ann-body ul { list-style-type: disc; }
-  #annModal .ann-body ul ul { list-style-type: circle; margin-top: 4px; margin-bottom: 4px; }
-  #annModal .ann-body ol { list-style-type: decimal; }
-  #annModal .ann-body ol ol { list-style-type: lower-alpha; margin-top: 4px; margin-bottom: 4px; }
-  #annModal .ann-body li { margin: 4px 0; display: list-item; }
-  #annModal .ann-body strong { color: #0F172A; }
-  #annModal .ann-body code {
-    background: #F1F5F9; padding: 1px 6px; border-radius: 4px;
-    font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px;
-  }
-  #annModal .ann-footer {
-    padding: 14px 24px 18px;
-    border-top: 1px solid #F1F5F9;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 10px; flex-wrap: wrap;
-    background: #FAFBFC;
-  }
-  #annModal .ann-counter {
-    font-size: 11px; color: #94A3B8; font-weight: 600;
-  }
-  #annModal .ann-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  #annModal .ann-btn {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 9px 16px; border-radius: 12px;
-    font-size: 13px; font-weight: 700;
-    border: 1px solid transparent; cursor: pointer;
-    transition: all 0.15s ease;
-  }
-  #annModal .ann-btn:active { transform: scale(0.97); }
-  #annModal .ann-btn-primary {
-    background: linear-gradient(135deg,#4F46E5,#3B82F6);
-    color: #fff;
-    box-shadow: 0 6px 16px -4px rgba(79,70,229,0.45);
-  }
-  #annModal .ann-btn-primary:hover {
-    box-shadow: 0 10px 24px -6px rgba(79,70,229,0.55);
-    transform: translateY(-1px);
-  }
-  #annModal .ann-btn-ghost {
-    background: #fff; color: #475569; border-color: #E2E8F0;
-  }
-  #annModal .ann-btn-ghost:hover { background: #F1F5F9; color: #1E293B; }
-  #annModal .ann-btn-prev,
-  #annModal .ann-btn-next {
-    background: #fff; color: #475569; border-color: #E2E8F0;
-    width: 38px; height: 38px; padding: 0; justify-content: center;
-  }
-  #annModal .ann-btn-prev:hover,
-  #annModal .ann-btn-next:hover { background: #EEF2FF; color: #4F46E5; }
-  #annModal .ann-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
-  #annModal .ann-pip-row {
-    display: flex; gap: 6px; align-items: center; justify-content: center;
-    margin-top: 10px;
-  }
-  #annModal .ann-pip {
-    width: 6px; height: 6px; border-radius: 999px; background: #CBD5E1;
-    transition: width 0.2s, background 0.2s;
-  }
-  #annModal .ann-pip.is-active { width: 24px; background: #4F46E5; }
-  #annModal .ann-close-x {
-    position: absolute; top: 14px; right: 14px;
-    width: 32px; height: 32px; border-radius: 999px;
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.25);
-    display: inline-flex; align-items: center; justify-content: center;
-    color: #fff; cursor: pointer; transition: background 0.15s;
-    z-index: 2;
-  }
-  #annModal .ann-close-x:hover { background: rgba(255,255,255,0.32); }
-  #annModal .ann-preview-banner {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 16px;
-    background: linear-gradient(90deg, #FDE68A 0%, #FCD34D 100%);
-    color: #78350F;
-    font-size: 11.5px; font-weight: 700;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid rgba(120,53,15,0.2);
-  }
-  #annModal .ann-preview-banner svg { flex-shrink: 0; }
-  @media (max-width: 480px) {
-    #annModal .ann-card { border-radius: 18px 18px 0 0; max-width: 100%; }
-    #annModal .ann-body { max-height: 55vh; padding: 18px 20px; }
-    #annModal .ann-footer { padding: 12px 18px 16px; }
-  }
-</style>
-<div id="annModal" class="hidden fixed inset-0 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="annTitle" aria-describedby="annBody">
-  <div class="fixed inset-0 backdrop-blur-sm" id="annBackdrop" style="background:rgba(15,23,42,0.6);"></div>
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4 relative">
-    <div class="ann-card">
-      <div id="annPreviewBadge" class="ann-preview-banner hidden" style="display:none;">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-        <span>MODE PRATINJAU · Tampilan persis seperti yang dilihat pengguna</span>
-      </div>
-      <div class="ann-header" id="annHeader" data-severity="info">
-        <button type="button" class="ann-close-x" id="annBtnCloseX" onclick="closeAnnouncementModal()" aria-label="Tutup">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3">
-          <div class="ann-icon" id="annIcon">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0 pr-6">
-            <p class="ann-eyebrow" id="annEyebrow">Pengumuman</p>
-            <h3 class="ann-title" id="annTitle">—</h3>
-            <div class="ann-meta" id="annMeta"></div>
-          </div>
-        </div>
-      </div>
-      <div class="ann-body" id="annBody">—</div>
-      <div class="ann-footer">
-        <div class="flex items-center gap-2 flex-wrap">
-          <button type="button" class="ann-btn ann-btn-prev" id="annBtnPrev" onclick="annNav(-1)" aria-label="Sebelumnya">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-          </button>
-          <button type="button" class="ann-btn ann-btn-next" id="annBtnNext" onclick="annNav(1)" aria-label="Berikutnya">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-          </button>
-          <span class="ann-counter" id="annCounter">1 / 1</span>
-        </div>
-        <div class="ann-actions">
-          <a id="annBtnCta" class="ann-btn ann-btn-ghost hidden" target="_blank" rel="noopener noreferrer" style="display:none;">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-            <span id="annBtnCtaLbl">Buka</span>
-          </a>
-          <button type="button" class="ann-btn ann-btn-primary" id="annBtnAck" onclick="annAcknowledge()">
-            <span id="annBtnAckLbl">Mengerti</span>
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="ann-pip-row" id="annPips" style="padding:0 18px 14px;"></div>
-    </div>
-  </div>
-</div>
-  <div id="attendanceModals">
-    <!-- Modal Set Jam Jadwal -->
-    <div id="attendanceSetJadwalModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSetJadwalModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
-            <h3 class="text-white font-bold text-lg">Set Jam Jadwal</h3>
-            <p class="text-blue-100 text-xs">Atur jam masuk dan pulang untuk <span id="lblSetJadwalUserName" class="font-bold"></span></p>
-          </div>
-          <form onsubmit="event.preventDefault(); submitSetJadwal();" class="p-6 space-y-4">
-            <input type="hidden" id="inpSetJadwalUserId">
-            <div class="flex gap-4">
-              <div class="flex-1">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Masuk</label>
-                <input type="time" id="inpSetJadwalIn" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
-              </div>
-              <div class="flex-1">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang</label>
-                <input type="time" id="inpSetJadwalOut" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
-              </div>
-            </div>
-            <div class="flex gap-3 pt-2">
-              <button type="button" onclick="closeSetJadwalModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-              <button type="submit" id="btnSubmitSetJadwal" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">Simpan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <!-- Modal Catat Jam Datang -->
-    <div id="attendanceTimeInModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeTimeInModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div class="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-5">
-            <h3 class="text-white font-bold text-lg">Catat Jam Datang</h3>
-            <p class="text-blue-100 text-xs">Untuk <span id="lblTimeInUserName" class="font-bold"></span></p>
-          </div>
-          <form onsubmit="event.preventDefault(); submitTimeIn();" class="p-6 space-y-4">
-            <input type="hidden" id="inpTimeInUserId">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Datang Aktual</label>
-              <input type="time" id="inpTimeIn" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-center focus:ring-2 focus:ring-blue-500 outline-none" required>
-            </div>
-            <div class="flex gap-3 pt-2">
-              <button type="button" onclick="closeTimeInModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-              <button type="submit" id="btnSubmitTimeIn" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">Simpan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <!-- Modal Catat Jam Pulang -->
-    <div id="attendanceTimeOutModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeTimeOutModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-5">
-            <h3 class="text-white font-bold text-lg">Catat Jam Pulang</h3>
-            <p class="text-emerald-100 text-xs">Untuk <span id="lblTimeOutUserName" class="font-bold"></span></p>
-          </div>
-          <form onsubmit="event.preventDefault(); submitTimeOut();" class="p-6 space-y-4">
-            <input type="hidden" id="inpTimeOutUserId">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang Aktual</label>
-              <input type="time" id="inpTimeOut" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-center focus:ring-2 focus:ring-emerald-500 outline-none" required>
-            </div>
-            <div class="flex gap-3 pt-2">
-              <button type="button" onclick="closeTimeOutModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-              <button type="submit" id="btnSubmitTimeOut" class="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition">Simpan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <!-- Modal Detail Kehadiran -->
-    <div id="attendanceDetailModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAttendanceDetailModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div class="bg-gradient-to-r from-slate-700 to-slate-900 px-6 py-5">
-            <h3 class="text-white font-bold text-lg">Detail Kehadiran Manual</h3>
-            <p class="text-slate-300 text-xs">Untuk <span id="lblDetailUserName" class="font-bold"></span></p>
-          </div>
-          <div id="formAttendanceDetailLoading" class="p-8 text-center hidden">
-            <svg class="w-8 h-8 animate-spin mx-auto text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            <p class="text-sm mt-2 text-slate-500">Memuat data...</p>
-          </div>
-          <form id="formAttendanceDetailContent" onsubmit="event.preventDefault(); submitAttendanceDetail();" class="p-6 space-y-4">
-            <input type="hidden" id="inpDetailUserId">
-            <div class="flex gap-4">
-              <div class="flex-1">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Datang</label>
-                <input type="time" id="inpDetailTimeIn" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-              </div>
-              <div class="flex-1">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang</label>
-                <input type="time" id="inpDetailTimeOut" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Status Kehadiran</label>
-              <select id="inpDetailStatus" class="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                <option value="">-- Pilih Status (Kosongkan jika hadir normal) --</option>
-                <option value="Hadir">Hadir</option>
-                <option value="Izin">Izin</option>
-                <option value="Sakit">Sakit</option>
-                <option value="Alpa">Alpa</option>
-              </select>
-              <p class="text-[10px] text-slate-400 mt-1">*Hanya diisi jika guru tidak hadir secara normal.</p>
-            </div>
-            <div class="flex gap-3 pt-2">
-              <button type="button" onclick="closeAttendanceDetailModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-              <button type="submit" id="btnSubmitDetail" class="flex-1 py-2.5 bg-slate-800 text-white rounded-xl font-bold text-sm hover:bg-slate-900 transition">Simpan Perubahan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <!-- Modal Izin Keluar Sementara -->
-    <div id="attendanceLeaveModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeLeaveModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div class="bg-gradient-to-r from-rose-500 to-pink-500 px-6 py-5">
-            <h3 class="text-white font-bold text-lg">Izin Keluar Sementara</h3>
-            <p class="text-rose-100 text-xs mt-0.5">Untuk <span id="lblLeaveModalUserName" class="font-bold"></span></p>
-          </div>
-          <div class="p-5 space-y-4">
-            <!-- Form input entri baru -->
-            <div id="leaveFormSection">
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Catat Izin Baru</p>
-              <div class="flex gap-3 mb-3">
-                <div class="flex-1">
-                  <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Keluar</label>
-                  <input type="time" id="inpLeaveTime" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-center focus:ring-2 focus:ring-rose-500 outline-none">
-                </div>
-                <div class="flex-1">
-                  <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Jam Kembali</label>
-                  <input type="time" id="inpReturnTime" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-center focus:ring-2 focus:ring-rose-500 outline-none">
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Keterangan <span class="text-rose-500">*</span></label>
-                <input type="text" id="inpLeaveReason" maxlength="200" placeholder="Mis: keperluan keluarga, urusan bank..." class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-rose-500 outline-none" required>
-              </div>
-              <button id="btnSubmitLeave" onclick="submitLeave()" class="w-full py-2.5 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition">Simpan Izin Keluar</button>
-            </div>
-            <!-- Daftar izin yang sudah ada -->
-            <div>
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Riwayat Hari Ini</p>
-              <div id="leaveListContainer"></div>
-            </div>
-            <button type="button" onclick="closeLeaveModal()" class="w-full py-2 text-slate-500 text-sm font-semibold hover:text-slate-700 transition">Tutup</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- Modal Tambah Guru ke Daftar Kehadiran -->
-    <div id="attendanceAddAttendeeModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAddAttendeeModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-          <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-5">
-            <h3 class="text-white font-bold text-lg">Tambah Guru ke Daftar Kehadiran</h3>
-            <p class="text-violet-100 text-xs mt-0.5">Guru yang tidak terjadwal hari ini</p>
-          </div>
-          <form onsubmit="event.preventDefault(); submitAddAttendee();" class="p-6 space-y-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pilih Guru <span class="text-red-500">*</span></label>
-              <div class="relative mb-1.5">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input type="text" id="inpAddAttendeeSearch" placeholder="Cari nama atau username..." autocomplete="off"
-                  oninput="_filterAddAttendeeSelect(this.value)"
-                  class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none transition">
-              </div>
-              <select id="selAddAttendeeUser" size="6" class="w-full border border-slate-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-violet-500 outline-none cursor-pointer" required>
-                <option value="">Memuat daftar guru...</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Alasan Penambahan <span class="text-red-500">*</span></label>
-              <textarea id="inpAddAttendeeReason" rows="3" maxlength="300" required
-                placeholder="Mis: Hadir mendampingi kegiatan OSIS, menggantikan tugas piket mendadak..."
-                class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none resize-none"></textarea>
-            </div>
-            <div class="flex gap-3 pt-2">
-              <button type="button" onclick="closeAddAttendeeModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-              <button type="submit" id="btnSubmitAddAttendee" class="flex-1 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-sm hover:bg-violet-700 transition">Tambahkan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-    <!-- Modal Atur Jam Jadwal (KBM/Ujian per hari) -->
-    <div id="schedTemplateModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-      <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSchedTemplateModal()"></div>
-        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div class="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-5">
-            <h3 class="text-white font-bold text-lg" id="lblSchedTemplateModalTitle">Atur Jam Jadwal</h3>
-            <p class="text-indigo-100 text-xs mt-1" id="lblSchedTemplateModalSub">Jam masuk dan pulang default</p>
-          </div>
-          <form onsubmit="event.preventDefault(); submitSchedTemplate();" class="p-6 space-y-4">
-            <input type="hidden" id="inpSchedTemplateId">
-            <input type="hidden" id="inpSchedTemplateSchedType">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Hari <span class="text-red-500">*</span></label>
-              <select id="inpSchedTemplateDayIndex" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                <option value="">-- Pilih Hari --</option>
-                <option value="1">Senin</option>
-                <option value="2">Selasa</option>
-                <option value="3">Rabu</option>
-                <option value="4">Kamis</option>
-                <option value="5">Jumat</option>
-                <option value="6">Sabtu</option>
-              </select>
-            </div>
-            <div class="flex gap-4">
-              <div class="flex-1">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Masuk <span class="text-red-500">*</span></label>
-                <input type="time" id="inpSchedTemplateTimeIn" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
-              </div>
-              <div class="flex-1">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Pulang <span class="text-red-500">*</span></label>
-                <input type="time" id="inpSchedTemplateTimeOut" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" required>
-              </div>
-            </div>
-            <p id="lblSchedTemplateApplyNote" class="text-[11px] text-slate-500 bg-slate-50 rounded-lg px-3 py-2 hidden"></p>
-            <div class="flex gap-3 pt-2">
-              <button type="button" onclick="closeSchedTemplateModal()" class="flex-1 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl font-semibold text-sm transition">Batal</button>
-              <button type="submit" id="btnSubmitSchedTemplate" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition">Simpan & Terapkan</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>`;
+  return false;
 }
-function getPageContent(pageName) {
-  try {
-    switch (pageName) {
-      case "Page_Login":
-        return `<style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
-  #sim-login-root {
-    min-height: 100vh;
-    display: flex;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    background: #0F172A;
-    overflow-x: hidden;
-  }
-  @media (min-width: 1024px) {
-    #sim-login-root { overflow: hidden; height: 100vh; min-height: 100vh; }
-  }
-  #sim-left {
-    display: flex;
-    position: relative;
-    width: 100%;
-    min-height: 100vh;
-    background: linear-gradient(145deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
-    padding: 2.5rem 1.75rem;
-    padding-bottom: max(8.5rem, calc(env(safe-area-inset-bottom, 0px) + 8.5rem));
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 1.75rem;
-  }
-  @supports (min-height: 100dvh) {
-    #sim-left { min-height: 100dvh; }
-  }
-  @media (min-width: 1024px) {
-    #sim-left {
-      width: 45%;
-      min-height: 100vh;
-      padding: 3rem;
-      padding-bottom: 3rem;
-      overflow: hidden;
-      gap: 0;
+function _extAddUser_(username, password) {
+  const sheet = _extUsersSheet_();
+  if (!sheet) return false;
+  sheet.appendRow(["", String(username), String(password)]);
+  SpreadsheetApp.flush();
+  return true;
+}
+function _extUpdateUsername_(oldUsername, newUsername) {
+  const sheet = _extUsersSheet_();
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]).trim() === String(oldUsername).trim()) {
+      sheet.getRange(i + 1, 2).setValue(String(newUsername));
+      SpreadsheetApp.flush();
+      return true;
     }
   }
-  .sim-orb {
-    position: absolute; border-radius: 50%;
-    filter: blur(60px); opacity: 0.18; pointer-events: none;
-    animation: simFloat 8s ease-in-out infinite;
-  }
-  .sim-orb-1 { width: 380px; height: 380px; background: #0EA5E9; top: -100px; right: -80px; animation-delay: 0s; }
-  .sim-orb-2 { width: 280px; height: 280px; background: #6366F1; bottom: 80px; left: -60px; animation-delay: -3s; }
-  .sim-orb-3 { width: 200px; height: 200px; background: #10B981; bottom: -40px; right: 40px; animation-delay: -6s; }
-  @keyframes simFloat {
-    0%, 100% { transform: translateY(0px) scale(1); }
-    50% { transform: translateY(-20px) scale(1.05); }
-  }
-  .sim-grid-bg {
-    position: absolute; inset: 0;
-    background-image: linear-gradient(rgba(148,163,184,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.04) 1px, transparent 1px);
-    background-size: 48px 48px;
-  }
-  #sim-brand-logo { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 12px; animation: simFadeUp 0.7s ease both; }
-  .sim-logo-icon {
-    width: 46px; height: 46px; border-radius: 14px;
-    background: linear-gradient(135deg, #0EA5E9, #6366F1);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 24px rgba(14,165,233,0.3);
-  }
-  .sim-logo-text-main { font-size: 22px; font-weight: 800; color: #F1F5F9; letter-spacing: -0.5px; }
-  .sim-logo-text-sub  { font-size: 11px; font-weight: 500; color: #64748B; letter-spacing: 0.5px; text-transform: uppercase; }
-  #sim-left-body { position: relative; z-index: 2; animation: simFadeUp 0.7s ease 0.15s both; }
-  #sim-left-body h2 { font-size: 34px; font-weight: 800; color: #F1F5F9; line-height: 1.18; letter-spacing: -1px; margin: 0 0 14px; }
-  #sim-left-body h2 span { color: #0EA5E9; }
-  #sim-left-body p { font-size: 14.5px; color: #94A3B8; line-height: 1.65; margin: 0 0 24px; }
-  .sim-feature-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 11px; }
-  .sim-feature-item { display: flex; align-items: center; gap: 12px; font-size: 13.5px; font-weight: 500; color: #CBD5E1; line-height: 1.4; }
-  .sim-feature-dot { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .sim-fd-blue    { background: rgba(14,165,233,0.15); }
-  .sim-fd-indigo  { background: rgba(99,102,241,0.15); }
-  .sim-fd-emerald { background: rgba(16,185,129,0.15); }
-  .sim-fd-amber   { background: rgba(245,158,11,0.15); }
-  .sim-fd-violet  { background: rgba(139,92,246,0.15); }
-  .sim-fd-rose    { background: rgba(244,63,94,0.15); }
-  #sim-left-footer { position: relative; z-index: 2; animation: simFadeUp 0.7s ease 0.25s both; }
-  .sim-left-footer-inner {
-    display: flex; align-items: center; gap: 12px;
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px; padding: 14px 18px;
-  }
-  .sim-school-badge {
-    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-    background: linear-gradient(135deg, #1D4ED8, #4F46E5);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .sim-school-name { font-size: 13px; font-weight: 700; color: #E2E8F0; }
-  .sim-school-sub  { font-size: 11px; color: #64748B; margin-top: 1px; }
-  #sim-right { flex: 1; background: #FFFFFF; display: none; flex-direction: column; overflow-y: auto; }
-  @media (min-width: 1024px) { #sim-right { display: flex; } }
-  #sim-right-inner {
-    flex: 1; display: flex; flex-direction: column; justify-content: center;
-    padding: 48px 40px; max-width: 480px; width: 100%; margin: 0 auto;
-    animation: simFadeUp 0.6s ease 0.1s both;
-  }
-  @media (max-width: 1023px) { #sim-right-inner { padding: 36px 24px; } }
-  #sim-mobile-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 36px; }
-  @media (min-width: 1024px) { #sim-mobile-brand { display: none; } }
-  .sim-mobile-logo-icon {
-    width: 38px; height: 38px; border-radius: 11px;
-    background: linear-gradient(135deg, #0EA5E9, #6366F1);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .sim-mobile-brand-name { font-size: 18px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; }
-  .sim-mobile-brand-sub  { font-size: 11px; font-weight: 500; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
-  #sim-form-header { margin-bottom: 32px; }
-  #sim-form-header h1 { font-size: 28px; font-weight: 800; color: #0F172A; letter-spacing: -0.75px; margin: 0 0 6px; }
-  #sim-form-header p  { font-size: 14px; color: #64748B; margin: 0; }
-  .sim-welcome-back {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: linear-gradient(135deg, #ECFEFF, #E0F2FE);
-    border: 1px solid #BAE6FD;
-    color: #075985;
-    padding: 6px 12px;
-    border-radius: 999px;
-    font-size: 12px; font-weight: 700;
-    margin-bottom: 14px;
-    animation: simFadeUp 0.5s ease 0.2s both;
-  }
-  .sim-welcome-back svg { color: #0EA5E9; flex-shrink: 0; }
-  .sim-welcome-back strong {
-    color: #0C4A6E; font-weight: 800;
-    max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .sim-welcome-back.hidden { display: none; }
-  .sim-field { margin-bottom: 20px; }
-  .sim-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 7px; letter-spacing: 0.1px; }
-  .sim-input-wrap { position: relative; }
-  .sim-input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94A3B8; display: flex; align-items: center; }
-  .sim-input {
-    width: 100%; padding: 13px 16px 13px 44px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 14px; font-weight: 500; color: #0F172A;
-    background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px;
-    outline: none; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-    box-sizing: border-box;
-  }
-  .sim-input:focus { background: #FFFFFF; border-color: #0EA5E9; box-shadow: 0 0 0 4px rgba(14,165,233,0.1); }
-  .sim-input::placeholder { color: #94A3B8; font-weight: 400; }
-  .sim-eye-btn { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px; color: #94A3B8; display: flex; align-items: center; transition: color 0.2s; }
-  .sim-eye-btn:hover { color: #0EA5E9; }
-  .sim-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-  .sim-remember { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: #475569; }
-  .sim-remember input[type=checkbox] { width: 16px; height: 16px; accent-color: #0EA5E9; cursor: pointer; }
-  .sim-forgot { font-size: 13px; font-weight: 600; color: #0EA5E9; background: none; border: none; cursor: pointer; transition: color 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
-  .sim-forgot:hover { color: #0284C7; }
-  #btnLogin, #m_btnLogin {
-    width: 100%; padding: 14px;
-    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 700; color: #FFFFFF;
-    background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%);
-    border: none; border-radius: 12px; cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-    box-shadow: 0 4px 20px rgba(14,165,233,0.35);
-    position: relative; overflow: hidden;
-  }
-  #btnLogin:hover, #m_btnLogin:hover { opacity: 0.93; box-shadow: 0 6px 28px rgba(14,165,233,0.45); transform: translateY(-1px); }
-  #btnLogin:active, #m_btnLogin:active { transform: scale(0.98); }
-  #btnLogin.is-ready, #m_btnLogin.is-ready {
-    box-shadow: 0 0 0 0 rgba(14,165,233,0.65), 0 4px 20px rgba(14,165,233,0.35);
-    animation: simReadyPulse 2s ease-in-out infinite;
-  }
-  @keyframes simReadyPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(14,165,233,0.5), 0 4px 20px rgba(14,165,233,0.35); }
-    50%      { box-shadow: 0 0 0 6px rgba(14,165,233,0), 0 4px 20px rgba(14,165,233,0.45); }
-  }
-  #btnLogin::after, #m_btnLogin::after {
-    content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-    transform: skewX(-20deg); animation: simShimmer 3s ease-in-out infinite 1s;
-  }
-  @keyframes simShimmer { 0% { left: -100%; } 60%, 100% { left: 160%; } }
-  .sim-divider { display: flex; align-items: center; gap: 12px; margin: 28px 0 0; }
-  .sim-divider-line { flex: 1; height: 1px; background: #E2E8F0; }
-  .sim-divider-text { font-size: 12px; color: #94A3B8; font-weight: 500; white-space: nowrap; }
-  #sim-verify-wrap { margin-top: 16px; background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 16px 18px; }
-  .sim-verify-title { font-size: 12px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
-  .sim-verify-row { display: flex; gap: 8px; }
-  .sim-verify-input {
-    flex: 1; padding: 9px 12px;
-    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 600; color: #0F172A;
-    background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 9px;
-    outline: none; text-transform: uppercase; transition: border-color 0.2s; letter-spacing: 0.5px;
-  }
-  .sim-verify-input:focus { border-color: #0EA5E9; }
-  .sim-verify-input::placeholder { text-transform: none; font-weight: 400; color: #94A3B8; letter-spacing: 0; }
-  .sim-verify-btn {
-    padding: 9px 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700; color: #FFFFFF;
-    background: #0F172A; border: none; border-radius: 9px; cursor: pointer; transition: background 0.2s; white-space: nowrap;
-  }
-  .sim-verify-btn:hover { background: #1E293B; }
-  #resValidation { margin-top: 10px; font-size: 12px; }
-  #sim-right-footer { padding: 20px 40px; text-align: center; border-top: 1px solid #F1F5F9; }
-  @media (max-width: 1023px) { #sim-right-footer { padding: 16px 24px; } }
-  .sim-footer-text { font-size: 12px; color: #94A3B8; font-family: 'Plus Jakarta Sans', sans-serif; }
-  @keyframes simFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes simFadeIn  { from { opacity: 0; } to { opacity: 1; } }
-  #sim-mobile-cta {
-    display: none;
-  }
-  @media (max-width: 1023px) {
-    #sim-mobile-cta {
-      display: block;
-      position: fixed;
-      bottom: 20px;
-      bottom: max(20px, env(safe-area-inset-bottom, 20px));
-      left: 0;
-      right: 0;
-      width: calc(100% - 48px);
-      margin-left: auto;
-      margin-right: auto;
-      max-width: 400px;
-      z-index: 1000;
-      opacity: 0;
-      animation: simFadeIn 0.5s ease 0.35s forwards;
+  return false;
+}
+function _extDeleteUser_(username) {
+  const sheet = _extUsersSheet_();
+  if (!sheet) return false;
+  const data = sheet.getDataRange().getValues();
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][1]).trim() === String(username).trim()) {
+      sheet.deleteRow(i + 1);
+      SpreadsheetApp.flush();
+      return true;
     }
   }
-  #btnOpenLoginModal {
-    width: 100%;
-    padding: 16px 24px;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 16px; font-weight: 700; color: #0F172A;
-    background: linear-gradient(135deg, #FFFFFF 0%, #E0F2FE 100%);
-    border: none; border-radius: 14px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    box-shadow: 0 4px 24px rgba(14,165,233,0.25), 0 0 0 1px rgba(255,255,255,0.12);
-    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
-    position: relative; overflow: hidden;
-  }
-  #btnOpenLoginModal::before {
-    content: '';
-    position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(14,165,233,0.15), transparent);
-    transform: skewX(-20deg);
-    animation: simShimmer 3.5s ease-in-out infinite 0.5s;
-  }
-  #btnOpenLoginModal:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(14,165,233,0.35); }
-  #btnOpenLoginModal:active { transform: scale(0.98); opacity: 0.9; }
-  .sim-cta-hint {
-    text-align: center; margin-top: 12px;
-    font-size: 12px; color: rgba(148,163,184,0.7); font-weight: 500;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-  }
-  .sim-cta-hint::before, .sim-cta-hint::after {
-    content: ''; flex: 1; height: 1px; background: rgba(148,163,184,0.15);
-  }
-  #simLoginModal {
-    display: none;
-    position: fixed; inset: 0; z-index: 9999;
-    align-items: flex-end;
-    justify-content: center;
-  }
-  #simLoginModal.sim-modal-open { display: flex; }
-  .sim-modal-backdrop {
-    position: absolute; inset: 0;
-    background: rgba(0,0,0,0.65);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    animation: simModalBdIn 0.3s ease both;
-  }
-  @keyframes simModalBdIn { from { opacity: 0; } to { opacity: 1; } }
-  .sim-modal-sheet {
-    position: relative; z-index: 1;
-    width: 100%; max-width: 520px;
-    background: #FFFFFF;
-    border-radius: 24px 24px 0 0;
-    padding: 0 0 env(safe-area-inset-bottom, 16px);
-    max-height: 92vh;
-    max-height: 92dvh;
-    overflow-y: auto;
-    animation: simSheetUp 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-  }
-  @keyframes simSheetUp { from { transform: translateY(100%); opacity: 0.7; } to { transform: translateY(0); opacity: 1; } }
-  .sim-modal-sheet.sim-sheet-closing {
-    animation: simSheetDown 0.28s cubic-bezier(0.4, 0, 1, 1) both;
-  }
-  @keyframes simSheetDown { from { transform: translateY(0); } to { transform: translateY(110%); } }
-  .sim-sheet-handle-bar {
-    display: flex; justify-content: center; padding: 12px 0 4px;
-  }
-  .sim-sheet-handle {
-    width: 40px; height: 4px; border-radius: 99px;
-    background: #E2E8F0;
-  }
-  .sim-sheet-header {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 24px 16px;
-    border-bottom: 1px solid #F1F5F9;
-  }
-  .sim-sheet-logo {
-    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-    background: linear-gradient(135deg, #0EA5E9, #6366F1);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .sim-sheet-brand-name { font-size: 16px; font-weight: 800; color: #0F172A; letter-spacing: -0.4px; }
-  .sim-sheet-brand-sub  { font-size: 10px; font-weight: 500; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
-  .sim-sheet-close {
-    margin-left: auto; width: 30px; height: 30px;
-    background: #F1F5F9; border: none; border-radius: 50%; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    color: #64748B; transition: background 0.2s, color 0.2s;
-    font-size: 16px; line-height: 1;
-  }
-  .sim-sheet-close:hover { background: #E2E8F0; color: #0F172A; }
-  .sim-sheet-body {
-    padding: 20px 24px 12px;
-  }
-  .sim-sheet-title { font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin: 0 0 4px; }
-  .sim-sheet-subtitle { font-size: 13px; color: #64748B; margin: 0 0 22px; }
-  .sim-sheet-divider {
-    display: flex; align-items: center; gap: 10px; margin: 20px 0 0;
-  }
-  .sim-sheet-divider-line { flex: 1; height: 1px; background: #E2E8F0; }
-  .sim-sheet-divider-text { font-size: 11px; color: #94A3B8; font-weight: 500; white-space: nowrap; }
-  .sim-sheet-verify-wrap {
-    margin-top: 14px; background: #F8FAFC; border: 1.5px solid #E2E8F0;
-    border-radius: 12px; padding: 14px 16px;
-  }
-  .sim-sheet-footer {
-    text-align: center; padding: 14px 24px 20px;
-    border-top: 1px solid #F1F5F9;
-    font-size: 11px; color: #94A3B8;
-  }
-  .sim-caps-hint {
-    align-items: center; gap: 6px;
-    margin-top: 8px;
-    background: #FEF3C7; color: #92400E;
-    border: 1px solid #FCD34D;
-    border-radius: 8px;
-    padding: 5px 10px;
-    font-size: 11.5px; font-weight: 700;
-    line-height: 1;
-    animation: simFadeUp 0.18s ease both;
-  }
-  .sim-caps-hint:not(.hidden) { display: inline-flex; }
-  .sim-caps-hint svg { color: #B45309; flex-shrink: 0; }
-  #loginErrorBanner, #m_loginErrorBanner {
-    background: linear-gradient(135deg, #DC2626, #B91C1C);
-    color: #FEF2F2;
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 600;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 14px rgba(220,38,38,0.28);
-    animation: simShakeIn 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-    border: 1px solid rgba(255,255,255,0.12);
-  }
-  #loginErrorBanner:not(.hidden), #m_loginErrorBanner:not(.hidden) { display: flex; }
-  #loginErrorBanner svg, #m_loginErrorBanner svg { flex-shrink: 0; opacity: 0.95; }
-  @keyframes simShakeIn {
-    0% { opacity: 0; transform: translateX(-12px); }
-    20% { opacity: 1; transform: translateX(8px); }
-    40% { transform: translateX(-5px); }
-    60% { transform: translateX(3px); }
-    80% { transform: translateX(-2px); }
-    100% { transform: translateX(0); }
-  }
-  #btnLogin:disabled, #m_btnLogin:disabled {
-    cursor: not-allowed; opacity: 0.85;
-    transform: none !important;
-    box-shadow: 0 4px 14px rgba(14,165,233,0.2) !important;
-  }
-  #btnLogin:disabled::after, #m_btnLogin:disabled::after { display: none; }
-  .sim-btn-loader {
-    display: inline-block; width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,0.35);
-    border-top-color: #FFFFFF;
-    border-radius: 50%;
-    animation: simBtnSpin 0.7s linear infinite;
-    vertical-align: middle;
-    margin-right: 8px;
-  }
-  @keyframes simBtnSpin { to { transform: rotate(360deg); } }
-  .sim-input-wrap.is-error .sim-input { border-color: #FCA5A5; background: #FEF2F2; }
-  .sim-input-wrap.is-error .sim-input:focus { border-color: #EF4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.12); }
-  .sim-verify-btn:disabled {
-    opacity: 0.65; cursor: not-allowed; background: #475569;
-  }
-  .sim-verify-input:disabled { background: #F1F5F9; cursor: not-allowed; }
-  .sim-sheet-body .sim-caps-hint { font-size: 11px; padding: 4px 9px; }
-  .sim-sheet-handle-bar {
-    cursor: grab; touch-action: none;
-    user-select: none; -webkit-user-select: none;
-  }
-  .sim-sheet-handle-bar:active { cursor: grabbing; }
-  #btnLogin:focus-visible, #m_btnLogin:focus-visible,
-  #btnOpenLoginModal:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 4px rgba(14,165,233,0.35), 0 4px 20px rgba(14,165,233,0.35);
-  }
-  .sim-input:focus-visible { outline: none; }
-  .sim-eye-btn:focus-visible { outline: 2px solid #0EA5E9; outline-offset: 2px; border-radius: 4px; }
-  .sim-forgot:focus-visible { outline: 2px solid #0EA5E9; outline-offset: 2px; border-radius: 4px; }
-</style>
-<div id="sim-login-root">
-  <div id="sim-left">
-    <div class="sim-grid-bg"></div>
-    <div class="sim-orb sim-orb-1"></div>
-    <div class="sim-orb sim-orb-2"></div>
-    <div class="sim-orb sim-orb-3"></div>
-    <div id="sim-brand-logo">
-      <div class="sim-logo-icon">
-        <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-      </div>
-      <div>
-        <div class="sim-logo-text-main">SiM-Guru</div>
-        <div class="sim-logo-text-sub">v <span id="txtLoginVersionLeft">2.1.1</span></div>
-      </div>
-    </div>
-    <div id="sim-left-body">
-      <h2>Manajemen guru<br>yang <span>cerdas &amp; terhubung</span></h2>
-      <p>Platform terpadu untuk jurnal mengajar, honorarium, kehadiran, ujian, hingga pengumuman — semuanya real-time dan otomatis.</p>
-      <ul class="sim-feature-list">
-        <li class="sim-feature-item">
-          <div class="sim-feature-dot sim-fd-blue">
-            <svg width="15" height="15" fill="none" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-          </div>
-          Jurnal mengajar harian dengan rekap real-time
-        </li>
-        <li class="sim-feature-item">
-          <div class="sim-feature-dot sim-fd-indigo">
-            <svg width="15" height="15" fill="none" stroke="#818CF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
-          Kalkulasi honorarium otomatis &amp; akurat
-        </li>
-        <li class="sim-feature-item">
-          <div class="sim-feature-dot sim-fd-emerald">
-            <svg width="15" height="15" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
-          Konfirmasi kehadiran, piket &amp; pembina upacara
-        </li>
-        <li class="sim-feature-item">
-          <div class="sim-feature-dot sim-fd-amber">
-            <svg width="15" height="15" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          </div>
-          Manajemen ujian, pengawas &amp; BAP digital
-        </li>
-        <li class="sim-feature-item">
-          <div class="sim-feature-dot sim-fd-violet">
-            <svg width="15" height="15" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-          </div>
-          Pengumuman &amp; notifikasi langsung ke guru
-        </li>
-        <li class="sim-feature-item">
-          <div class="sim-feature-dot sim-fd-rose">
-            <svg width="15" height="15" fill="none" stroke="#FB7185" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          </div>
-          Auto-jurnal libur bonus &amp; bonus JTM otomatis
-        </li>
-      </ul>
-    </div>
-    <div id="sim-left-footer">
-      <div class="sim-left-footer-inner">
-        <div class="sim-school-badge">
-          <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
-        </div>
-        <div>
-          <div class="sim-school-name">MTs Nurul Falah</div>
-          <div class="sim-school-sub">Madrasah Tsanawiyah</div>
-        </div>
-      </div>
-    </div>
-    <div id="sim-mobile-cta">
-      <button id="btnOpenLoginModal" onclick="openLoginModal()">
-        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
-        </svg>
-        Masuk ke Akun Saya
-      </button>
-      <p class="sim-cta-hint">Masuk untuk mengakses semua fitur</p>
-    </div>
-  </div>
-  <div id="sim-right">
-    <div id="sim-right-inner">
-      <div id="sim-mobile-brand">
-        <div class="sim-mobile-logo-icon">
-          <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-        </div>
-        <div>
-          <div class="sim-mobile-brand-name">SiM-Guru</div>
-          <div class="sim-mobile-brand-sub">Sistem Manajemen Guru</div>
-        </div>
-      </div>
-      <div id="sim-form-header">
-        <div id="simWelcomeBack" class="sim-welcome-back hidden" aria-hidden="true">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span>Selamat datang kembali, <strong id="simWelcomeBackName">—</strong></span>
-        </div>
-        <h1>Selamat datang &#128075;</h1>
-        <p>Masuk ke akun Anda untuk melanjutkan</p>
-      </div>
-      <form id="formLogin" onsubmit="handleLogin(event)" novalidate>
-        <div id="loginErrorBanner" class="hidden" role="alert" aria-live="polite"></div>
-        <div class="sim-field">
-          <label class="sim-label" for="username">Username</label>
-          <div class="sim-input-wrap">
-            <span class="sim-input-icon"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-            <input type="text" id="username" class="sim-input" placeholder="Masukkan username Anda" required autocomplete="username" autocapitalize="none" spellcheck="false">
-          </div>
-        </div>
-        <div class="sim-field">
-          <label class="sim-label" for="password">Password</label>
-          <div class="sim-input-wrap">
-            <span class="sim-input-icon"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
-            <input type="password" id="password" class="sim-input" placeholder="Masukkan password Anda" required autocomplete="current-password">
-            <button type="button" class="sim-eye-btn" onclick="togglePassword('password', this)" aria-label="Tampilkan/sembunyikan password" tabindex="-1">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-            </button>
-          </div>
-          <div id="capsHintDesktop" class="sim-caps-hint hidden" role="status" aria-live="polite">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l7 7h-4v6H9v-6H5z"/></svg>
-            Caps Lock aktif
-          </div>
-        </div>
-        <div class="sim-row">
-          <label class="sim-remember"><input type="checkbox" id="chkRemember"> Ingat saya</label>
-          <button type="button" class="sim-forgot" onclick="handleForgotPassword()">Lupa password?</button>
-        </div>
-        <button type="submit" id="btnLogin">
-          <span class="sim-btn-label">Masuk Aplikasi</span>
-        </button>
-      </form>
-      <div class="sim-divider">
-        <div class="sim-divider-line"></div>
-        <span class="sim-divider-text">Verifikasi Dokumen</span>
-        <div class="sim-divider-line"></div>
-      </div>
-      <div id="sim-verify-wrap">
-        <div class="sim-verify-title">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          Cek Keaslian Dokumen
-        </div>
-        <div class="sim-verify-row">
-          <input type="text" id="inpValTrxId" class="sim-verify-input" placeholder="ID Transaksi (TRX-...)"
-            oninput="this.value = this.value.toUpperCase().replace(/\\s+/g,'');"
-            onkeydown="if(event.key==='Enter'){ event.preventDefault(); checkValidationAction('inpValTrxId'); }"
-            autocapitalize="characters" spellcheck="false" autocomplete="off">
-          <button type="button" class="sim-verify-btn" onclick="checkValidationAction('inpValTrxId')">Verifikasi</button>
-        </div>
-        <div id="resValidation" class="hidden"></div>
-      </div>
-    </div>
-    <div id="sim-right-footer">
-      <p class="sim-footer-text">&copy; 2025&ndash;<span class="sim-footer-year">2026</span> MTs Nurul Falah &mdash; SiM-Guru</p>
-    </div>
-  </div>
-</div>
-<div id="simLoginModal" role="dialog" aria-modal="true" aria-label="Form Login">
-  <div class="sim-modal-backdrop" id="simModalBackdrop" onclick="closeLoginModal()"></div>
-  <div class="sim-modal-sheet" id="simLoginModalSheet">
-    <div class="sim-sheet-handle-bar">
-      <div class="sim-sheet-handle"></div>
-    </div>
-    <div class="sim-sheet-header">
-      <div class="sim-sheet-logo">
-        <svg width="18" height="18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-        </svg>
-      </div>
-      <div>
-        <div class="sim-sheet-brand-name">SiM-Guru</div>
-        <div class="sim-sheet-brand-sub">Sistem Manajemen Guru</div>
-      </div>
-      <button class="sim-sheet-close" onclick="closeLoginModal()" aria-label="Tutup" type="button">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="sim-sheet-body">
-      <div id="m_simWelcomeBack" class="sim-welcome-back hidden" aria-hidden="true">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>Selamat datang kembali, <strong id="m_simWelcomeBackName">—</strong></span>
-      </div>
-      <h2 class="sim-sheet-title">Selamat datang &#128075;</h2>
-      <p class="sim-sheet-subtitle">Masuk ke akun Anda untuk melanjutkan</p>
-      <form id="m_formLogin" onsubmit="handleLogin(event)" novalidate>
-        <div id="m_loginErrorBanner" class="hidden" role="alert" aria-live="polite"></div>
-        <div class="sim-field">
-          <label class="sim-label" for="m_username">Username</label>
-          <div class="sim-input-wrap">
-            <span class="sim-input-icon">
-              <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </span>
-            <input type="text" id="m_username" class="sim-input" placeholder="Masukkan username Anda" required autocomplete="username" autocapitalize="none" spellcheck="false">
-          </div>
-        </div>
-        <div class="sim-field">
-          <label class="sim-label" for="m_password">Password</label>
-          <div class="sim-input-wrap">
-            <span class="sim-input-icon">
-              <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-            </span>
-            <input type="password" id="m_password" class="sim-input" placeholder="Masukkan password Anda" required autocomplete="current-password">
-            <button type="button" class="sim-eye-btn" onclick="togglePassword('m_password', this)" aria-label="Tampilkan/sembunyikan password" tabindex="-1">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-            </button>
-          </div>
-          <div id="capsHintMobile" class="sim-caps-hint hidden" role="status" aria-live="polite">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l7 7h-4v6H9v-6H5z"/></svg>
-            Caps Lock aktif
-          </div>
-        </div>
-        <div class="sim-row">
-          <label class="sim-remember"><input type="checkbox" id="m_chkRemember"> Ingat saya</label>
-          <button type="button" class="sim-forgot" onclick="handleForgotPassword()">Lupa password?</button>
-        </div>
-        <button type="submit" id="m_btnLogin">
-          <span class="sim-btn-label">Masuk Aplikasi</span>
-        </button>
-      </form>
-      <div class="sim-sheet-divider">
-        <div class="sim-sheet-divider-line"></div>
-        <span class="sim-sheet-divider-text">Verifikasi Dokumen</span>
-        <div class="sim-sheet-divider-line"></div>
-      </div>
-      <div class="sim-sheet-verify-wrap">
-        <div class="sim-verify-title">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          Cek Keaslian Dokumen
-        </div>
-        <div class="sim-verify-row">
-          <input type="text" id="m_inpValTrxId" class="sim-verify-input" placeholder="ID Transaksi (TRX-...)"
-            oninput="this.value = this.value.toUpperCase().replace(/\\s+/g,'');"
-            onkeydown="if(event.key==='Enter'){ event.preventDefault(); checkValidationAction('m_inpValTrxId'); }"
-            autocapitalize="characters" spellcheck="false" autocomplete="off">
-          <button type="button" class="sim-verify-btn" onclick="checkValidationAction('m_inpValTrxId')">Verifikasi</button>
-        </div>
-        <div id="m_resValidation" class="hidden"></div>
-      </div>
-    </div>
-    <div class="sim-sheet-footer">
-      &copy; 2025&ndash;<span class="sim-footer-year">2026</span> MTs Nurul Falah &mdash; SiM-Guru
-    </div>
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Dashboard":
-        return `<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      .db-main {
-        padding: 1rem;
-        display: flex;
-        flex-direction: column;
-        gap: 1.25rem;
-        position: relative;
-      }
-      .db-main::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 320px;
-        background: radial-gradient(ellipse at top, rgba(99,102,241,0.04), transparent 70%);
-        pointer-events: none;
-        z-index: 0;
-      }
-      .db-main > * { position: relative; z-index: 1; }
-      @media (min-width: 640px) { .db-main { padding: 1.5rem; gap: 1.5rem; } }
-      @media (min-width: 1024px) { .db-main { padding: 2rem; } }
-      .db-welcome {
-        position: relative; overflow: hidden;
-        border-radius: 1.25rem;
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 50%, #1E3665 100%);
-        padding: 1.5rem 2rem;
-        box-shadow: 0 4px 24px rgba(15,23,42,0.18);
-      }
-      .db-welcome::before {
-        content: ''; position: absolute; top: -60px; right: -60px;
-        width: 220px; height: 220px; border-radius: 50%;
-        background: radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 70%);
-        pointer-events: none;
-      }
-      .db-welcome::after {
-        content: ''; position: absolute; bottom: -40px; left: 30%;
-        width: 160px; height: 160px; border-radius: 50%;
-        background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
-        pointer-events: none;
-      }
-      .db-welcome-tag {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 999px; padding: 4px 12px;
-        font-size: 0.72rem; font-weight: 600; color: #93C5FD;
-        letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.75rem;
-      }
-      .db-welcome-title {
-        font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 800;
-        color: #F1F5F9; line-height: 1.2; letter-spacing: -0.5px;
-        position: relative; z-index: 1;
-      }
-      .db-welcome-sub {
-        font-size: 0.825rem; color: #94A3B8; margin-top: 0.25rem;
-        position: relative; z-index: 1;
-      }
-      .db-welcome-actions {
-        position: relative; z-index: 1;
-        display: flex; gap: 6px; flex-wrap: wrap;
-        margin-top: 0.875rem;
-      }
-      .db-welcome-chip {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 999px;
-        padding: 4px 12px;
-        font-size: 0.7rem;
-        color: #CBD5E1;
-        font-weight: 500;
-      }
-      .db-welcome-chip svg { width: 12px; height: 12px; opacity: 0.8; }
-      .db-welcome-dots {
-        position: absolute; right: 1.5rem; top: 50%; transform: translateY(-50%);
-        display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
-        opacity: 0.12; pointer-events: none;
-      }
-      .db-welcome-dot {
-        width: 8px; height: 8px; border-radius: 50%; background: white;
-      }
-      .db-section-label {
-        font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
-        letter-spacing: 0.1em; color: #94A3B8; margin-bottom: 0.625rem;
-        display: flex; align-items: center; gap: 8px;
-      }
-      @media (min-width: 640px) {
-        .db-section-label { font-size: 0.7rem; margin-bottom: 0.75rem; }
-      }
-      .db-section-label::after { content: ''; flex: 1; height: 1px; background: #E2E8F0; }
-      .db-stat-card {
-        background: white; border-radius: 1rem;
-        border: 1px solid #E2E8F0;
-        padding: 1rem 1.125rem;
-        box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.03);
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
-        position: relative; overflow: hidden;
-      }
-      @media (min-width: 640px) {
-        .db-stat-card { padding: 1.25rem 1.5rem; border-radius: 1.125rem; }
-      }
-      .db-stat-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,0.1); transform: translateY(-1px); }
-      .db-stat-card-accent {
-        position: absolute; top: 0; right: 0; bottom: 0;
-        width: 4px; border-radius: 0 1.125rem 1.125rem 0;
-      }
-      .db-stat-icon {
-        width: 36px; height: 36px; border-radius: 9px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-      }
-      @media (min-width: 640px) {
-        .db-stat-icon { width: 42px; height: 42px; border-radius: 10px; }
-      }
-      .db-stat-label {
-        font-size: 0.63rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: #94A3B8; margin-bottom: 0.2rem;
-      }
-      @media (min-width: 640px) {
-        .db-stat-label { font-size: 0.68rem; margin-bottom: 0.25rem; }
-      }
-      .db-stat-value {
-        font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px;
-        color: #0F172A; line-height: 1;
-        overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-      }
-      @media (min-width: 640px) {
-        .db-stat-value { font-size: 1.75rem; }
-      }
-      .db-stat-sub {
-        font-size: 0.65rem; font-weight: 600; margin-top: 0.3rem;
-        border-radius: 999px; display: inline-flex; padding: 2px 7px;
-      }
-      .db-honor-card {
-        border-radius: 1.125rem; overflow: hidden;
-        background: linear-gradient(135deg, #1D4ED8 0%, #4F46E5 60%, #6D28D9 100%);
-        padding: 1.5rem; position: relative;
-        box-shadow: 0 8px 24px rgba(79,70,229,0.28);
-        transition: box-shadow 0.2s ease;
-      }
-      .db-honor-card:hover { box-shadow: 0 12px 32px rgba(79,70,229,0.35); }
-      .db-honor-card::before {
-        content: ''; position: absolute; top: -30px; right: -30px;
-        width: 130px; height: 130px; border-radius: 50%;
-        background: rgba(255,255,255,0.08); pointer-events: none;
-      }
-      .db-panel {
-        background: white; border-radius: 1rem;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 1px 3px rgba(15,23,42,0.04);
-        overflow: hidden;
-      }
-      @media (min-width: 640px) {
-        .db-panel { border-radius: 1.125rem; }
-      }
-      .db-panel-header {
-        padding: 0.875rem 1rem;
-        border-bottom: 1px solid #F1F5F9;
-        display: flex; align-items: center; justify-content: space-between;
-        background: linear-gradient(to right, #FAFBFD, #F8FAFC);
-        gap: 0.5rem;
-      }
-      @media (min-width: 640px) {
-        .db-panel-header { padding: 1rem 1.5rem; }
-      }
-      .db-panel-header-left { display: flex; align-items: center; gap: 0.625rem; min-width: 0; flex: 1; }
-      @media (min-width: 640px) {
-        .db-panel-header-left { gap: 0.75rem; }
-      }
-      .db-panel-icon {
-        width: 30px; height: 30px; border-radius: 7px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-      }
-      @media (min-width: 640px) {
-        .db-panel-icon { width: 34px; height: 34px; border-radius: 8px; }
-      }
-      .db-panel-title {
-        font-size: 0.8125rem; font-weight: 700; color: #1E293B;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      @media (min-width: 480px) {
-        .db-panel-title {
-          white-space: normal;
-          overflow: visible;
-          text-overflow: unset;
-        }
-      }
-      .db-panel-body { padding: 1rem; }
-      @media (min-width: 640px) {
-        .db-panel-body { padding: 1.25rem 1.5rem; }
-      }
-      .db-panel-refresh {
-        transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .db-panel-refresh:hover {
-        transform: translateY(-1px);
-      }
-      .db-panel-refresh:active {
-        transform: translateY(0) scale(0.96);
-      }
-      .db-progress-track {
-        background: #EEF2FF; border-radius: 999px; overflow: hidden;
-        height: 10px;
-      }
-      .db-progress-fill {
-        height: 100%; border-radius: 999px;
-        background: linear-gradient(90deg, #6366F1, #3B82F6);
-        transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
-      }
-      .db-journal-item {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0.75rem 1rem; border-radius: 0.75rem;
-        border: 1px solid #F1F5F9; background: #FAFBFD;
-        transition: all 0.15s ease;
-      }
-      .db-journal-item:hover { background: #F5F7FF; border-color: #DDE6FF; }
-      .db-journal-item.done { background: #F0FDF4; border-color: #DCFCE7; }
-      .db-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-      @media (min-width: 640px) { .db-table { font-size: 0.8125rem; } }
-      .db-table thead { background: #FAFBFD; }
-      .db-table th {
-        padding: 0.625rem 0.75rem; text-align: left;
-        font-size: 0.6rem; font-weight: 800; text-transform: uppercase;
-        letter-spacing: 0.06em; color: #94A3B8;
-        border-bottom: 1px solid #F1F5F9;
-        white-space: nowrap;
-      }
-      @media (min-width: 640px) {
-        .db-table th { padding: 0.75rem 1rem; font-size: 0.65rem; }
-      }
-      .db-table td {
-        padding: 0.75rem 0.75rem; color: #334155;
-        border-bottom: 1px solid #F8FAFC;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-      @media (min-width: 640px) {
-        .db-table td { padding: 0.875rem 1rem; }
-      }
-      .db-table tbody tr:last-child td { border-bottom: none; }
-      .db-table tbody tr:hover td { background: #F8FAFC; }
-      /* ── Marquee untuk teks overflow di mobile ── */
-      @keyframes db-marquee {
-        0%   { transform: translateX(0); }
-        100% { transform: translateX(-100%); }
-      }
-      /* Kelas wrapper: potong overflow, teks bergerak scroll */
-      .db-marquee-wrap {
-        display: inline-block; /* wajib agar clientWidth terukur, bukan 0 */
-        overflow: hidden;
-        white-space: nowrap;
-        position: relative;
-        max-width: 100%;
-      }
-      /* Teks scroll hanya di layar sempit; di lebar cukup, teks diam */
-      @media (max-width: 479px) {
-        .db-marquee-wrap.is-overflow .db-marquee-inner {
-          display: inline-block;
-          padding-right: 3rem;          /* jarak antar repetisi */
-          animation: db-marquee 8s linear infinite;
-        }
-        /* Pause saat hover / fokus */
-        .db-marquee-wrap:hover .db-marquee-inner,
-        .db-marquee-wrap:focus-within .db-marquee-inner {
-          animation-play-state: paused;
-        }
-      }
-      /* Di layar ≥480px marquee dimatikan, ellipsis yang berlaku */
-      @media (min-width: 480px) {
-        .db-marquee-wrap .db-marquee-inner {
-          animation: none !important;
-          display: inline;
-        }
-      }
-      /* Sembunyikan kolom non-kritis di layar sangat kecil */
-      @media (max-width: 479px) {
-        .db-table .col-hide-xs { display: none; }
-      }
-      .db-autojurnal-banner {
-        border-radius: 1.125rem; overflow: hidden;
-        background: linear-gradient(135deg, #5B21B6 0%, #4338CA 50%, #1D4ED8 100%);
-        box-shadow: 0 4px 20px rgba(91,33,182,0.25);
-      }
-      .db-adm-card-orange { --accent: #F97316; --bg: #FFF7ED; --border: #FED7AA; }
-      .db-adm-card-blue   { --accent: #3B82F6; --bg: #EFF6FF; --border: #BFDBFE; }
-      .db-adm-card-emerald{ --accent: #10B981; --bg: #ECFDF5; --border: #A7F3D0; }
-      .db-adm-card-amber  { --accent: #F59E0B; --bg: #FFFBEB; --border: #FDE68A; }
-      .db-adm-card-teal   { --accent: #14B8A6; --bg: #F0FDFA; --border: #99F6E4; }
-      .db-adm-card-rose   { --accent: #F43F5E; --bg: #FFF1F2; --border: #FECDD3; }
-      .db-adm-card-indigo { --accent: #6366F1; --bg: #EEF2FF; --border: #C7D2FE; }
-      /* === PANEL & KARTU PIKET DASHBOARD ADMIN === */
-      .db-piket-card {
-        background: white;
-        border: 1px solid #E2E8F0;
-        border-radius: 0.875rem;
-        padding: 0.875rem 1rem;
-        transition: box-shadow 0.18s ease, transform 0.18s ease;
-        position: relative;
-        overflow: hidden;
-      }
-      @media (min-width: 640px) {
-        .db-piket-card { border-radius: 1rem; padding: 1rem 1.25rem; }
-      }
-      .db-piket-card:hover {
-        box-shadow: 0 4px 16px rgba(15,23,42,0.08);
-        transform: translateY(-1px);
-      }
-      .db-piket-card.is-confirmed {
-        background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
-        border-color: #A7F3D0;
-      }
-      .db-piket-card.is-unconfirmed {
-        background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
-        border-color: #FCD34D;
-      }
-      .db-piket-card.has-substitute {
-        background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
-        border-color: #C7D2FE;
-      }
-      .db-piket-card-accent {
-        position: absolute; top: 0; left: 0; bottom: 0;
-        width: 3.5px; border-radius: 1rem 0 0 1rem;
-      }
-      .db-piket-time-badge {
-        display: inline-flex; align-items: center; gap: 4px;
-        padding: 3px 8px; border-radius: 8px;
-        font-size: 0.72rem; font-weight: 700; font-family: monospace;
-      }
-      .db-piket-action-btn {
-        display: inline-flex; align-items: center; gap: 4px;
-        padding: 5px 12px; border-radius: 8px;
-        font-size: 0.72rem; font-weight: 700;
-        border: 1px solid transparent;
-        transition: all 0.15s ease;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-      .db-piket-action-btn:hover { transform: translateY(-1px); }
-      .db-piket-action-btn:active { transform: scale(0.97); }
-      /* Animasi modal piket */
-      @keyframes apm-pop {
-        from { opacity: 0; transform: scale(0.94) translateY(12px); }
-        to   { opacity: 1; transform: scale(1) translateY(0); }
-      }
-      /* Animasi backdrop */
-      #adminPicketModal:not(.hidden) {
-        animation: apm-backdrop 0.2s ease forwards;
-      }
-      @keyframes apm-backdrop {
-        from { opacity: 0; }
-        to   { opacity: 1; }
-      }
-      .db-badge {
-        display: inline-flex; align-items: center; gap: 4px;
-        padding: 3px 10px; border-radius: 999px;
-        font-size: 0.68rem; font-weight: 700;
-        flex-shrink: 0;
-        white-space: nowrap;
-      }
-      .db-badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-      .db-libur-banner {
-        border-radius: 1.125rem; overflow: hidden;
-        background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%);
-        box-shadow: 0 4px 20px rgba(124,58,237,0.3);
-        position: relative;
-      }
-      .db-libur-banner::after {
-        content: ''; position: absolute; right: -20px; top: 50%; transform: translateY(-50%);
-        width: 140px; height: 140px; border-radius: 50%;
-        background: rgba(255,255,255,0.07); pointer-events: none;
-      }
-      .db-quick-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.5rem;
-      }
-      @media (min-width: 480px) {
-        .db-quick-actions { gap: 0.625rem; }
-      }
-      @media (min-width: 768px) {
-        .db-quick-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
-      }
-      .db-quick-btn {
-        background: white;
-        border: 1px solid #E2E8F0;
-        border-radius: 0.75rem;
-        padding: 0.75rem 0.875rem;
-        display: flex; align-items: center; gap: 0.5rem;
-        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-        cursor: pointer;
-        font-family: inherit;
-        text-align: left;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-      }
-      @media (min-width: 640px) {
-        .db-quick-btn { border-radius: 0.875rem; padding: 0.875rem 1rem; gap: 0.625rem; }
-      }
-      .db-quick-btn::after {
-        content: '';
-        position: absolute;
-        right: 10px; top: 50%; transform: translateY(-50%);
-        width: 14px; height: 14px;
-        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8' stroke-width='2.4'><path stroke-linecap='round' stroke-linejoin='round' d='M9 5l7 7-7 7'/></svg>");
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: 12px 12px;
-        opacity: 0;
-        transition: opacity 0.18s ease, transform 0.18s ease;
-      }
-      .db-quick-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(15,23,42,0.08);
-        border-color: #CBD5E1;
-        background: #FAFBFD;
-      }
-      .db-quick-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(2px); }
-      .db-quick-btn:focus-visible {
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
-        border-color: #A5B4FC;
-      }
-      .db-quick-btn:active { transform: translateY(0) scale(0.98); }
-      .db-quick-icon {
-        width: 32px; height: 32px;
-        border-radius: 0.5rem;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-      }
-      @media (min-width: 640px) {
-        .db-quick-icon { width: 38px; height: 38px; border-radius: 0.625rem; }
-      }
-      .db-quick-label {
-        font-size: 0.75rem; font-weight: 700;
-        color: #1E293B; line-height: 1.25;
-        flex: 1; min-width: 0;
-        overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-      }
-      @media (min-width: 640px) {
-        .db-quick-label { font-size: 0.8125rem; }
-      }
-    </style>
-    <main class="db-main flex-grow">
-      <div id="viewGuruDashboard" class="hidden space-y-6">
-        <div id="bannerAutoJurnalLibur" class="hidden db-libur-banner p-5 text-white">
-          <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.18); backdrop-filter:blur(4px);">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="font-extrabold text-base tracking-tight">🎉 Hari Libur Bonus JTM</p>
-                <p class="text-purple-200 text-xs mt-0.5" id="txtLiburInfo">Memuat info...</p>
-              </div>
-            </div>
-            <div class="flex-shrink-0 text-center sm:text-right">
-              <div class="text-xs text-purple-200 mb-0.5">Bonus JTM Anda</div>
-              <div class="text-3xl font-black text-white" id="valBonusJtmLibur">0</div>
-              <div class="text-[10px] text-purple-300 mt-0.5">Otomatis ke honorarium</div>
-            </div>
-          </div>
-        </div>
-        <span id="lblRoleTitle" class="hidden">Guru</span>
-        <div class="db-quick-actions">
-          <button type="button" onclick="scrollToDashboardSchedule()" class="db-quick-btn" data-color="indigo">
-            <span class="db-quick-icon" style="background:#EEF2FF;color:#4F46E5;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Isi Jurnal</span></span></span>
-          </button>
-          <button type="button" onclick="handleNav('Page_MySchedule')" class="db-quick-btn" data-color="blue">
-            <span class="db-quick-icon" style="background:#EFF6FF;color:#3B82F6;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Saya</span></span></span>
-          </button>
-          <button type="button" onclick="handleNav('Page_Picket')" class="db-quick-btn" data-color="emerald">
-            <span class="db-quick-icon" style="background:#ECFDF5;color:#10B981;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Piket &amp; Upacara</span></span></span>
-          </button>
-          <button type="button" onclick="handleNav('Page_Honorarium')" class="db-quick-btn" data-color="amber">
-            <span class="db-quick-icon" style="background:#FFFBEB;color:#F59E0B;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Honorarium</span></span></span>
-          </button>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div class="db-stat-card" data-tooltip="Akumulasi JTM bulan berjalan: mengajar, piket, upacara, acara/kegiatan, dan bonus hari libur">
-            <div class="db-stat-card-accent" style="background: linear-gradient(180deg, #3B82F6, #6366F1);"></div>
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="db-stat-label">Total JTM Bulan Ini</p>
-                <h3 class="db-stat-value" id="valJtmTotal">0</h3>
-                <span class="db-stat-sub" style="background:#EFF6FF; color:#2563EB;">+<span id="valJtmToday">0</span> hari ini</span>
-                <div id="detailEventJtm" class="hidden mt-2">
-                  <span class="db-stat-sub" style="background:#ECFDF5; color:#065F46;" title="JTM dari kehadiran acara/kegiatan">
-                    <svg style="width:9px;height:9px;display:inline;margin-right:2px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    Acara: <span id="valEventJtm">0</span> JTM
-                  </span>
-                </div>
-              </div>
-              <div class="db-stat-icon" style="background:#EFF6FF;">
-                <svg class="w-5 h-5" style="color:#3B82F6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div class="db-stat-card" data-tooltip="JTM bonus dari hari libur (otomatis dan estimasi)">
-            <div class="db-stat-card-accent" style="background: linear-gradient(180deg, #8B5CF6, #A78BFA);"></div>
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="db-stat-label">Bonus JTM (Libur)</p>
-                <h3 class="db-stat-value" id="valJtmBonus">0</h3>
-                <div id="detailBonusJtm" class="hidden mt-2 space-y-1">
-                  <span class="db-stat-sub" style="background:#F5F3FF; color:#7C3AED;" title="Sudah masuk database">Auto: <span id="valAutoLiburJtm">0</span></span>
-                  <span class="db-stat-sub ml-1" style="background:#FFFBEB; color:#B45309;" title="Estimasi (belum di-generate)">Est: <span id="valEstLiburJtm">0</span></span>
-                </div>
-              </div>
-              <div class="db-stat-icon" style="background:#F5F3FF;">
-                <svg class="w-5 h-5" style="color:#8B5CF6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div class="db-stat-card" id="guruTransportCard" data-tooltip="Akumulasi tunjangan transportasi harian Anda bulan ini (tgl 1 s/d hari ini)">
-            <div class="db-stat-card-accent" style="background: linear-gradient(180deg, #0EA5E9, #06B6D4);"></div>
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5 mb-1">
-                  <p class="db-stat-label" style="margin:0;">Transport Bulan Ini</p>
-                  <button type="button" onclick="event.stopPropagation(); toggleTransportVisibility()" id="btnToggleTransport"
-                    class="text-slate-400 hover:text-slate-700 transition p-1 rounded-md hover:bg-slate-100"
-                    title="Tampilkan/Sembunyikan">
-                    <svg id="iconTransportEyeOpen" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                    </svg>
-                    <svg id="iconTransportEyeClosed" class="hidden w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>
-                    </svg>
-                  </button>
-                </div>
-                <h3 class="db-stat-value text-base sm:text-lg font-extrabold cursor-pointer"
-                    id="valGuruTransport" data-value=""
-                    onclick="event.stopPropagation(); toggleTransportVisibility()"
-                    style="color:#0369A1;">
-                  <span class="skeleton inline-block h-6 w-20 rounded"></span>
-                </h3>
-                <span class="db-stat-sub" id="valGuruTransportSub" style="background:#F0F9FF; color:#0369A1;">Tgl 1 s/d hari ini</span>
-              </div>
-              <div class="db-stat-icon" style="background:#F0F9FF;">
-                <svg class="w-5 h-5" style="color:#0EA5E9;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div class="sm:col-span-2 db-honor-card flex items-center justify-between">
-            <div class="relative z-10 min-w-0 flex-1 overflow-hidden">
-              <div class="flex items-center gap-2 mb-1">
-                <p class="text-xs font-bold text-blue-200 uppercase tracking-wider">Estimasi Honorarium</p>
-                <button type="button" onclick="event.stopPropagation(); toggleHonorVisibility()" id="btnToggleHonor"
-                  class="text-blue-200 hover:text-white transition p-1.5 rounded-lg hover:bg-white/10"
-                  title="Tampilkan/Sembunyikan">
-                  <svg id="iconEyeOpen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                  </svg>
-                  <svg id="iconEyeClosed" class="hidden w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>
-                  </svg>
-                </button>
-              </div>
-              <h3 class="text-3xl font-black text-white tracking-tight cursor-pointer relative z-20"
-                  id="valEstHonor" data-value="Rp 0"
-                  onclick="event.stopPropagation(); toggleHonorVisibility()">Rp 0</h3>
-              <p class="text-xs text-blue-200 mt-1.5 opacity-80">*Belum termasuk potongan jika ada</p>
-            </div>
-            <div class="relative z-10 w-12 h-12 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,0.15); backdrop-filter:blur(4px);">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-              </svg>
-            </div>
-          </div>
-        </div>
-        <div class="db-panel" id="panelJurnalHariIni">
-          <div class="db-panel-header">
-            <div class="db-panel-header-left">
-              <div class="db-panel-icon" style="background:#EEF2FF;">
-                <svg class="w-4 h-4" style="color:#6366F1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-              </div>
-              <div>
-                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Status Jurnal Hari Ini</span></span></p>
-                <p class="text-xs text-slate-400 font-medium mt-0.5">Progres pengisian jurnal mengajar</p>
-                <span id="guruJurnalBadge" class="db-badge mt-1.5 inline-flex" style="background:#EEF2FF; color:#4F46E5; border:1px solid #C7D2FE;">Memuat...</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="refreshDashboard()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="db-panel-body" id="guruJurnalProgressContainer">
-            <div class="skeleton h-2.5 w-full rounded-full mb-5"></div>
-            <div class="space-y-2.5">
-              <div class="skeleton h-11 rounded-xl w-full"></div>
-              <div class="skeleton h-11 rounded-xl w-4/5"></div>
-            </div>
-          </div>
-        </div>
-        <div id="panelExamDashboard" class="hidden"></div>
-        <div class="db-panel" id="panelJadwalMengajarHariIni">
-          <div class="db-panel-header">
-            <div class="db-panel-header-left">
-              <div class="db-panel-icon" style="background:#EFF6FF;">
-                <svg class="w-4 h-4" style="color:#3B82F6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Mengajar Hari Ini</span></span></p>
-                <p class="text-xs text-slate-400 font-medium mt-0.5">Sesi aktif &amp; progres jurnal</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="db-badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" id="lblMonth">Bulan Ini</span>
-              <button onclick="handleNav('Page_MySchedule')" class="hidden sm:inline-flex db-panel-refresh items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold text-blue-700 transition" title="Lihat semua jadwal">
-                Lihat Semua
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
-            <table class="db-table" style="min-width:420px;">
-              <thead>
-                <tr>
-                  <th style="min-width:90px; max-width:110px;">Jam</th>
-                  <th class="col-hide-xs" style="min-width:70px; max-width:90px;">Kelas</th>
-                  <th style="min-width:110px; max-width:180px;">Mata Pelajaran</th>
-                  <th class="text-center" style="min-width:50px; max-width:70px;">JTM</th>
-                  <th class="text-center" style="min-width:90px; max-width:130px;">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="scheduleTableBody">
-                <tr><td colspan="5" class="text-center py-8 text-slate-400 italic text-sm">Memuat jadwal...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div id="viewAdminDashboard" class="hidden space-y-6">
-        <div id="panelAutoJurnalAdmin" class="hidden db-autojurnal-banner">
-          <div class="p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div class="flex items-center gap-4 min-w-0 flex-1">
-              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.15);">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h3 class="text-white font-extrabold text-base tracking-tight">Auto Jurnal — Hari Libur Bonus</h3>
-                  <span id="badgeAutoJurnalScheduler" class="hidden inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-white">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 inline-block"></span>
-                    <span id="badgeAutoJurnalSchedulerLabel">—</span>
-                  </span>
-                </div>
-                <p class="text-purple-200 text-xs mt-0.5" id="txtAdminLiburDate">Memuat...</p>
-                <p class="text-purple-200/80 text-[10px] mt-0.5" id="txtAdminSchedulerInfo">Trigger otomatis ~16.00 WIB di hari libur bonus.</p>
-              </div>
-            </div>
-            <div class="flex gap-2 flex-shrink-0 flex-wrap">
-              <button id="btnToggleAutoJurnalScheduler" onclick="toggleAutoJurnalScheduler()"
-                class="hidden items-center gap-1.5 bg-white/12 hover:bg-white/22 text-white border border-white/20 px-3 py-2 rounded-xl font-semibold text-xs transition active:scale-95">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span id="btnToggleAutoJurnalSchedulerLabel">—</span>
-              </button>
-              <button id="btnCancelAutoJurnal" onclick="cancelAutoJurnalAction()"
-                class="hidden items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-600 transition text-sm shadow-lg">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-                Batalkan
-              </button>
-              <button id="btnGenerateAutoJurnal" onclick="generateAutoJurnalAction()"
-                class="flex items-center gap-2 bg-white text-indigo-700 px-5 py-2 rounded-xl font-bold hover:bg-indigo-50 transition shadow-lg text-sm">
-                🚀 Generate Jurnal Otomatis
-              </button>
-            </div>
-          </div>
-          <div id="resultAutoJurnal" class="hidden border-t border-white/10 p-5 bg-black/15">
-            <div class="flex justify-between items-center mb-3">
-              <h4 class="font-bold text-white text-sm">Hasil Generate:</h4>
-              <span id="badgeAutoJurnalStatus" class="hidden text-xs font-bold px-2 py-1 rounded-full"></span>
-            </div>
-            <div id="contentResultAutoJurnal" class="space-y-2 text-sm text-purple-100"></div>
-          </div>
-        </div>
-        <div class="db-quick-actions">
-          <button type="button" onclick="handleNav('Page_Users')" class="db-quick-btn" data-color="orange">
-            <span class="db-quick-icon" style="background:#FFF7ED;color:#F97316;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Data Pengguna</span></span></span>
-          </button>
-          <button type="button" onclick="handleNav('Page_ManageSchedule')" class="db-quick-btn" data-color="blue">
-            <span class="db-quick-icon" style="background:#EFF6FF;color:#3B82F6;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Manajemen Jadwal</span></span></span>
-          </button>
-          <button type="button" onclick="handleNav('Page_ExamSchedule')" class="db-quick-btn" data-color="emerald">
-            <span class="db-quick-icon" style="background:#ECFDF5;color:#10B981;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Ujian</span></span></span>
-          </button>
-          <button type="button" onclick="handleNav('Page_Settings_Config')" class="db-quick-btn" data-color="indigo">
-            <span class="db-quick-icon" style="background:#EEF2FF;color:#6366F1;">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            </span>
-            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Pengaturan</span></span></span>
-          </button>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <div class="db-stat-card db-adm-card-blue" data-tooltip="Total JTM tercatat dari semua guru bulan ini">
-            <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#3B82F6,#60A5FA);"></div>
-            <div class="flex items-center gap-3">
-              <div class="db-stat-icon" style="background:var(--bg); border:1px solid var(--border);">
-                <svg class="w-4 h-4 sm:w-5 sm:h-5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <p class="db-stat-label">Total JTM</p>
-                <h3 class="db-stat-value" id="admTotalJTM">0</h3>
-              </div>
-            </div>
-          </div>
-          <div class="db-stat-card db-adm-card-emerald" data-tooltip="Estimasi total honorarium yang akan dibayarkan bulan ini">
-            <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#10B981,#34D399);"></div>
-            <div class="flex items-center gap-3">
-              <div class="db-stat-icon" style="background:var(--bg); border:1px solid var(--border);">
-                <svg class="w-4 h-4 sm:w-5 sm:h-5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <p class="db-stat-label">Est. Honor</p>
-                <h3 class="db-stat-value text-base sm:text-xl font-extrabold" id="admTotalHonor">Rp 0</h3>
-              </div>
-            </div>
-          </div>
-          <div class="db-stat-card" id="admTransportCard" data-tooltip="Total tunjangan transportasi semua guru bulan ini">
-            <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#0EA5E9,#06B6D4);"></div>
-            <div class="flex items-center gap-3">
-              <div class="db-stat-icon" style="background:#F0F9FF; border:1px solid #BAE6FD;">
-                <svg class="w-4 h-4 sm:w-5 sm:h-5" style="color:#0EA5E9;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <p class="db-stat-label">Transport</p>
-                <h3 class="db-stat-value text-base sm:text-xl font-extrabold" id="admTotalTransport" style="color:#0369A1;">
-                  <span class="skeleton inline-block h-6 w-20 rounded"></span>
-                </h3>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <p class="db-section-label">Ringkasan Hari Ini</p>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <div class="db-stat-card db-adm-card-amber">
-              <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#F59E0B,#FCD34D);"></div>
-              <p class="db-stat-label">JTM Hari Ini</p>
-              <h3 class="db-stat-value mt-1" id="admTotalJTMToday">
-                <span class="skeleton inline-block h-7 w-12 rounded"></span>
-              </h3>
-              <span class="db-stat-sub mt-2" style="background:#FFFBEB; color:#B45309;">Masuk database hari ini</span>
-            </div>
-            <div class="db-stat-card db-adm-card-teal cursor-pointer" onclick="handleNav('Page_Picket')" title="Lihat detail kehadiran">
-              <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#14B8A6,#2DD4BF);"></div>
-              <p class="db-stat-label" id="admHadirCardTitle">Kehadiran</p>
-              <div class="flex items-baseline gap-1.5 mt-1">
-                <h3 class="db-stat-value" id="admHadirCount">
-                  <span class="skeleton inline-block h-7 w-8 rounded"></span>
-                </h3>
-                <span class="text-slate-400 font-bold">/</span>
-                <span class="text-lg font-bold text-slate-600" id="admHadirTotal">
-                  <span class="skeleton inline-block h-5 w-6 rounded"></span>
-                </span>
-              </div>
-              <p class="text-[10px] mt-1.5 font-medium" style="color:#0F766E;" id="admHadirCardSub">Digantikan: <span class="font-extrabold" id="admSubstitutesToday">0</span></p>
-            </div>
-            <div class="db-stat-card db-adm-card-indigo cursor-pointer" onclick="handleNav('Page_Journal')" title="Lihat detail jurnal">
-              <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#6366F1,#818CF8);"></div>
-              <p class="db-stat-label" id="admJurnalCardTitle">Jurnal Hari Ini</p>
-              <div class="flex items-baseline gap-1.5 mt-1">
-                <h3 class="db-stat-value" style="color:#4338CA;" id="admJurnalDone">
-                  <span class="skeleton inline-block h-7 w-8 rounded"></span>
-                </h3>
-                <span class="text-slate-400 font-bold">/</span>
-                <span class="text-lg font-bold text-slate-600" id="admJurnalTotal">
-                  <span class="skeleton inline-block h-5 w-6 rounded"></span>
-                </span>
-              </div>
-              <div class="mt-2 db-progress-track" style="height:6px;">
-                <div id="admJurnalProgressBar" class="db-progress-fill" style="width:0%; height:100%;"></div>
-              </div>
-              <p class="text-[10px] mt-1 font-medium text-slate-500" id="admJurnalCardSub">Guru sudah isi jurnal</p>
-            </div>
-          </div>
-        </div>
-        <div class="db-panel transition-all" id="admPanelJurnal">
-          <div class="db-panel-header">
-            <div class="db-panel-header-left">
-              <div class="db-panel-icon" style="background:#EEF2FF;">
-                <svg class="w-4 h-4" style="color:#6366F1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-              </div>
-              <div>
-                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Progress Pengisian Jurnal</span></span></p>
-                <p class="text-xs text-slate-400 font-medium mt-0.5">Status real-time per guru</p>
-                <span id="admJurnalProgressBadge" class="db-badge mt-1.5 inline-flex" style="background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE;">Memuat...</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="refreshDashboard()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="db-panel-body">
-            <div class="mb-5">
-              <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
-                <span>Progress Pengisian</span>
-                <span id="admJurnalProgressPct" style="color:#4338CA;" class="font-bold">0%</span>
-              </div>
-              <div class="db-progress-track">
-                <div id="admJurnalProgressBarFull" class="db-progress-fill" style="width:0%;"></div>
-              </div>
-            </div>
-            <div id="admJurnalBelumList" class="space-y-2.5">
-              <div class="skeleton h-11 rounded-xl w-full"></div>
-              <div class="skeleton h-11 rounded-xl w-4/5"></div>
-            </div>
-          </div>
-        </div>
-        <!-- =====================================================
-             PANEL PIKET HARI INI — Admin Dashboard
-             ===================================================== -->
-        <div class="db-panel" id="admPanelPiket">
-          <div class="db-panel-header">
-            <div class="db-panel-header-left">
-              <div class="db-panel-icon" style="background:#FEF3C7;">
-                <svg class="w-4 h-4" style="color:#D97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Manajemen Piket Hari Ini</span></span></p>
-                <p class="text-xs text-slate-400 font-medium mt-0.5">Konfirmasi kehadiran, penunjukan pengganti &amp; jam piket</p>
-                <span id="admPiketBadge" class="db-badge mt-1.5 inline-flex" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;">Memuat...</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button onclick="loadAdminDashboardPicket()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui data piket">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="db-panel-body" id="admPiketPanelBody">
-            <div class="space-y-3">
-              <div class="skeleton h-20 rounded-xl w-full"></div>
-              <div class="skeleton h-20 rounded-xl w-full"></div>
-            </div>
-          </div>
-        </div>
-        <!-- END PANEL PIKET -->
-
-        <div class="grid grid-cols-1 gap-4 transition-all" id="admPanelNormalGrid">
-          <div class="db-panel" id="admPanelJadwal">
-            <div class="db-panel-header">
-              <div class="db-panel-header-left">
-                <div class="db-panel-icon" style="background:#EFF6FF;">
-                  <svg class="w-4 h-4" style="color:#3B82F6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                </div>
-                <div class="min-w-0">
-                  <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Pelajaran Hari Ini</span></span></p>
-                  <p class="hidden sm:block text-xs text-slate-400 font-medium mt-0.5">Semua kelas &amp; guru hari ini</p>
-                </div>
-              </div>
-            </div>
-            <div class="overflow-x-auto" style="max-height:380px; overflow-y:auto; -webkit-overflow-scrolling:touch;">
-              <table class="db-table" style="min-width:480px;">
-                <thead class="sticky top-0" style="background:#FAFBFD;">
-                  <tr>
-                    <th style="min-width:80px; max-width:100px;">Jam</th>
-                    <th style="min-width:120px; max-width:180px;">Guru</th>
-                    <th class="col-hide-xs" style="min-width:70px; max-width:90px;">Kelas</th>
-                    <th style="min-width:100px; max-width:160px;">Mapel</th>
-                    <th class="text-center" style="min-width:90px; max-width:120px;">Status</th>
-                  </tr>
-                </thead>
-                <tbody id="admScheduleTableBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- BAP PENGISIAN PANEL (HIDDEN BY DEFAULT) -->
-      <div class="db-panel transition-all mt-6" id="admPanelExamBap" style="display:none;">
-        <div class="db-panel-header">
-          <div class="db-panel-header-left">
-            <div class="db-panel-icon" style="background:#F0FDF4;">
-              <svg class="w-4 h-4" style="color:#16A34A;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-            </div>
-            <div>
-              <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Progress Pengisian BAP Pengawas Ujian Hari Ini</span></span></p>
-              <p class="text-xs text-slate-400 font-medium mt-0.5">Status real-time per ruang/sesi ujian</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <span id="admBapProgressBadge" class="db-badge" style="background:#F0FDF4; color:#16A34A; border:1px solid #BBF7D0;">Memuat...</span>
-            <button onclick="refreshDashboard()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="db-panel-body">
-          <div class="mb-5">
-            <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
-              <span>Progress BAP</span>
-              <span id="admBapProgressPct" style="color:#16A34A;" class="font-bold">0%</span>
-            </div>
-            <div class="db-progress-track">
-              <div id="admBapProgressBarFull" class="db-progress-fill" style="width:0%; background:#10B981;"></div>
-            </div>
-          </div>
-          <div id="admBapBelumList" class="space-y-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-            <div class="skeleton h-11 rounded-xl w-full"></div>
-            <div class="skeleton h-11 rounded-xl w-4/5"></div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Journal":
-        return `<div class="flex h-screen overflow-hidden" style="background:#F5F6FA;">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-      .jrn-root, .jrn-root * { box-sizing: border-box; }
-      .jrn-root { font-family: 'DM Sans', sans-serif; }
-      .jrn-mono { font-family: 'JetBrains Mono', monospace; }
-      .jrn-page-header {
-        background: linear-gradient(135deg, #312e81 0%, #4338ca 50%, #4f46e5 100%);
-        position: relative;
-        overflow: hidden;
-        padding: 1.75rem 1.5rem 1.5rem;
-      }
-      @media (min-width: 640px) {
-        .jrn-page-header { padding: 2rem 2rem 1.75rem; }
-      }
-      .jrn-page-header::before {
-        content: ''; position: absolute;
-        top: -40px; right: -40px;
-        width: 220px; height: 220px;
-        background: radial-gradient(circle, rgba(255,255,255,0.10), transparent 70%);
-        border-radius: 50%; pointer-events: none;
-      }
-      .jrn-page-header::after {
-        content: ''; position: absolute;
-        bottom: -80px; left: 12%;
-        width: 320px; height: 320px;
-        background: radial-gradient(circle, rgba(255,255,255,0.07), transparent 70%);
-        border-radius: 50%; pointer-events: none;
-      }
-      .jrn-stat-chip {
-        background: rgba(255,255,255,0.10);
-        border: 1px solid rgba(255,255,255,0.18);
-        border-radius: 14px;
-        backdrop-filter: blur(6px);
-        padding: 10px 14px;
-        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
-        display: flex; align-items: center; gap: 10px;
-        min-width: 0;
-      }
-      .jrn-stat-chip:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.28); }
-      .jrn-stat-chip-icon {
-        width: 36px; height: 36px; border-radius: 10px;
-        background: rgba(255,255,255,0.16); flex-shrink: 0;
-        display: flex; align-items: center; justify-content: center;
-      }
-      .jrn-stat-chip-num {
-        color: #fff; font-weight: 800; font-size: 1.15rem; line-height: 1.05;
-        font-family: 'JetBrains Mono', monospace; white-space: nowrap;
-      }
-      .jrn-stat-chip-lbl {
-        color: rgba(199,210,254,0.85); font-size: 0.625rem; font-weight: 700;
-        text-transform: uppercase; letter-spacing: 0.06em;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      .jrn-card {
-        background: #fff;
-        border: 1px solid #E8EAF0;
-        border-radius: 18px;
-        box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 6px 20px rgba(79,70,229,0.04);
-        overflow: hidden;
-        min-width: 0;
-      }
-      .jrn-toolbar {
-        background: #FAFBFF;
-        border-bottom: 1px solid #ECEEF5;
-        padding: 12px 16px;
-        display: flex; align-items: center; gap: 8px;
-        flex-wrap: wrap;
-      }
-      .jrn-toolbar > * { min-width: 0; }
-      .jrn-input {
-        border: 1.5px solid #DDE1F0;
-        border-radius: 10px;
-        padding: 7px 12px;
-        font-size: 13px;
-        font-family: 'DM Sans', sans-serif;
-        background: #fff; color: #374151;
-        outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      }
-      .jrn-input:focus {
-        border-color: #4f46e5;
-        box-shadow: 0 0 0 3px rgba(79,70,229,0.10);
-      }
-      .jrn-input::placeholder { color: #9CA3AF; }
-      .jrn-input-group {
-        position: relative;
-      }
-      .jrn-input-group svg.jrn-input-icon {
-        position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
-        width: 14px; height: 14px; color: #9CA3AF; pointer-events: none;
-      }
-      .jrn-input-group input.jrn-input { padding-left: 30px; }
-      .jrn-table { width: 100%; border-collapse: collapse; }
-      .jrn-table thead {
-        position: sticky; top: 0; z-index: 4;
-        background: #F7F8FC;
-      }
-      .jrn-table thead tr { border-bottom: 2px solid #ECEEF5; }
-      .jrn-table thead th {
-        padding: 11px 16px;
-        font-size: 11px; font-weight: 700;
-        letter-spacing: 0.06em; text-transform: uppercase;
-        color: #6B7280; white-space: nowrap;
-        background: #F7F8FC;
-      }
-      .jrn-table tbody tr {
-        border-bottom: 1px solid #F0F1F7;
-        transition: background 0.12s;
-      }
-      .jrn-table tbody tr:hover { background: #FAFBFF; }
-      .jrn-table tbody td { padding: 12px 16px; vertical-align: middle; }
-      .jrn-table tbody tr:last-child { border-bottom: none; }
-      .jrn-table .jrn-cell-clip {
-        max-width: 0; overflow: hidden;
-        text-overflow: ellipsis; white-space: nowrap;
-      }
-      .jrn-badge {
-        display: inline-flex; align-items: center; gap: 4px;
-        font-size: 11px; font-weight: 700;
-        padding: 3px 9px; border-radius: 999px;
-        white-space: nowrap;
-      }
-      .jrn-badge-indigo  { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
-      .jrn-badge-emerald { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
-      .jrn-badge-rose    { background: #FFF1F2; color: #E11D48; border: 1px solid #FECDD3; }
-      .jrn-badge-purple  { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
-      .jrn-badge-amber   { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
-      .jrn-badge-slate   { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
-      .jrn-badge-sky     { background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
-      .jrn-icon-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 32px; height: 32px; border-radius: 8px;
-        border: 1px solid transparent;
-        transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
-        cursor: pointer;
-      }
-      .jrn-icon-btn svg { width: 15px; height: 15px; }
-      .jrn-icon-btn-view   { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
-      .jrn-icon-btn-view:hover   { background: #DBEAFE; border-color: #93C5FD; transform: scale(1.06); }
-      .jrn-icon-btn-edit   { background: #FFFBEB; border-color: #FDE68A; color: #D97706; }
-      .jrn-icon-btn-edit:hover   { background: #FEF3C7; border-color: #FCD34D; transform: scale(1.06); }
-      .jrn-icon-btn-delete { background: #FFF1F2; border-color: #FECDD3; color: #E11D48; }
-      .jrn-icon-btn-delete:hover { background: #FFE4E6; border-color: #FDA4AF; transform: scale(1.06); }
-      .jrn-pag-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        height: 34px; min-width: 34px; padding: 0 10px;
-        border: 1px solid #DDE1F0; border-radius: 9px;
-        background: #fff; color: #4B5563; font-size: 13px; font-weight: 600;
-        cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
-        font-family: 'DM Sans', sans-serif;
-      }
-      .jrn-pag-btn:hover:not(:disabled) { background: #EEF2FF; border-color: #A5B4FC; color: #4338CA; }
-      .jrn-pag-btn.active { background: #4F46E5; border-color: #4F46E5; color: #fff; }
-      .jrn-pag-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-      .jrn-action-btn {
-        display: inline-flex; align-items: center; gap: 7px;
-        border-radius: 10px;
-        padding: 8px 14px; font-size: 12.5px; font-weight: 700;
-        font-family: 'DM Sans', sans-serif; cursor: pointer;
-        transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
-        border: 1px solid transparent;
-        white-space: nowrap;
-      }
-      .jrn-action-btn svg { width: 14px; height: 14px; }
-      .jrn-action-btn-primary {
-        background: linear-gradient(135deg, #1e293b, #334155);
-        color: #fff; box-shadow: 0 2px 8px rgba(30,41,59,0.20);
-      }
-      .jrn-action-btn-primary:hover { box-shadow: 0 4px 14px rgba(30,41,59,0.30); }
-      .jrn-action-btn-ghost {
-        background: #fff; color: #4B5563; border-color: #DDE1F0;
-      }
-      .jrn-action-btn-ghost:hover { background: #F1F5F9; color: #1E293B; border-color: #CBD5E1; }
-      .jrn-action-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-      .jrn-personal-bar {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
-        border-radius: 16px;
-        padding: 16px 20px;
-        margin-bottom: 18px;
-        display: flex; align-items: center; gap: 16px;
-        flex-wrap: wrap;
-        position: relative; overflow: hidden;
-      }
-      .jrn-personal-bar::after {
-        content: ''; position: absolute; right: -40px; top: -40px;
-        width: 180px; height: 180px;
-        background: radial-gradient(circle, rgba(99,102,241,0.18), transparent 70%);
-        pointer-events: none;
-      }
-      .jrn-personal-bar > * { position: relative; z-index: 1; }
-      .jrn-row-dot {
-        display: inline-block;
-        width: 8px; height: 8px; border-radius: 50%;
-        flex-shrink: 0;
-      }
-      .jrn-attbar {
-        display: flex; height: 5px; border-radius: 999px; overflow: hidden;
-        background: #E2E8F0;
-        min-width: 56px; max-width: 120px;
-        margin-top: 4px;
-      }
-      .jrn-attbar > span { height: 100%; display: block; }
-      @keyframes jrnFadeUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .jrn-fadein { animation: jrnFadeUp 0.32s ease-out forwards; }
-      @keyframes jrnPulse { 0%,100%{opacity:1} 50%{opacity:.55} }
-      .jrn-auto-badge { animation: jrnPulse 2.5s ease-in-out infinite; }
-      .jrn-select {
-        border: 1.5px solid #DDE1F0; border-radius: 10px;
-        padding: 7px 30px 7px 12px; font-size: 13px;
-        font-family: 'DM Sans', sans-serif; background: #fff;
-        color: #374151; outline: none; cursor: pointer;
-        appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-        background-repeat: no-repeat; background-position: right 10px center;
-        transition: border-color 0.15s, box-shadow 0.15s;
-      }
-      .jrn-select:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.10); }
-      .jrn-empty {
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; padding: 56px 20px; text-align: center;
-      }
-      .jrn-empty-icon {
-        width: 72px; height: 72px; border-radius: 20px;
-        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
-        display: flex; align-items: center; justify-content: center;
-        margin-bottom: 16px;
-      }
-      .jrn-empty p { font-weight: 700; color: #374151; font-size: 14px; margin-bottom: 4px; }
-      .jrn-empty span { color: #9CA3AF; font-size: 12px; }
-      .jrn-quickrange {
-        display: inline-flex; gap: 4px; padding: 3px;
-        background: #F1F5F9; border-radius: 10px;
-      }
-      .jrn-quickrange button {
-        border: none; background: transparent;
-        padding: 5px 10px; border-radius: 7px;
-        font-size: 11.5px; font-weight: 700; color: #64748B;
-        cursor: pointer;
-        transition: background 0.15s, color 0.15s;
-        font-family: 'DM Sans', sans-serif;
-      }
-      .jrn-quickrange button:hover { background: #fff; color: #1E293B; }
-      .jrn-quickrange button.active { background: #4F46E5; color: #fff; box-shadow: 0 2px 6px rgba(79,70,229,0.30); }
-      .jrn-filter-summary {
-        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-        padding: 8px 16px;
-        background: #FFFBEB; border-bottom: 1px solid #FDE68A;
-        font-size: 11.5px; color: #78350F;
-      }
-      .jrn-filter-summary strong { color: #B45309; }
-      .jrn-filter-summary .jrn-chip {
-        background: #fff; border: 1px solid #FDE68A;
-        padding: 2px 9px; border-radius: 999px;
-        font-weight: 700; font-size: 11px;
-      }
-      @media (max-width: 768px) {
-        .jrn-table thead th { padding: 9px 12px; font-size: 10px; }
-        .jrn-table tbody td { padding: 10px 12px; font-size: 12.5px; }
-      }
-      @media (max-width: 640px) {
-        .jrn-personal-bar {
-          flex-direction: column !important;
-          align-items: stretch !important;
-          gap: 12px !important;
-          padding: 14px 16px !important;
-        }
-        .jrn-personal-bar > div:first-child { flex: none !important; width: 100% !important; }
-        .jrn-bar-right {
-          width: 100% !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: space-between !important;
-          gap: 10px !important;
-        }
-        .jrn-bar-stat { flex: 0 0 auto !important; min-width: 78px !important; }
-        .jrn-bar-select { flex: 1 1 auto !important; }
-        .jrn-toolbar { padding: 10px 12px; }
-        .jrn-toolbar > .jrn-input,
-        .jrn-toolbar > .jrn-input-group { flex: 1 1 calc(50% - 4px); min-width: 120px; }
-      }
-    </style>
-    <main class="w-full grow jrn-root" id="page-journal-root">
-      <div class="jrn-page-header">
-        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.18);">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-              </div>
-              <div class="min-w-0">
-                <h1 class="text-white font-bold text-xl sm:text-2xl tracking-tight" style="line-height:1.15;">Riwayat Jurnal Mengajar</h1>
-                <p class="text-indigo-200 text-xs sm:text-sm mt-0.5" id="jrnHeroSubtitle">Rekam jejak aktivitas pembelajaran</p>
-              </div>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2.5 flex-shrink-0" id="jrnHeaderStats">
-            <div class="jrn-stat-chip">
-              <div class="jrn-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="jrn-stat-chip-num" id="jrnStatTotal">—</p>
-                <p class="jrn-stat-chip-lbl">Total Log</p>
-              </div>
-            </div>
-            <div class="jrn-stat-chip">
-              <div class="jrn-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="jrn-stat-chip-num" id="jrnStatMonth">—</p>
-                <p class="jrn-stat-chip-lbl">Bulan Ini</p>
-              </div>
-            </div>
-            <div class="jrn-stat-chip">
-              <div class="jrn-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="jrn-stat-chip-num" id="jrnStatJtm">—</p>
-                <p class="jrn-stat-chip-lbl">Total JTM</p>
-              </div>
-            </div>
-            <div class="jrn-stat-chip">
-              <div class="jrn-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="jrn-stat-chip-num" id="jrnStatAttRate">—</p>
-                <p class="jrn-stat-chip-lbl">Rerata Hadir</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="p-4 sm:p-6">
-        <div id="viewGuruJournal" class="hidden jrn-fadein">
-          <div class="jrn-personal-bar">
-            <div class="flex items-center gap-3 flex-1 min-w-0">
-              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(99,102,241,0.35);">
-                <svg class="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="text-slate-300 text-xs font-semibold">Log Aktivitas Anda</p>
-                <p class="text-white font-bold text-sm mt-0.5" style="word-break:break-word;">Semua riwayat jurnal yang pernah Anda isi tersimpan di sini.</p>
-              </div>
-            </div>
-            <div class="jrn-bar-right flex items-center gap-3 flex-shrink-0">
-              <div class="jrn-bar-stat text-center px-4 py-2 rounded-xl" style="background:rgba(255,255,255,0.07);">
-                <p class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Total</p>
-                <p class="text-white font-bold text-xl jrn-mono" id="lblTotalLogs">—</p>
-              </div>
-              <select id="selGuruJournalLimit" onchange="changeGuruJournalLimit()" class="jrn-select jrn-bar-select text-xs">
-                <option value="10">10 / halaman</option>
-                <option value="25">25 / halaman</option>
-                <option value="50">50 / halaman</option>
-                <option value="100">100 / halaman</option>
-              </select>
-            </div>
-          </div>
-          <div class="jrn-card mb-4">
-            <div class="jrn-toolbar">
-              <div class="jrn-input-group" style="flex:1 1 220px; min-width:180px;">
-                <svg class="jrn-input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input type="text" id="jrnGuruSearch" placeholder="Cari materi, kelas, atau mapel..." oninput="onGuruJournalSearchInput()" class="jrn-input w-full">
-              </div>
-              <input type="date" id="jrnGuruFilterDateFrom" onchange="filterGuruJournalTable()" class="jrn-input" title="Tanggal mulai" style="flex:0 1 150px;">
-              <span class="text-slate-400 text-xs font-bold">→</span>
-              <input type="date" id="jrnGuruFilterDateTo" onchange="filterGuruJournalTable()" class="jrn-input" title="Tanggal akhir" style="flex:0 1 150px;">
-              <div class="jrn-quickrange" id="jrnGuruQuickRange">
-                <button type="button" data-range="7"  onclick="setGuruJournalQuickRange(7)">7 Hari</button>
-                <button type="button" data-range="30" onclick="setGuruJournalQuickRange(30)">30 Hari</button>
-                <button type="button" data-range="month" onclick="setGuruJournalQuickRange('month')">Bulan Ini</button>
-              </div>
-              <button onclick="resetGuruJournalFilter()" class="jrn-action-btn jrn-action-btn-ghost" title="Reset Filter">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span class="hidden sm:inline">Reset</span>
-              </button>
-              <div class="flex-1"></div>
-              <button onclick="exportGuruJournalCSV()" class="jrn-action-btn jrn-action-btn-primary" title="Unduh CSV jurnal">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <span class="hidden sm:inline">Export CSV</span>
-              </button>
-            </div>
-            <div id="jrnGuruFilterSummary" class="jrn-filter-summary hidden"></div>
-          </div>
-          <div class="jrn-card">
-            <div class="overflow-x-auto" style="max-height: 620px; overflow-y:auto;">
-              <table class="jrn-table">
-                <thead>
-                  <tr>
-                    <th class="text-left pl-5">Tanggal</th>
-                    <th class="text-left">Waktu</th>
-                    <th class="text-left">Kelas &amp; Mapel</th>
-                    <th class="text-left">Materi</th>
-                    <th class="text-center">Hadir</th>
-                    <th class="text-center">Absen</th>
-                    <th class="text-center">Kehadiran</th>
-                    <th class="text-center pr-5">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="journalTableBody">
-                  <tr><td colspan="8" class="py-12 text-center text-slate-400 text-sm">Memuat data...</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="px-5 py-3.5 border-t border-slate-100" style="background:#FAFBFF;">
-              <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <p class="text-xs text-slate-500">
-                  Menampilkan
-                  <span class="font-bold text-slate-700 jrn-mono" id="txtGuruJournalStart">-</span>–<span class="font-bold text-slate-700 jrn-mono" id="txtGuruJournalEnd">-</span>
-                  dari <span class="font-bold text-indigo-600 jrn-mono" id="txtGuruJournalTotal">-</span> data
-                </p>
-                <div class="flex items-center gap-1.5 flex-wrap justify-center">
-                  <button onclick="changeGuruJournalPage('first')" id="btnFirstGuruJournal" class="jrn-pag-btn" title="Pertama">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
-                  </button>
-                  <button onclick="changeGuruJournalPage(-1)" id="btnPrevGuruJournal" class="jrn-pag-btn" title="Sebelumnya">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
-                  </button>
-                  <div id="guruJournalPageNumbers" class="flex items-center gap-1"></div>
-                  <button onclick="changeGuruJournalPage(1)" id="btnNextGuruJournal" class="jrn-pag-btn" title="Selanjutnya">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-                  </button>
-                  <button onclick="changeGuruJournalPage('last')" id="btnLastGuruJournal" class="jrn-pag-btn" title="Terakhir">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
-                  </button>
-                  <div class="flex items-center gap-1.5 ml-2">
-                    <input type="number" id="inpGuruJournalJump" min="1" placeholder="Hal." onkeypress="if(event.key==='Enter') jumpToGuruJournalPage()" class="jrn-input w-16 text-center text-xs py-1.5">
-                    <button onclick="jumpToGuruJournalPage()" class="jrn-pag-btn" style="background:#4F46E5;border-color:#4F46E5;color:#fff;padding:0 12px;">Go</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="viewAdminJournal" class="hidden jrn-fadein">
-          <div class="jrn-card mb-4">
-            <div class="jrn-toolbar">
-              <div class="jrn-input-group" style="flex:1 1 200px; min-width:160px;">
-                <svg class="jrn-input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                <input type="text" id="jrnFilterGuru" placeholder="Filter nama guru..." oninput="onAdminFilterInput()" class="jrn-input w-full">
-              </div>
-              <input type="date" id="jrnFilterDateFrom" onchange="filterAdminJournalTable()" class="jrn-input" title="Dari tanggal" style="flex:0 1 150px;">
-              <span class="text-slate-400 text-xs font-bold">→</span>
-              <input type="date" id="jrnFilterDateTo" onchange="filterAdminJournalTable()" class="jrn-input" title="Sampai tanggal" style="flex:0 1 150px;">
-              <input type="text" id="jrnFilterClass" placeholder="Kelas..." oninput="onAdminFilterInput()" class="jrn-input" style="flex:0 1 110px;">
-              <div class="jrn-quickrange" id="jrnAdminQuickRange">
-                <button type="button" data-range="today" onclick="setAdminJournalQuickRange('today')">Hari Ini</button>
-                <button type="button" data-range="7"  onclick="setAdminJournalQuickRange(7)">7 Hari</button>
-                <button type="button" data-range="month" onclick="setAdminJournalQuickRange('month')">Bulan Ini</button>
-              </div>
-              <button onclick="resetAdminJournalFilter()" class="jrn-action-btn jrn-action-btn-ghost" title="Reset Filter">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span class="hidden sm:inline">Reset</span>
-              </button>
-              <div class="flex-1"></div>
-              <button onclick="exportAdminJournalCSV()" class="jrn-action-btn jrn-action-btn-ghost" title="Unduh CSV">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <span class="hidden sm:inline">Export CSV</span>
-              </button>
-              <button onclick="exportJournalPDF()" class="jrn-action-btn jrn-action-btn-primary">
-                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                <span class="hidden sm:inline">Export PDF</span>
-              </button>
-            </div>
-            <div id="jrnAdminFilterSummary" class="jrn-filter-summary hidden"></div>
-          </div>
-          <div id="printAreaJournal" class="jrn-card">
-            <div class="mb-4 text-center hidden p-4" id="headerJournalPrint">
-              <h2 class="text-xl font-bold">LAPORAN JURNAL MENGAJAR HARIAN</h2>
-              <p class="text-sm">MTs Nurul Falah</p>
-              <p class="text-xs text-slate-500" id="headerJournalPrintMeta"></p>
-            </div>
-            <div class="overflow-x-auto" style="max-height: 620px; overflow-y:auto;">
-              <table class="jrn-table">
-                <thead>
-                  <tr>
-                    <th class="text-left pl-5">Tanggal &amp; Waktu</th>
-                    <th class="text-left">Guru</th>
-                    <th class="text-left">Kelas &amp; Mapel</th>
-                    <th class="text-left">Materi</th>
-                    <th class="text-center">Hadir</th>
-                    <th class="text-center">Absen</th>
-                    <th class="text-center">Kehadiran</th>
-                    <th class="text-center pr-5" data-html2canvas-ignore="true">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyAdminJournal"></tbody>
-              </table>
-            </div>
-            <div class="px-5 py-3.5 border-t border-slate-100" id="adminJournalFooter" style="background:#FAFBFF;">
-              <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <p class="text-xs text-slate-500">
-                  Menampilkan
-                  <span class="font-bold text-slate-700 jrn-mono" id="txtAdminJournalStart">-</span>–<span class="font-bold text-slate-700 jrn-mono" id="txtAdminJournalEnd">-</span>
-                  dari <span class="font-bold text-indigo-600 jrn-mono" id="txtAdminJournalTotal">-</span> data
-                </p>
-                <div class="flex items-center gap-1.5 flex-wrap justify-center">
-                  <button onclick="changeJournalPage('first')" id="btnFirstJournal" class="jrn-pag-btn" title="Pertama">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
-                  </button>
-                  <button onclick="changeJournalPage(-1)" id="btnPrevJournal" class="jrn-pag-btn" title="Sebelumnya">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
-                  </button>
-                  <div id="adminJournalPageNumbers" class="flex items-center gap-1"></div>
-                  <button onclick="changeJournalPage(1)" id="btnNextJournal" class="jrn-pag-btn" title="Selanjutnya">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-                  </button>
-                  <button onclick="changeJournalPage('last')" id="btnLastJournal" class="jrn-pag-btn" title="Terakhir">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
-                  </button>
-                  <div class="flex items-center gap-1.5 ml-2">
-                    <input type="number" id="inpAdminJournalJump" min="1" placeholder="Hal." onkeypress="if(event.key==='Enter') jumpToAdminJournalPage()" class="jrn-input w-16 text-center text-xs py-1.5">
-                    <button onclick="jumpToAdminJournalPage()" class="jrn-pag-btn" style="background:#4F46E5;border-color:#4F46E5;color:#fff;padding:0 12px;">Go</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Honorarium":
-        return `<div class="flex h-screen w-full overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 w-full max-w-full overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6">
-       <div id="viewGuru" class="hidden max-w-5xl mx-auto w-full">
-          <div class="no-print mb-5">
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div class="flex items-start gap-3">
-                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-md flex-shrink-0">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                  </svg>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Slip Honorarium</h1>
-                  <p class="text-sm text-slate-400 mt-0.5">Ringkasan jam mengajar &amp; honor Anda per periode</p>
-                </div>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <div class="relative flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 shadow-sm hover:border-slate-300 transition flex-1 sm:flex-none min-w-[200px]">
-                  <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                  </svg>
-                  <select id="selHonorPeriod" onchange="changeHonorPeriod()" aria-label="Pilih periode honorarium"
-                    class="text-sm font-semibold text-slate-700 bg-transparent border-0 outline-none cursor-pointer pr-1 flex-1 min-w-0"></select>
-                </div>
-                <button type="button" onclick="changeHonorPeriod()" title="Muat ulang data" aria-label="Muat ulang"
-                  class="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95 flex items-center justify-center text-slate-500 transition shadow-sm flex-shrink-0">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                  </svg>
-                </button>
-                <button id="btnPrintSlipGuru" type="button" onclick="printSlipNative()" title="Cetak slip"
-                  class="hidden items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-xl text-sm font-semibold transition shadow-sm">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                  </svg>
-                  <span class="hidden sm:inline">Cetak</span>
-                </button>
-                <button id="btnDownloadSlipGuru" type="button" onclick="downloadSlipPDF()" title="Unduh sebagai PDF"
-                  class="hidden items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm hover:shadow-md">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                  </svg>
-                  Unduh PDF
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="no-print mb-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap text-xs">
-            <div class="flex items-center gap-2 text-slate-600">
-              <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              <span>Slip akan menjadi <strong class="text-slate-700">final</strong> setelah admin melakukan finalisasi periode.</span>
-            </div>
-            <button type="button" onclick="handleNav('Page_HonorariumHistory')"
-              class="inline-flex items-center gap-1.5 text-blue-700 hover:text-blue-800 font-bold whitespace-nowrap">
-              Lihat Arsip Honor
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-          <div id="printAreaSlip" class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-8 shadow-md relative overflow-hidden w-full">
-             <div id="watermarkEstimasi" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] z-0 transform -rotate-45 hidden">
-                 <span class="text-[60px] sm:text-[150px] font-black text-slate-900 uppercase">ESTIMASI</span>
-             </div>
-             <div class="relative z-10">
-                 <div class="border-b-2 border-slate-800 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                    <div class="w-full">
-                       <h2 class="text-xl sm:text-2xl font-bold text-slate-900 uppercase tracking-wide">SLIP HONORARIUM</h2>
-                       <p class="text-sm font-bold text-slate-600 mt-1 truncate" id="txtSlipSchoolName">...</p>
-                    </div>
-                    <div class="text-left sm:text-right w-full sm:w-auto">
-                       <h3 class="text-lg sm:text-xl font-bold text-slate-800" id="txtSlipPeriod">...</h3>
-                       <p id="txtSlipStatus" class="text-xs font-bold text-slate-400 mt-1 px-2 py-1 rounded inline-block">Loading...</p>
-                    </div>
-                 </div>
-                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-8 text-sm">
-                    <div>
-                       <p class="text-slate-500 mb-1 text-xs uppercase font-bold tracking-wider">Penerima</p>
-                       <p class="font-bold text-lg text-slate-800 break-words" id="txtSlipReceiverName">...</p>
-                       <p class="text-slate-500 mt-2 mb-1 text-xs">NIP / NPK</p>
-                       <p class="font-mono text-slate-700 break-all" id="txtSlipNIP">-</p>
-                    </div>
-                    <div class="text-left sm:text-right">
-                       <p class="text-slate-500 mb-1 text-xs uppercase font-bold tracking-wider">Tanggal Cetak</p>
-                       <p class="font-bold text-slate-800" id="txtPrintDate">...</p>
-                       <p class="text-slate-500 mt-2 mb-1 text-xs">ID Transaksi</p>
-                       <p class="font-mono text-xs text-slate-400 break-all" id="txtSlipTransId">...</p>
-                    </div>
-                 </div>
-                 <div class="overflow-x-auto rounded-lg border border-slate-200 mb-8">
-                     <table class="w-full text-sm min-w-[500px]">
-                        <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
-                           <tr>
-                              <th class="py-3 px-4 text-left">Keterangan</th>
-                              <th class="py-3 px-4 text-center">Qty / JTM</th>
-                              <th class="py-3 px-4 text-right">Tarif</th>
-                              <th class="py-3 px-4 text-right">Jumlah</th>
-                           </tr>
-                        </thead>
-                        <tbody id="honorTableBody" class="text-slate-700 divide-y divide-slate-100"></tbody>
-                     </table>
-                 </div>
-                 <div class="flex justify-end mb-12">
-                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 rounded-xl border border-blue-200 text-right w-full sm:min-w-[280px] sm:w-auto shadow-sm">
-                       <p class="text-xs text-blue-600 mb-1 font-bold uppercase tracking-wider">Total Diterima</p>
-                       <h3 class="text-2xl sm:text-3xl font-extrabold text-blue-700 tracking-tight" id="txtSlipTotal">Rp 0</h3>
-                    </div>
-                 </div>
-                 <div class="flex flex-col sm:flex-row justify-between items-end text-center mt-8 text-sm text-slate-600 gap-12 sm:gap-0">
-                    <div class="w-full sm:w-48 text-left sm:text-center">
-                       <p class="mb-16 text-xs text-slate-500">Penerima,</p>
-                       <p class="font-bold border-b border-slate-300 pb-1 text-slate-800 block w-full" id="txtSlipSignReceiver">...</p>
-                    </div>
-                    <div class="w-full sm:w-48 text-left sm:text-center">
-                      <p class="mb-1 text-xs text-slate-500">Mengetahui,</p>
-                      <p class="mb-16 text-xs font-bold text-slate-700" id="txtSlipKepsekTitle">...</p>
-                      <p class="font-bold border-b border-slate-300 pb-1 text-slate-800 uppercase block w-full" id="txtSlipKepsekName">...</p>
-                    </div>
-                 </div>
-                 <div class="mt-8 pt-4 border-t border-slate-100 text-[10px] text-slate-400 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                     <span id="txtPrintedBy">Dicetak otomatis dari SiM-Guru</span>
-                     <div id="alertInfoFinal" class="bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded border border-yellow-100 flex items-start sm:items-center gap-2 font-medium w-full sm:w-auto">
-                        <span>⚠️ Total diterima bulan ini akan final dicetak mulai tanggal 02 bulan berikutnya.</span>
-                     </div>
-                 </div>
-             </div>
-          </div>
-       </div>
-       <div id="viewAdmin" class="hidden w-full">
-         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-           <div class="flex items-start gap-3">
-             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-md flex-shrink-0 mt-0.5">
-               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-               </svg>
-             </div>
-             <div>
-               <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Rekapitulasi Honorarium</h1>
-               <p class="text-sm text-slate-400 mt-0.5">Rekap &amp; finalisasi pembayaran honorarium guru per periode</p>
-             </div>
-           </div>
-           <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-             <div class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm hover:border-slate-300 transition flex-1 sm:flex-none">
-               <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-               </svg>
-               <select id="selAdminHonorMonth" onchange="loadAdminHonorByFilter()" aria-label="Pilih bulan" class="text-sm font-semibold text-slate-700 bg-transparent border-0 outline-none cursor-pointer"></select>
-               <span class="text-slate-300 text-sm font-light select-none">/</span>
-               <select id="selAdminHonorYear" onchange="loadAdminHonorByFilter()" aria-label="Pilih tahun" class="text-sm font-semibold text-slate-700 bg-transparent border-0 outline-none cursor-pointer"></select>
-             </div>
-             <button type="button" onclick="loadAdminHonorByFilter()" title="Muat ulang" aria-label="Muat ulang"
-               class="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95 flex items-center justify-center text-slate-500 transition shadow-sm flex-shrink-0">
-               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-               </svg>
-             </button>
-             <button id="btnFinalizeHonor" onclick="finalizeHonorarium()"
-               class="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-sm hover:shadow-md whitespace-nowrap">
-               <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-               </svg>
-               Finalisasi Periode Ini
-             </button>
-           </div>
-         </div>
-         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-             <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-               <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-               </svg>
-             </div>
-             <div class="min-w-0 flex-1">
-               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Periode Aktif</p>
-               <p id="lblAdminPeriode" class="text-base font-bold text-slate-900 leading-tight">—</p>
-               <p class="text-xs text-slate-400 mt-1">Periode yang ditampilkan</p>
-             </div>
-           </div>
-           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-             <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-               <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-               </svg>
-             </div>
-             <div>
-               <p class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Guru Penerima</p>
-               <p id="lblStatGuruCount" class="text-2xl font-bold text-blue-700">—</p>
-               <p class="text-xs text-slate-400 mt-1">orang menerima honor</p>
-             </div>
-           </div>
-           <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-md p-5 flex items-start gap-4 hover:shadow-lg transition-shadow relative overflow-hidden">
-             <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 pointer-events-none"></div>
-             <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 relative z-10">
-               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-               </svg>
-             </div>
-             <div class="min-w-0 flex-1 relative z-10">
-               <p class="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">Total Payout</p>
-               <p id="lblGrandTotalPayout" class="text-xl font-bold text-white leading-tight truncate">Rp 0</p>
-               <p class="text-xs text-blue-200 mt-1">total honor periode ini</p>
-             </div>
-           </div>
-         </div>
-         <div id="bannerFinalizedAdmin" class="hidden mb-5 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
-           <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-             <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-             </svg>
-           </div>
-           <div class="flex-1 min-w-0">
-             <p class="text-emerald-800 text-sm font-bold">Periode ini sudah difinalisasi ✅</p>
-             <p class="text-emerald-600 text-xs mt-0.5">Data yang ditampilkan adalah data final yang telah tersimpan secara permanen di database</p>
-           </div>
-         </div>
-         <div id="printAreaRecap" class="bg-white rounded-2xl shadow-sm border border-slate-200 w-full overflow-hidden">
-           <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4 flex-wrap">
-             <div>
-               <h2 class="font-bold text-slate-800 text-sm">Daftar Penerima Honorarium</h2>
-               <p class="text-xs text-slate-400 mt-0.5">Rincian per guru untuk periode yang dipilih</p>
-             </div>
-             <span id="lblStatEntriCount" class="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap">0 Guru</span>
-           </div>
-           <div class="overflow-x-auto w-full">
-             <table class="w-full text-sm min-w-[750px]">
-               <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wide border-b border-slate-200">
-                 <tr>
-                   <th class="px-5 sm:px-6 py-3.5 text-left font-bold">Guru</th>
-                   <th class="px-5 sm:px-6 py-3.5 text-center font-bold">Total JTM</th>
-                   <th class="px-5 sm:px-6 py-3.5 text-right font-bold">Tgs. Tambahan</th>
-                   <th class="px-5 sm:px-6 py-3.5 text-right font-bold">Transportasi</th>
-                   <th class="px-5 sm:px-6 py-3.5 text-right font-bold">Total Diterima</th>
-                   <th class="px-5 sm:px-6 py-3.5 text-center font-bold">Status</th>
-                 </tr>
-               </thead>
-               <tbody id="tbodyAdminRecap" class="divide-y divide-slate-50"></tbody>
-             </table>
-           </div>
-         </div>
-       </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_HonorariumHistory":
-        return `<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      .ah-hero {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 55%, #1E3665 100%);
-        padding: 2rem 2rem 2.5rem;
-        position: relative;
-      }
-      .ah-hero::before {
-        content:''; position:absolute; width:280px; height:280px; border-radius:50%;
-        background:radial-gradient(circle,rgba(59,130,246,.18) 0%,transparent 70%);
-        top:-70px; right:-50px; pointer-events:none;
-      }
-      .ah-hero-tag {
-        display:inline-flex; align-items:center; gap:6px;
-        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-        border-radius:999px; padding:4px 12px;
-        font-size:.7rem; font-weight:700; color:#93C5FD;
-        letter-spacing:.06em; text-transform:uppercase; margin-bottom:.75rem;
-      }
-      .ah-hero-title {
-        font-size:clamp(1.35rem,3.5vw,2rem); font-weight:800;
-        color:#F1F5F9; letter-spacing:-.5px; line-height:1.2;
-        position:relative; z-index:1;
-      }
-      .ah-hero-sub { font-size:.825rem; color:#94A3B8; margin-top:.35rem; }
-      .ah-pills { display:flex; flex-wrap:wrap; gap:.625rem; margin-top:1.5rem; }
-      .ah-pill {
-        display:flex; align-items:center; gap:8px;
-        background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
-        border-radius:12px; padding:8px 14px;
-      }
-      .ah-pill-icon {
-        width:32px; height:32px; border-radius:8px;
-        display:flex; align-items:center; justify-content:center; flex-shrink:0;
-      }
-      .ah-pill-num { font-size:1.15rem; font-weight:800; color:#F1F5F9; line-height:1; }
-      .ah-pill-lbl { font-size:.65rem; font-weight:600; color:#64748B; text-transform:uppercase; letter-spacing:.05em; }
-      .ah-content { padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
-      @media (min-width:640px) { .ah-content { padding:2rem; } }
-      .ah-panel {
-        background:white; border-radius:1.25rem;
-        border:1px solid #E2E8F0;
-        box-shadow:0 2px 8px rgba(15,23,42,.05),0 8px 24px rgba(15,23,42,.03);
-        overflow:hidden;
-      }
-      .ah-panel-header {
-        padding:1rem 1.5rem; border-bottom:1px solid #F1F5F9;
-        display:flex; align-items:center; justify-content:space-between;
-        background:linear-gradient(to right,#FAFBFD,#F8FAFC);
-      }
-      .ah-panel-header-left { display:flex; align-items:center; gap:.75rem; }
-      .ah-panel-icon {
-        width:36px; height:36px; border-radius:9px;
-        display:flex; align-items:center; justify-content:center; flex-shrink:0;
-      }
-      .ah-panel-title { font-size:.875rem; font-weight:700; color:#1E293B; }
-      .ah-panel-sub { font-size:.7rem; color:#94A3B8; font-weight:500; margin-top:1px; }
-      .ah-cards-grid {
-        display:grid;
-        grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
-        gap:1rem;
-        padding:1.25rem 1.5rem;
-      }
-      .ah-honor-card {
-        border-radius:1rem; border:1px solid #E2E8F0;
-        background:#FAFBFD; overflow:hidden;
-        transition:box-shadow .2s ease, transform .2s ease;
-        display:flex; flex-direction:column;
-      }
-      .ah-honor-card:hover {
-        box-shadow:0 6px 20px rgba(15,23,42,.1);
-        transform:translateY(-2px);
-      }
-      .ah-honor-card-top {
-        padding:.875rem 1.125rem .75rem;
-        border-bottom:1px solid #F1F5F9;
-        display:flex; align-items:center; justify-content:space-between;
-      }
-      .ah-honor-card-periode {
-        font-size:.875rem; font-weight:800; color:#1E293B;
-        letter-spacing:-.2px;
-      }
-      .ah-honor-card-body { padding:.875rem 1.125rem; flex:1; }
-      .ah-honor-card-row {
-        display:flex; align-items:center; justify-content:space-between;
-        margin-bottom:.5rem;
-      }
-      .ah-honor-card-row:last-of-type { margin-bottom:0; }
-      .ah-honor-card-lbl { font-size:.7rem; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:.04em; }
-      .ah-honor-card-val { font-size:.8125rem; font-weight:700; color:#334155; }
-      .ah-honor-card-foot {
-        padding:.75rem 1.125rem;
-        border-top:1px solid #F1F5F9;
-        background:white;
-      }
-      .ah-slip-btn {
-        width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
-        padding:.5rem 1rem; border-radius:.625rem;
-        background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;
-        font-size:.78rem; font-weight:700; cursor:pointer;
-        transition:all .15s ease;
-      }
-      .ah-slip-btn:hover { background:#DBEAFE; border-color:#93C5FD; }
-      .ah-filter-bar {
-        display:flex; flex-wrap:wrap; align-items:center; gap:.75rem;
-        padding:1rem 1.5rem;
-        background:white; border-radius:1.25rem;
-        border:1px solid #E2E8F0;
-        box-shadow:0 2px 8px rgba(15,23,42,.04);
-      }
-      .ah-filter-label {
-        font-size:.7rem; font-weight:800; color:#94A3B8;
-        text-transform:uppercase; letter-spacing:.06em; flex-shrink:0;
-        display:flex; align-items:center; gap:6px;
-      }
-      .ah-filter-sep { width:1px; height:20px; background:#E2E8F0; flex-shrink:0; }
-      .ah-filter-select {
-        padding:.45rem .875rem; border-radius:.625rem;
-        border:1px solid #E2E8F0; font-size:.8125rem; font-weight:600;
-        color:#334155; background:white; outline:none; cursor:pointer;
-        transition:border-color .15s ease, box-shadow .15s ease;
-        min-width:180px;
-      }
-      .ah-filter-select:focus { border-color:#93C5FD; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
-      .ah-admin-stats {
-        display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;
-      }
-      @media (max-width:640px) { .ah-admin-stats { grid-template-columns:1fr; } }
-      .ah-admin-stat {
-        background:white; border-radius:1rem;
-        border:1px solid #E2E8F0; padding:1rem 1.25rem;
-        box-shadow:0 1px 4px rgba(15,23,42,.04);
-        display:flex; align-items:center; gap:.875rem;
-        position:relative; overflow:hidden;
-      }
-      .ah-admin-stat-accent {
-        position:absolute; top:0; left:0; bottom:0;
-        width:4px; border-radius:1rem 0 0 1rem;
-      }
-      .ah-admin-stat-icon {
-        width:40px; height:40px; border-radius:10px;
-        display:flex; align-items:center; justify-content:center; flex-shrink:0;
-      }
-      .ah-admin-stat-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#94A3B8; }
-      .ah-admin-stat-val { font-size:1.5rem; font-weight:800; color:#0F172A; letter-spacing:-.5px; line-height:1.1; margin-top:.15rem; }
-      .ah-table { width:100%; border-collapse:collapse; font-size:.8125rem; }
-      .ah-table thead { position:sticky; top:0; z-index:4; }
-      .ah-table th {
-        padding:.75rem 1.25rem; text-align:left;
-        font-size:.625rem; font-weight:800; text-transform:uppercase;
-        letter-spacing:.08em; color:#94A3B8; background:#FAFBFD;
-        border-bottom:1px solid #F1F5F9;
-      }
-      .ah-table td {
-        padding:.9375rem 1.25rem; color:#334155;
-        border-bottom:1px solid #F8FAFC; vertical-align:middle;
-      }
-      .ah-table tbody tr:last-child td { border-bottom:none; }
-      .ah-table tbody tr { transition:background .12s ease; }
-      .ah-table tbody tr:hover td { background:#F8FAFC; }
-      .ah-periode-badge {
-        display:inline-flex; align-items:center; gap:5px;
-        padding:3px 10px; border-radius:7px;
-        font-size:.75rem; font-weight:800;
-        background:#F8FAFC; color:#1E293B; border:1px solid #E2E8F0;
-      }
-      .ah-jtm-badge {
-        display:inline-flex; align-items:center; gap:4px;
-        padding:3px 10px; border-radius:999px;
-        font-size:.72rem; font-weight:800;
-        background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;
-      }
-      .ah-nominal { font-weight:800; color:#059669; font-size:.875rem; }
-      .ah-btn-slip {
-        display:inline-flex; align-items:center; gap:5px;
-        padding:5px 12px; border-radius:8px;
-        font-size:.72rem; font-weight:700; cursor:pointer;
-        background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE;
-        transition:all .15s ease;
-      }
-      .ah-btn-slip:hover { background:#E0E7FF; border-color:#A5B4FC; }
-      .ah-empty {
-        display:flex; flex-direction:column; align-items:center;
-        justify-content:center; padding:3.5rem 1rem; text-align:center; color:#94A3B8;
-      }
-      .ah-empty-icon {
-        width:56px; height:56px; border-radius:14px; margin-bottom:1rem;
-        background:#F1F5F9; border:1px solid #E2E8F0;
-        display:flex; align-items:center; justify-content:center;
-      }
-      .ah-pagination-wrap {
-        display:flex; flex-wrap:wrap; align-items:center;
-        justify-content:space-between; gap:.875rem;
-        padding:1rem 1.5rem; border-top:1px solid #F1F5F9;
-        background:linear-gradient(to right,#FAFBFD,#F8FAFC);
-        border-radius:0 0 1.25rem 1.25rem;
-      }
-      .ah-pagination-info {
-        font-size:.75rem; font-weight:600; color:#64748B; white-space:nowrap;
-      }
-      .ah-pagination-info strong { color:#334155; font-weight:800; }
-      .ah-pagination-controls {
-        display:flex; align-items:center; gap:.3rem; flex-wrap:wrap;
-      }
-      .ah-pg-btn {
-        display:inline-flex; align-items:center; justify-content:center;
-        min-width:34px; height:34px; padding:0 .5rem;
-        border-radius:9px; font-size:.8rem; font-weight:700; letter-spacing:-.2px;
-        border:1px solid #E2E8F0; background:white; color:#475569;
-        cursor:pointer; transition:all .18s cubic-bezier(.4,0,.2,1);
-        box-shadow:0 1px 2px rgba(15,23,42,.04);
-      }
-      .ah-pg-btn:hover:not(:disabled):not(.ah-pg-active) {
-        background:#F1F5F9; border-color:#CBD5E1; color:#1E293B;
-        transform:translateY(-1px); box-shadow:0 2px 6px rgba(15,23,42,.08);
-      }
-      .ah-pg-btn:active:not(:disabled) { transform:scale(.93); }
-      .ah-pg-btn:disabled { opacity:.35; cursor:not-allowed; box-shadow:none; }
-      .ah-pg-active {
-        background:linear-gradient(135deg,#3B82F6 0%,#6366F1 100%);
-        color:white; border-color:transparent;
-        box-shadow:0 3px 10px rgba(99,102,241,.38);
-        transform:translateY(-1px);
-      }
-      .ah-pg-nav {
-        background:white; color:#64748B;
-      }
-      .ah-pg-dots {
-        color:#CBD5E1; font-size:.95rem; padding:0 .25rem; line-height:34px;
-        user-select:none; letter-spacing:.1em;
-      }
-      .ah-pagination-perpage {
-        display:flex; align-items:center; gap:.5rem;
-      }
-      .ah-pagination-perpage-lbl {
-        font-size:.72rem; font-weight:600; color:#94A3B8; white-space:nowrap;
-      }
-      .ah-pagination-perpage-select {
-        padding:.3rem .65rem; border-radius:8px;
-        border:1px solid #E2E8F0; font-size:.78rem; font-weight:700;
-        color:#334155; background:white; outline:none; cursor:pointer;
-        transition:border-color .15s, box-shadow .15s;
-      }
-      .ah-pagination-perpage-select:focus {
-        border-color:#93C5FD; box-shadow:0 0 0 3px rgba(59,130,246,.1);
-      }
-      .ah-search-wrap { position:relative; flex:1; min-width:180px; }
-      .ah-search-input {
-        width:100%; padding:.45rem .875rem .45rem 2.2rem;
-        border-radius:.625rem; border:1px solid #E2E8F0;
-        font-size:.8125rem; font-weight:500; color:#334155; background:white;
-        outline:none; transition:border-color .15s ease, box-shadow .15s ease;
-      }
-      .ah-search-input:focus {
-        border-color:#93C5FD; box-shadow:0 0 0 3px rgba(59,130,246,.1);
-      }
-      .ah-search-input::placeholder { color:#CBD5E1; }
-      .ah-search-icon {
-        position:absolute; left:.65rem; top:50%; transform:translateY(-50%);
-        pointer-events:none; color:#CBD5E1;
-      }
-      @media (max-width:640px) {
-        .ah-pagination-wrap { flex-direction:column; align-items:stretch; gap:.625rem; }
-        .ah-pagination-info { text-align:center; }
-        .ah-pagination-controls { justify-content:center; }
-        .ah-pagination-perpage { justify-content:center; }
-      }
-      .ah-guru-filter-bar {
-        border-bottom: 1px solid #F1F5F9;
-        background: linear-gradient(to bottom, #FAFBFD, #FFFFFF);
-        padding: 1rem 1.5rem;
-        display: flex;
-        flex-direction: column;
-        gap: .875rem;
-      }
-      .ah-guru-filter-row {
-        display: flex;
-        align-items: center;
-        gap: .75rem;
-        flex-wrap: nowrap;
-      }
-      .ah-guru-filter-lbl {
-        font-size: .65rem; font-weight: 800; color: #94A3B8;
-        text-transform: uppercase; letter-spacing: .07em;
-        white-space: nowrap; display: flex; align-items: center;
-        gap: 5px; flex-shrink: 0; min-width: 48px;
-      }
-      .ah-guru-filter-divider {
-        width: 1px; height: 18px; background: #E2E8F0; flex-shrink: 0;
-      }
-      .ah-guru-chips-scroll {
-        display: flex; align-items: center; gap: .4rem;
-        overflow-x: auto; padding-bottom: 2px;
-        scrollbar-width: none; -ms-overflow-style: none; flex: 1;
-      }
-      .ah-guru-chips-scroll::-webkit-scrollbar { display: none; }
-      .ah-guru-year-chip {
-        display: inline-flex; align-items: center;
-        padding: .35rem .9rem; border-radius: 999px;
-        font-size: .78rem; font-weight: 700; cursor: pointer;
-        border: 1.5px solid #E2E8F0; background: white; color: #64748B;
-        white-space: nowrap; transition: all .18s cubic-bezier(.4,0,.2,1);
-        flex-shrink: 0;
-      }
-      .ah-guru-year-chip:hover:not(.ah-guru-year-active) {
-        border-color: #CBD5E1; background: #F8FAFC; color: #334155;
-        transform: translateY(-1px);
-      }
-      .ah-guru-year-active {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
-        color: white !important; border-color: transparent !important;
-        box-shadow: 0 3px 10px rgba(15,23,42,.28); transform: translateY(-1px);
-      }
-      .ah-guru-month-chip {
-        display: inline-flex; align-items: center;
-        padding: .28rem .75rem; border-radius: 8px;
-        font-size: .75rem; font-weight: 700; cursor: pointer;
-        border: 1.5px solid #E2E8F0; background: white; color: #64748B;
-        white-space: nowrap; transition: all .16s ease;
-        flex-shrink: 0; letter-spacing: -.1px;
-      }
-      .ah-guru-month-chip:hover:not(.ah-guru-month-active) {
-        border-color: #BFDBFE; background: #EFF6FF; color: #1D4ED8;
-        transform: translateY(-1px);
-      }
-      .ah-guru-month-active {
-        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
-        color: white !important; border-color: transparent !important;
-        box-shadow: 0 3px 8px rgba(99,102,241,.32); transform: translateY(-1px);
-      }
-      .ah-guru-month-row { display: none; }
-      .ah-guru-month-row.visible { display: flex; }
-      .ah-guru-filter-result {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: .5rem .875rem; border-radius: .625rem;
-        background: #F8FAFC; border: 1px solid #F1F5F9;
-      }
-      .ah-guru-result-info {
-        display: flex; align-items: center; gap: .5rem;
-        font-size: .75rem; font-weight: 600; color: #64748B;
-      }
-      .ah-guru-result-dot {
-        width: 6px; height: 6px; border-radius: 50%; background: #10B981;
-        flex-shrink: 0; box-shadow: 0 0 0 3px rgba(16,185,129,.18);
-      }
-      .ah-guru-result-dot.filtered {
-        background: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.18);
-      }
-      .ah-guru-reset-btn {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: .28rem .75rem; border-radius: 7px;
-        font-size: .72rem; font-weight: 700; color: #EF4444;
-        background: #FEF2F2; border: 1px solid #FCA5A5;
-        cursor: pointer; transition: all .15s ease;
-      }
-      .ah-guru-reset-btn:hover { background: #FEE2E2; border-color: #F87171; }
-      @keyframes cardReveal {
-        from { opacity:0; transform:translateY(8px) scale(.97); }
-        to   { opacity:1; transform:translateY(0) scale(1); }
-      }
-      .ah-card-reveal { animation: cardReveal .2s ease-out both; }
-      @media (max-width:640px) {
-        .ah-guru-filter-bar { padding: .875rem 1rem; }
-        .ah-guru-filter-lbl { display: none; }
-        .ah-guru-filter-divider { display: none; }
-      }
-    </style>
-    <div id="viewGuruHistory" class="hidden">
-      <div class="ah-hero">
-        <div class="relative z-10">
-          <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <div class="ah-hero-tag">
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="#93C5FD"><circle cx="4" cy="4" r="4"/></svg>
-                Arsip Honorarium
-              </div>
-              <h1 class="ah-hero-title">Riwayat Honor Saya</h1>
-              <p class="ah-hero-sub">Rekap honorarium bulanan yang telah difinalisasi</p>
-            </div>
-            <button type="button" onclick="handleNav('Page_Honorarium')"
-              style="display:inline-flex;align-items:center;gap:6px;padding:.5rem 1rem;border-radius:.625rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#F1F5F9;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s ease;backdrop-filter:blur(8px);"
-              onmouseover="this.style.background='rgba(255,255,255,.18)'"
-              onmouseout="this.style.background='rgba(255,255,255,.1)'">
-              <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              Lihat Slip Bulan Ini
-            </button>
-          </div>
-          <div class="ah-pills">
-            <div class="ah-pill">
-              <div class="ah-pill-icon" style="background:rgba(59,130,246,.18);">
-                <svg class="w-4 h-4" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                </svg>
-              </div>
-              <div>
-                <div class="ah-pill-num" id="guruStatPeriods">—</div>
-                <div class="ah-pill-lbl" id="guruStatPeriodsLbl">Total Periode</div>
-              </div>
-            </div>
-            <div class="ah-pill">
-              <div class="ah-pill-icon" style="background:rgba(16,185,129,.18);">
-                <svg class="w-4 h-4" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div>
-                <div class="ah-pill-num" id="guruStatJtm">—</div>
-                <div class="ah-pill-lbl">Akumulasi JTM</div>
-              </div>
-            </div>
-            <div class="ah-pill">
-              <div class="ah-pill-icon" style="background:rgba(245,158,11,.18);">
-                <svg class="w-4 h-4" style="color:#FCD34D;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div>
-                <div class="ah-pill-num" id="guruStatTotal" style="font-size:.85rem;">—</div>
-                <div class="ah-pill-lbl">Total Diterima</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="ah-content">
-        <div class="ah-panel">
-          <div class="ah-panel-header">
-            <div class="ah-panel-header-left">
-              <div class="ah-panel-icon" style="background:#EFF6FF;">
-                <svg style="color:#3B82F6;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="ah-panel-title">Daftar Slip Honorarium</p>
-                <p class="ah-panel-sub">Klik "Lihat Slip" untuk melihat detail rincian</p>
-              </div>
-            </div>
-            <span id="guruHistoryBadge" style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:800;background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;">Memuat...</span>
-          </div>
-          <div id="guruHonorFilterBar" class="ah-guru-filter-bar" style="display:none;">
-            <div class="ah-guru-filter-row">
-              <span class="ah-guru-filter-lbl">
-                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                Tahun
-              </span>
-              <div class="ah-guru-filter-divider"></div>
-              <div id="guruYearChips" class="ah-guru-chips-scroll">
-              </div>
-            </div>
-            <div id="guruMonthRow" class="ah-guru-filter-row ah-guru-month-row">
-              <span class="ah-guru-filter-lbl">
-                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                Bulan
-              </span>
-              <div class="ah-guru-filter-divider"></div>
-              <div id="guruMonthChips" class="ah-guru-chips-scroll">
-              </div>
-            </div>
-            <div class="ah-guru-filter-result">
-              <div class="ah-guru-result-info">
-                <span id="guruFilterDot" class="ah-guru-result-dot"></span>
-                <span id="guruFilterResultText">— periode tersedia</span>
-              </div>
-              <button id="guruFilterResetBtn" onclick="resetGuruHonorFilter()"
-                class="ah-guru-reset-btn" style="display:none;">
-                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                Reset Filter
-              </button>
-            </div>
-          </div>
-          <div id="tbodyHonorHistory" class="ah-cards-grid">
-            <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
-              <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
-            </div>
-            <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
-              <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
-            </div>
-            <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
-              <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
-              <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="viewAdminHistory" class="hidden">
-      <div class="ah-hero">
-        <div class="relative z-10">
-          <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <div class="ah-hero-tag" style="color:#FCD34D;">
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="#FCD34D"><circle cx="4" cy="4" r="4"/></svg>
-                Administrator
-              </div>
-              <h1 class="ah-hero-title">Arsip Honorarium Semua Guru</h1>
-              <p class="ah-hero-sub">Data honorarium final semua periode yang telah difinalisasi</p>
-            </div>
-            <button type="button" onclick="handleNav('Page_Honorarium')"
-              style="display:inline-flex;align-items:center;gap:6px;padding:.5rem 1rem;border-radius:.625rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#F1F5F9;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s ease;backdrop-filter:blur(8px);"
-              onmouseover="this.style.background='rgba(255,255,255,.18)'"
-              onmouseout="this.style.background='rgba(255,255,255,.1)'">
-              <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-              </svg>
-              Rekap Periode Aktif
-            </button>
-          </div>
-          <div class="ah-pills">
-            <div class="ah-pill">
-              <div class="ah-pill-icon" style="background:rgba(249,115,22,.18);">
-                <svg class="w-4 h-4" style="color:#FB923C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
-                </svg>
-              </div>
-              <div>
-                <div class="ah-pill-num" id="admStatPeriods">—</div>
-                <div class="ah-pill-lbl">Periode</div>
-              </div>
-            </div>
-            <div class="ah-pill">
-              <div class="ah-pill-icon" style="background:rgba(59,130,246,.18);">
-                <svg class="w-4 h-4" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
-              </div>
-              <div>
-                <div class="ah-pill-num" id="admStatGuru">—</div>
-                <div class="ah-pill-lbl">Guru Tercatat</div>
-              </div>
-            </div>
-            <div class="ah-pill">
-              <div class="ah-pill-icon" style="background:rgba(16,185,129,.18);">
-                <svg class="w-4 h-4" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-              </div>
-              <div>
-                <div class="ah-pill-num" id="admStatTotal" style="font-size:.85rem;">—</div>
-                <div class="ah-pill-lbl">Total Entri</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="ah-content">
-        <div class="ah-filter-bar">
-          <span class="ah-filter-label">
-            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-            </svg>
-            Filter Periode
-          </span>
-          <div class="ah-filter-sep"></div>
-          <select id="selAdminHistoryFilter" onchange="filterAdminHistoryByPeriod()" class="ah-filter-select" aria-label="Filter berdasarkan periode">
-            <option value="">Semua Periode</option>
-          </select>
-          <div class="ah-filter-sep"></div>
-          <div class="ah-search-wrap">
-            <svg class="ah-search-icon" style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-            <input type="text" id="admHistorySearch" oninput="filterAdminHistorySearchDebounced()" placeholder="Cari nama guru..." class="ah-search-input" autocomplete="off" aria-label="Cari guru">
-            <button type="button" id="admSearchClearBtn" onclick="clearAdminHistorySearch()" aria-label="Bersihkan pencarian"
-              style="position:absolute;right:.45rem;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:#E2E8F0;color:#64748B;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;">
-              <svg style="width:10px;height:10px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-          <button type="button" id="admFilterResetBtn" onclick="clearAdminHistoryFilter()" class="ah-guru-reset-btn" style="display:none;" title="Reset semua filter">
-            <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            Reset
-          </button>
-          <button type="button" onclick="exportAdminHonorHistoryExcel()" title="Unduh Excel"
-            style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:.4rem .85rem;border-radius:8px;font-size:.72rem;font-weight:700;color:#0F766E;background:#ECFDF5;border:1px solid #A7F3D0;cursor:pointer;transition:all .15s ease;">
-            <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
-            Unduh Excel
-          </button>
-          <span id="admFilterCount" style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:800;background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;">Memuat...</span>
-        </div>
-        <div class="ah-panel">
-          <div class="ah-panel-header">
-            <div class="ah-panel-header-left">
-              <div class="ah-panel-icon" style="background:#ECFDF5;">
-                <svg style="color:#10B981;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="ah-panel-title">Rekap Honorarium Per Guru</p>
-                <p class="ah-panel-sub">Data final setelah finalisasi per periode</p>
-              </div>
-            </div>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="ah-table">
-              <thead>
-                <tr>
-                  <th>Periode</th>
-                  <th>Nama Guru</th>
-                  <th style="text-align:center;">Total JTM</th>
-                  <th style="text-align:right;">Tgs. Tambahan</th>
-                  <th style="text-align:right;">Transportasi</th>
-                  <th style="text-align:right;">Nominal Diterima</th>
-                  <th style="text-align:center;">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyAdminHonorHistory">
-              </tbody>
-            </table>
-          </div>
-          <div id="adminHonorPaginationWrap" class="ah-pagination-wrap">
-            <div class="ah-pagination-info">
-              <span id="admPaginationInfo">—</span>
-            </div>
-            <div id="admPaginationControls" class="ah-pagination-controls">
-            </div>
-            <div class="ah-pagination-perpage">
-              <span class="ah-pagination-perpage-lbl">Tampilkan</span>
-              <select id="admItemsPerPage" onchange="changeAdminHonorItemsPerPage()" class="ah-pagination-perpage-select">
-                <option value="10" selected>10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-              <span class="ah-pagination-perpage-lbl">per halaman</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_ManageSchedule":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6 space-y-5">
-      <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-200">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-xl font-extrabold text-slate-800 tracking-tight leading-tight">Manajemen Jadwal Pelajaran</h1>
-            <p class="text-slate-500 text-xs mt-0.5">Kelola &amp; pantau jadwal mengajar seluruh guru</p>
-          </div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
-          <button onclick="openRekapKelas()" class="inline-flex items-center gap-1.5 bg-white text-violet-700 border border-violet-200 px-3.5 py-2 rounded-xl font-semibold text-xs hover:bg-violet-50 active:scale-95 transition shadow-sm">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-            Rekap Kelas
-          </button>
-          <button onclick="openRekapGuru()" class="inline-flex items-center gap-1.5 bg-white text-teal-700 border border-teal-200 px-3.5 py-2 rounded-xl font-semibold text-xs hover:bg-teal-50 active:scale-95 transition shadow-sm">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            Rekap Guru
-          </button>
-          <button onclick="openRekapHari()" class="inline-flex items-center gap-1.5 bg-white text-amber-700 border border-amber-200 px-3.5 py-2 rounded-xl font-semibold text-xs hover:bg-amber-50 active:scale-95 transition shadow-sm">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            Rekap Hari
-          </button>
-          <button onclick="openRekapKelasHari()" class="inline-flex items-center gap-1.5 bg-white text-sky-700 border border-sky-200 px-3.5 py-2 rounded-xl font-semibold text-xs hover:bg-sky-50 active:scale-95 transition shadow-sm">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
-            Rekap Kelas/Hari
-          </button>
-          <button id="btnDeleteSelectedSchedules" onclick="deleteSelectedSchedules()" class="hidden inline-flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-rose-700 active:scale-95 shadow-md shadow-rose-200 transition">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-            Hapus Terpilih (<span id="countSelectedSchedules">0</span>)
-          </button>
-          <button onclick="openScheduleModal()" class="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-blue-700 active:scale-95 shadow-md shadow-blue-200 transition">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Tambah Jadwal
-          </button>
-        </div>
-      </div>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-            </svg>
-          </div>
-          <p class="text-2xl font-extrabold text-slate-800" id="statTotalJadwal"><span class="skeleton inline-block h-7 w-10 rounded"></span></p>
-          <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Total Jadwal</p>
-        </div>
-        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
-          </div>
-          <p class="text-2xl font-extrabold text-slate-800" id="statTotalHari"><span class="skeleton inline-block h-7 w-10 rounded"></span></p>
-          <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Hari Aktif</p>
-        </div>
-        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-          </div>
-          <p class="text-2xl font-extrabold text-slate-800" id="statTotalGuru"><span class="skeleton inline-block h-7 w-10 rounded"></span></p>
-          <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Guru Terjadwal</p>
-        </div>
-        <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-3">
-            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </div>
-          <p class="text-2xl font-extrabold text-slate-800" id="statTotalJTM"><span class="skeleton inline-block h-7 w-10 rounded"></span></p>
-          <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">Total JTM/Minggu</p>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50/70">
-          <div class="flex items-center gap-2">
-            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-            </svg>
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filter &amp; Pencarian</span>
-            <span id="badgeFilterActive" class="hidden inline-flex items-center gap-1 bg-blue-100 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              <span id="badgeFilterActiveCount">0</span> AKTIF
-            </span>
-          </div>
-          <button id="btnClearFilters" type="button" onclick="clearScheduleFilters()" class="hidden text-[10px] font-bold text-slate-500 hover:text-rose-600 transition inline-flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-            Reset Filter
-          </button>
-        </div>
-        <div class="p-4">
-          <div class="flex flex-col gap-3">
-            <div class="flex flex-col md:flex-row gap-3">
-              <div class="flex-1 relative">
-                <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                  </svg>
-                </div>
-                <input type="text" id="filterSearch" oninput="applyScheduleFilters()" placeholder="Cari nama guru atau mata pelajaran..." class="w-full pl-10 pr-9 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none bg-slate-50 hover:bg-white transition placeholder:text-slate-400">
-                <button id="btnClearSearch" type="button" onclick="clearScheduleSearch()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-90 transition flex items-center justify-center" aria-label="Hapus pencarian">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <div class="flex gap-3">
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                    </svg>
-                  </div>
-                  <select id="filterDay" onchange="applyScheduleFilters()" class="pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-slate-50 hover:bg-white transition w-full md:w-36">
-                    <option value="">Semua Hari</option>
-                    <option value="1">Senin</option>
-                    <option value="2">Selasa</option>
-                    <option value="3">Rabu</option>
-                    <option value="4">Kamis</option>
-                    <option value="5">Jumat</option>
-                    <option value="6">Sabtu</option>
-                  </select>
-                </div>
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21V5a2 2 0 012-2h14a2 2 0 012 2v16m-7-5h-2m-4-6h10"/>
-                    </svg>
-                  </div>
-                  <select id="filterClass" onchange="applyScheduleFilters()" class="pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-slate-50 hover:bg-white transition w-full md:w-36"></select>
-                </div>
-              </div>
-            </div>
-            <div class="flex flex-col md:flex-row gap-3">
-              <div class="flex-1"></div>
-              <div class="flex gap-3">
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
-                  </div>
-                  <input type="text" id="filterTahunPelajaran" oninput="applyScheduleFilters()" placeholder="Tahun (e.g. 2025/2026)" class="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 hover:bg-white transition md:w-48">
-                </div>
-                <div class="relative">
-                  <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  </div>
-                  <select id="filterSemester" onchange="applyScheduleFilters()" class="pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-slate-50 hover:bg-white transition w-full md:w-44">
-                    <option value="">Semua Semester</option>
-                    <option value="Ganjil">Ganjil</option>
-                    <option value="Genap">Genap</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/70 gap-2">
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-            </svg>
-            <span class="text-sm font-bold text-slate-700">Daftar Jadwal</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button id="btnRefreshSchedules" type="button" onclick="reloadScheduleWithFilters()" title="Muat ulang"
-              class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 active:scale-95 transition">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            </button>
-            <span id="labelJadwalCount" class="text-xs font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">Memuat...</span>
-          </div>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm text-left">
-            <thead>
-              <tr class="border-b border-slate-100">
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 w-10 text-center">
-                  <input type="checkbox" id="checkAllSchedules" onclick="toggleAllScheduleCheckboxes(this)" class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer">
-                </th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 w-28">Hari</th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 w-28">Jam</th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">Guru Pengampu</th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 w-20">Kelas</th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50">Mata Pelajaran</th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 text-center w-16">JTM</th>
-                <th class="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/50 text-center w-24">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyManageSchedule">
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_MySchedule":
-        return `<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      #page-myschedule-root, #page-myschedule-root * { box-sizing: border-box; }
-      .ms-hero {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 55%, #1E3665 100%);
-        padding: 2rem 2rem 2.5rem;
-        position: relative;
-        overflow: hidden;
-        min-width: 0;
-      }
-      @media (max-width: 640px) {
-        .ms-hero { padding: 1.25rem 1rem 1.5rem; }
-      }
-      .ms-hero::before {
-        content: ''; position: absolute;
-        width: 300px; height: 300px; border-radius: 50%;
-        background: radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%);
-        top: -80px; right: -60px; pointer-events: none;
-      }
-      .ms-hero::after {
-        content: ''; position: absolute;
-        width: 200px; height: 200px; border-radius: 50%;
-        background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
-        bottom: 10px; left: 25%; pointer-events: none;
-      }
-      .ms-hero-tag {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 999px; padding: 4px 12px;
-        font-size: 0.7rem; font-weight: 700; color: #93C5FD;
-        letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.75rem;
-      }
-      .ms-hero-title {
-        font-size: clamp(1.2rem, 3.5vw, 2rem); font-weight: 800;
-        color: #F1F5F9; letter-spacing: -0.5px; line-height: 1.2;
-        position: relative; z-index: 1;
-        word-break: break-word;
-      }
-      .ms-hero-sub {
-        font-size: 0.825rem; color: #94A3B8; margin-top: 0.35rem;
-        position: relative; z-index: 1;
-        word-break: break-word;
-      }
-      .ms-stat-pills {
-        display: flex; flex-wrap: wrap; gap: 0.625rem; margin-top: 1.5rem;
-        position: relative; z-index: 1;
-      }
-      .ms-stat-pill {
-        display: flex; align-items: center; gap: 8px;
-        background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 12px; padding: 8px 14px;
-        transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-        min-width: 0; flex: 0 1 auto;
-      }
-      .ms-stat-pill:hover {
-        background: rgba(255,255,255,0.12);
-        border-color: rgba(255,255,255,0.22);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-      }
-      .ms-stat-pill[data-clickable] { cursor: pointer; }
-      .ms-stat-pill-icon {
-        width: 32px; height: 32px; border-radius: 8px;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      }
-      .ms-stat-pill > div:last-child { min-width: 0; }
-      .ms-stat-pill-num { font-size: 1.15rem; font-weight: 800; color: #F1F5F9; line-height: 1.1; white-space: nowrap; }
-      .ms-stat-pill-lbl {
-        font-size: 0.65rem; font-weight: 600; color: #94A3B8;
-        text-transform: uppercase; letter-spacing: 0.05em;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      @media (max-width: 480px) {
-        .ms-stat-pill { flex: 1 1 calc(50% - 0.625rem); padding: 8px 10px; }
-        .ms-stat-pill-num { font-size: 1rem; }
-        .ms-stat-pill-lbl { font-size: 0.6rem; letter-spacing: 0.03em; }
-      }
-      .ms-content {
-        padding: 1.5rem;
-        min-width: 0;
-      }
-      @media (min-width: 640px) { .ms-content { padding: 2rem; } }
-      @media (max-width: 480px) { .ms-content { padding: 1rem; } }
-      .ms-card {
-        background: white; border-radius: 1.25rem;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 2px 8px rgba(15,23,42,0.05), 0 8px 24px rgba(15,23,42,0.03);
-        overflow: hidden;
-        transition: box-shadow 0.2s ease;
-        min-width: 0;
-      }
-      .ms-card:hover {
-        box-shadow: 0 4px 14px rgba(15,23,42,0.08), 0 16px 40px rgba(15,23,42,0.04);
-      }
-      @keyframes ms-card-fade-in {
-        from { opacity: 0; transform: translateY(8px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .ms-card { animation: ms-card-fade-in 0.4s ease both; }
-      .ms-card:nth-of-type(2) { animation-delay: 0.06s; }
-      .ms-card:nth-of-type(3) { animation-delay: 0.12s; }
-      .ms-card:nth-of-type(4) { animation-delay: 0.18s; }
-      @media (prefers-reduced-motion: reduce) {
-        .ms-card { animation: none !important; transition: none !important; }
-      }
-      .ms-card-header {
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid #F1F5F9;
-        display: flex; align-items: center; justify-content: space-between;
-        gap: 0.75rem; flex-wrap: wrap;
-        background: linear-gradient(to right, #FAFBFD, #F8FAFC);
-      }
-      .ms-card-header-left {
-        display: flex; align-items: center; gap: 0.75rem;
-        min-width: 0; flex: 1 1 auto;
-      }
-      .ms-card-icon {
-        width: 36px; height: 36px; border-radius: 9px;
-        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      }
-      .ms-card-header-left > div:last-child { min-width: 0; flex: 1 1 auto; }
-      .ms-card-title {
-        font-size: 0.875rem; font-weight: 700; color: #1E293B;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      .ms-card-sub {
-        font-size: 0.7rem; color: #94A3B8; font-weight: 500; margin-top: 1px;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      .ms-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-      .ms-table thead { position: sticky; top: 0; z-index: 4; }
-      .ms-table th {
-        padding: 0.75rem 1.25rem; text-align: left;
-        font-size: 0.625rem; font-weight: 800; text-transform: uppercase;
-        letter-spacing: 0.08em; color: #94A3B8;
-        background: #FFFFFF;
-        border-bottom: 1px solid #E2E8F0;
-        box-shadow: 0 1px 0 rgba(15,23,42,0.04);
-      }
-      .ms-table th:last-child { text-align: center; }
-      .ms-table td {
-        padding: 1rem 1.25rem; color: #334155;
-        border-bottom: 1px solid #F8FAFC; vertical-align: middle;
-      }
-      .ms-table tbody tr:last-child td { border-bottom: none; }
-      .ms-table tbody tr { transition: background 0.12s ease; }
-      .ms-table tbody tr:hover td { background: #F8FAFC; }
-      @media (max-width: 640px) {
-        .ms-table th { padding: 0.6rem 0.75rem; font-size: 0.6rem; }
-        .ms-table td { padding: 0.75rem 0.75rem; }
-      }
-      .ms-day-badge {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 4px 10px; border-radius: 8px;
-        font-size: 0.75rem; font-weight: 800;
-      }
-      .ms-day-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-      .ms-class-badge {
-        display: inline-flex; align-items: center; justify-content: center;
-        padding: 4px 10px; border-radius: 7px;
-        font-size: 0.72rem; font-weight: 800;
-        background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;
-      }
-      .ms-jtm-badge {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 32px; height: 28px; border-radius: 7px;
-        font-size: 0.78rem; font-weight: 800;
-        background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;
-      }
-      .ms-allowance-item {
-        display: flex; align-items: center; justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.75rem 0; border-bottom: 1px solid #F8FAFC;
-        flex-wrap: wrap;
-      }
-      .ms-allowance-item:last-child { border-bottom: none; padding-bottom: 0; }
-      .ms-allowance-name {
-        font-size: 0.8125rem; font-weight: 600; color: #1E293B;
-        flex: 1 1 auto; min-width: 0; word-break: break-word;
-      }
-      .ms-allowance-amt {
-        font-size: 0.7rem; font-weight: 700; color: #059669;
-        background: #ECFDF5; border: 1px solid #A7F3D0;
-        padding: 3px 9px; border-radius: 999px; white-space: nowrap;
-        flex-shrink: 0;
-      }
-      .ms-piket-item {
-        display: flex; align-items: center; gap: 10px;
-        padding: 0.625rem 0; border-bottom: 1px solid #F8FAFC;
-        flex-wrap: wrap;
-      }
-      .ms-piket-item:last-child { border-bottom: none; }
-      .ms-piket-dot {
-        width: 8px; height: 8px; border-radius: 50%;
-        background: #F97316; flex-shrink: 0;
-        box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
-      }
-      .ms-piket-day {
-        font-size: 0.8125rem; font-weight: 700; color: #1E293B;
-        flex: 1 1 auto; min-width: 0; word-break: break-word;
-      }
-      .ms-piket-lbl {
-        font-size: 0.65rem; font-weight: 700; color: #EA580C;
-        background: #FFF7ED; border: 1px solid #FED7AA;
-        padding: 2px 7px; border-radius: 999px; margin-left: auto;
-        white-space: nowrap; flex-shrink: 0;
-      }
-      .ms-ceremony-item {
-        display: flex; align-items: center; gap: 10px;
-        padding: 0.625rem 0.875rem; border-radius: 0.75rem;
-        margin-bottom: 0.5rem; border: 1px solid;
-        transition: background 0.12s ease, border-color 0.12s ease;
-        flex-wrap: wrap;
-      }
-      .ms-ceremony-item:last-child { margin-bottom: 0; }
-      .ms-ceremony-item > p {
-        flex: 1 1 auto; min-width: 0; word-break: break-word;
-      }
-      .ms-ceremony-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-      .ms-empty {
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; padding: 2.5rem 1rem; text-align: center;
-        color: #94A3B8;
-      }
-      .ms-empty svg { opacity: 0.35; margin-bottom: 0.75rem; }
-      .ms-empty p { font-size: 0.8125rem; font-weight: 600; }
-      .ms-empty span { font-size: 0.72rem; margin-top: 0.25rem; }
-      .ms-count-badge {
-        display: inline-flex; align-items: center;
-        padding: 3px 10px; border-radius: 999px;
-        font-size: 0.68rem; font-weight: 800;
-        white-space: nowrap; flex-shrink: 0;
-      }
-      .ms-hero-actions {
-        display: flex; align-items: center; gap: 0.5rem;
-        flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;
-      }
-      .ms-hero-actions button { white-space: nowrap; flex-shrink: 0; }
-      .ms-filter-bar {
-        padding: 0.625rem 1.25rem;
-        border-bottom: 1px solid #F1F5F9;
-        background: rgba(248,250,252,0.5);
-        display: flex; align-items: center; gap: 0.5rem;
-        flex-wrap: wrap;
-      }
-      .ms-filter-bar > * { min-width: 0; }
-      .ms-filter-bar .ms-search-wrap {
-        position: relative; flex: 1 1 180px; min-width: 140px;
-      }
-      .ms-filter-bar select { flex: 0 0 auto; }
-      @media (max-width: 480px) {
-        .ms-filter-bar { padding: 0.625rem 1rem; }
-        .ms-filter-bar .ms-search-wrap { flex-basis: 100%; }
-        .ms-filter-bar select { flex: 1 1 auto; }
-      }
-      .ms-grid {
-        display: grid; gap: 1.25rem;
-        grid-template-columns: minmax(0, 1fr);
-        align-items: start;
-      }
-      @media (min-width: 1024px) {
-        .ms-grid {
-          grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-        }
-      }
-      .ms-table td.ms-cell-clip {
-        max-width: 0;
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      }
-    </style>
-    <div id="page-myschedule-root">
-    <div class="ms-hero">
-      <div class="relative z-10">
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-          <div class="min-w-0 flex-1">
-            <div class="ms-hero-tag">
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="#93C5FD"><circle cx="4" cy="4" r="4"/></svg>
-              Jadwal &amp; Tugas Saya
-            </div>
-            <h1 class="ms-hero-title">Ringkasan Tugas Mingguan</h1>
-            <p class="ms-hero-sub">Semua jadwal mengajar, piket, dan upacara Anda dalam satu tempat</p>
-          </div>
-          <div class="ms-hero-actions">
-            <button onclick="refreshMySchedule()" id="btnRefreshMySchedule"
-              class="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-blue-100 hover:text-white transition" title="Perbarui data">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span class="hidden sm:inline">Refresh</span>
-            </button>
-            <button onclick="printMySchedule()"
-              class="inline-flex items-center gap-1.5 bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700 rounded-xl px-3 py-2 text-xs font-bold transition shadow-sm" title="Cetak / Export jadwal">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-              <span class="hidden sm:inline">Cetak</span>
-            </button>
-          </div>
-        </div>
-        <div class="ms-stat-pills">
-          <div class="ms-stat-pill">
-            <div class="ms-stat-pill-icon" style="background:rgba(59,130,246,0.18);">
-              <svg class="w-4 h-4" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-            </div>
-            <div>
-              <div class="ms-stat-pill-num" id="statTotalJadwal">—</div>
-              <div class="ms-stat-pill-lbl">Total Sesi</div>
-            </div>
-          </div>
-          <div class="ms-stat-pill" data-clickable onclick="handleNav('Page_Picket')" title="Buka halaman Piket &amp; Upacara">
-            <div class="ms-stat-pill-icon" style="background:rgba(249,115,22,0.18);">
-              <svg class="w-4 h-4" style="color:#FB923C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <div>
-              <div class="ms-stat-pill-num" id="statTotalPiket">—</div>
-              <div class="ms-stat-pill-lbl">Hari Piket</div>
-            </div>
-          </div>
-          <div class="ms-stat-pill">
-            <div class="ms-stat-pill-icon" style="background:rgba(16,185,129,0.18);">
-              <svg class="w-4 h-4" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <div>
-              <div class="ms-stat-pill-num" id="statTotalJtm">—</div>
-              <div class="ms-stat-pill-lbl">JTM / Minggu</div>
-            </div>
-          </div>
-          <div class="ms-stat-pill" data-clickable onclick="handleNav('Page_Picket')" title="Lihat detail jadwal upacara">
-            <div class="ms-stat-pill-icon" style="background:rgba(139,92,246,0.18);">
-              <svg class="w-4 h-4" style="color:#A78BFA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
-              </svg>
-            </div>
-            <div>
-              <div class="ms-stat-pill-num" id="statTotalUpacara">—</div>
-              <div class="ms-stat-pill-lbl">Pembina Upacara</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="ms-content">
-      <div id="panelExamMySchedule" class="hidden mb-5"></div>
-      <div class="ms-grid">
-        <div class="ms-card">
-          <div class="ms-card-header">
-            <div class="ms-card-header-left">
-              <div class="ms-card-icon" style="background:#EFF6FF;">
-                <svg class="w-4.5 h-4.5" style="color:#3B82F6;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-              </div>
-              <div>
-                <p class="ms-card-title">Jadwal Mengajar Mingguan</p>
-                <p class="ms-card-sub">Semua sesi mengajar per hari</p>
-              </div>
-            </div>
-            <span class="ms-count-badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" id="badgeJadwalCount">Memuat...</span>
-          </div>
-          <div class="ms-filter-bar">
-            <div class="ms-search-wrap">
-              <svg class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <input type="text" id="msSearchInput" oninput="filterMySchedule()" placeholder="Cari mata pelajaran atau kelas..."
-                class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-            </div>
-            <select id="msDayFilter" onchange="filterMySchedule()"
-              class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer">
-              <option value="">Semua Hari</option>
-              <option value="Senin">Senin</option>
-              <option value="Selasa">Selasa</option>
-              <option value="Rabu">Rabu</option>
-              <option value="Kamis">Kamis</option>
-              <option value="Jumat">Jumat</option>
-              <option value="Sabtu">Sabtu</option>
-              <option value="Minggu">Minggu</option>
-            </select>
-            <button onclick="resetMyScheduleFilter()" class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1.5 hover:bg-slate-100 rounded-lg transition flex-shrink-0" title="Reset filter">
-              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-          </div>
-          <div class="overflow-x-auto" style="max-height: 520px; overflow-y: auto;">
-            <table class="ms-table">
-              <thead>
-                <tr>
-                  <th style="width:110px;">Hari</th>
-                  <th style="width:130px;">Jam</th>
-                  <th>Kelas</th>
-                  <th>Mata Pelajaran</th>
-                  <th style="width:60px; text-align:center;">JTM</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyMyWeeklySchedule">
-                <tr><td colspan="5" class="text-center py-10 text-slate-400 text-sm italic">Memuat jadwal...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="flex flex-col gap-5 min-w-0">
-          <div class="ms-card">
-            <div class="ms-card-header">
-              <div class="ms-card-header-left">
-                <div class="ms-card-icon" style="background:#ECFDF5;">
-                  <svg style="color:#10B981;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="ms-card-title">Tugas Tambahan</p>
-                  <p class="ms-card-sub">Tunjangan &amp; tugas khusus</p>
-                </div>
-              </div>
-            </div>
-            <div class="px-5 py-3">
-              <ul id="listMyAllowances" class="divide-y divide-slate-50">
-                <li class="ms-allowance-item">
-                  <div class="skeleton h-4 w-32 rounded"></div>
-                  <div class="skeleton h-5 w-20 rounded-full"></div>
-                </li>
-                <li class="ms-allowance-item">
-                  <div class="skeleton h-4 w-28 rounded"></div>
-                  <div class="skeleton h-5 w-20 rounded-full"></div>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div class="ms-card">
-            <div class="ms-card-header">
-              <div class="ms-card-header-left">
-                <div class="ms-card-icon" style="background:#FFF7ED;">
-                  <svg style="color:#F97316;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="ms-card-title">Jadwal Piket</p>
-                  <p class="ms-card-sub">Hari piket sekolah</p>
-                </div>
-              </div>
-            </div>
-            <div class="px-5 py-3">
-              <ul id="listMyPickets" class="space-y-0">
-                <li class="ms-piket-item">
-                  <div class="skeleton h-4 w-20 rounded"></div>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div class="ms-card">
-            <div class="ms-card-header">
-              <div class="ms-card-header-left">
-                <div class="ms-card-icon" style="background:#F5F3FF;">
-                  <svg style="color:#7C3AED;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="ms-card-title">Pembina Upacara</p>
-                  <p class="ms-card-sub">Jadwal &amp; status konfirmasi</p>
-                </div>
-              </div>
-            </div>
-            <div class="px-4 py-3">
-              <div id="listMyCeremonies">
-                <div class="ms-ceremony-item" style="background:#F5F3FF; border-color:#DDD6FE;">
-                  <div class="skeleton h-4 w-24 rounded"></div>
-                  <div class="skeleton h-4 w-16 rounded-full ml-auto"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    </div>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Picket":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      .pkt-root, .pkt-root * { box-sizing: border-box; }
-      .pkt-hero {
-        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #2563EB 110%);
-        position: relative; overflow: hidden;
-        padding: 1.75rem 1.5rem 1.5rem;
-        border-radius: 0;
-      }
-      @media (min-width: 640px) { .pkt-hero { padding: 2rem 2rem 1.75rem; } }
-      .pkt-hero::before {
-        content: ''; position: absolute;
-        top: -40px; right: -40px;
-        width: 220px; height: 220px;
-        background: radial-gradient(circle, rgba(96,165,250,0.18), transparent 70%);
-        border-radius: 50%; pointer-events: none;
-      }
-      .pkt-hero::after {
-        content: ''; position: absolute;
-        bottom: -80px; left: 12%;
-        width: 320px; height: 320px;
-        background: radial-gradient(circle, rgba(139,92,246,0.10), transparent 70%);
-        border-radius: 50%; pointer-events: none;
-      }
-      .pkt-stat-chip {
-        background: rgba(255,255,255,0.10);
-        border: 1px solid rgba(255,255,255,0.18);
-        border-radius: 14px;
-        padding: 10px 14px;
-        transition: background 0.2s, border-color 0.2s;
-        display: flex; align-items: center; gap: 10px;
-        min-width: 0;
-      }
-      .pkt-stat-chip:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.28); }
-      .pkt-stat-chip-icon {
-        width: 36px; height: 36px; border-radius: 10px;
-        background: rgba(255,255,255,0.16); flex-shrink: 0;
-        display: flex; align-items: center; justify-content: center;
-      }
-      .pkt-stat-chip-num {
-        color: #fff; font-weight: 800; font-size: 1.15rem; line-height: 1.05;
-        font-family: 'JetBrains Mono', monospace; white-space: nowrap;
-      }
-      .pkt-stat-chip-lbl {
-        color: rgba(199,210,254,0.85); font-size: 0.625rem; font-weight: 700;
-        text-transform: uppercase; letter-spacing: 0.06em;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      }
-      .pkt-tab-btn {
-        flex: 1 1 auto;
-        display: flex; align-items: center; justify-content: center;
-        gap: 6px; padding: 10px 12px;
-        border-radius: 10px;
-        font-size: 0.8rem; font-weight: 700;
-        white-space: nowrap; cursor: pointer;
-        transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-        border: none; outline: none; min-width: 0;
-      }
-      .pkt-tab-btn[data-active="false"] { background: transparent; color: #64748B; }
-      .pkt-tab-btn[data-active="false"]:hover { background: #F1F5F9; color: #1E293B; }
-      .pkt-tab-btn[data-active="true"] {
-        background: linear-gradient(135deg, #2563EB, #4F46E5);
-        color: #fff; box-shadow: 0 4px 10px rgba(79,70,229,0.30);
-      }
-      .pkt-tab-btn svg { flex-shrink: 0; }
-      @keyframes pktFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-      .pkt-fadein { animation: pktFadeUp 0.28s ease-out forwards; }
-      .pkt-card {
-        background: #fff; border: 1px solid #E2E8F0; border-radius: 18px;
-        box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 6px 18px rgba(15,23,42,0.04);
-        overflow: hidden; min-width: 0;
-      }
-    </style>
-    <main class="w-full grow p-4 sm:p-6 pkt-root" id="page-picket-root" data-active-tab="1">
-      <div class="pkt-hero rounded-2xl mb-5">
-        <div class="relative z-10 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.18);">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-              <div class="min-w-0">
-                <h1 class="text-white font-bold text-xl sm:text-2xl tracking-tight" style="line-height:1.15;">Piket &amp; Upacara</h1>
-                <p class="text-blue-200 text-xs sm:text-sm mt-0.5" id="pktHeroSubtitle">Pemantauan tugas piket dan upacara bendera</p>
-              </div>
-            </div>
-            <div class="mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-xl px-3.5 py-1.5 text-sm font-semibold text-white">
-              <svg class="w-4 h-4 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-              <span id="lblPicketTodayDate">—</span>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2.5 flex-shrink-0" id="pktHeaderStats">
-            <div class="pkt-stat-chip" title="Petugas piket yang sudah hadir hari ini">
-              <div class="pkt-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="pkt-stat-chip-num" id="pktStatPiketHadir">—</p>
-                <p class="pkt-stat-chip-lbl">Piket Hadir</p>
-              </div>
-            </div>
-            <div class="pkt-stat-chip" title="Guru pengganti aktif (KBM + piket) hari ini">
-              <div class="pkt-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="pkt-stat-chip-num" id="pktStatSubActive">—</p>
-                <p class="pkt-stat-chip-lbl">Pengganti Aktif</p>
-              </div>
-            </div>
-            <div class="pkt-stat-chip" title="Jumlah sesi mengajar hari ini & rate kehadiran guru">
-              <div class="pkt-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="pkt-stat-chip-num" id="pktStatKbm">—</p>
-                <p class="pkt-stat-chip-lbl">KBM Hadir</p>
-              </div>
-            </div>
-            <div class="pkt-stat-chip" title="Status pembina upacara hari ini">
-              <div class="pkt-stat-chip-icon">
-                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
-              </div>
-              <div class="min-w-0">
-                <p class="pkt-stat-chip-num" id="pktStatCeremony">—</p>
-                <p class="pkt-stat-chip-lbl">Upacara</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div id="viewAdminPicket" class="hidden space-y-5">
-        <div class="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm flex gap-1 no-scrollbar overflow-x-auto">
-          <button id="adminPicketTabBtn1" data-active="true"  onclick="switchAdminPicketTab(1)" class="pkt-tab-btn admin-picket-tab-btn">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            <span class="hidden sm:inline">Monitoring Hari Ini</span>
-            <span class="sm:hidden">Monitoring</span>
-          </button>
-          <button id="adminPicketTabBtn2" data-active="false" onclick="switchAdminPicketTab(2)" class="pkt-tab-btn admin-picket-tab-btn">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-            <span class="hidden sm:inline">Guru Pengganti</span>
-            <span class="sm:hidden">Pengganti</span>
-            <span id="badgeAdminPicketTab2" class="hidden ml-1 inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 bg-amber-500 text-white rounded-full text-[10px] font-bold">0</span>
-          </button>
-          <button id="adminPicketTabBtn3" data-active="false" onclick="switchAdminPicketTab(3)" class="pkt-tab-btn admin-picket-tab-btn">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <span class="hidden sm:inline">Atur Jadwal</span>
-            <span class="sm:hidden">Jadwal</span>
-          </button>
-        </div>
-        <div id="adminPicketPanel1" class="admin-picket-panel space-y-5">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div class="pkt-card">
-              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-slate-50">
-                <div class="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-700">Petugas Piket</p>
-                  <p class="text-xs text-slate-400">Kehadiran hari ini</p>
-                </div>
-              </div>
-              <div class="p-2">
-                <table class="w-full text-sm text-left">
-                  <thead class="text-[10px] uppercase text-slate-400 font-bold">
-                    <tr>
-                      <th class="px-3 py-2">Guru</th>
-                      <th class="px-3 py-2 text-center">Status</th>
-                      <th class="px-3 py-2 text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tbodyTodayPickets"></tbody>
-                </table>
-              </div>
-            </div>
-            <div id="cardCeremonyAdmin" class="hidden pkt-card">
-              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-slate-50">
-                <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-700">Pembina Upacara</p>
-                  <p class="text-xs text-slate-400">Senin hari ini</p>
-                </div>
-              </div>
-              <div class="p-4" id="panelCeremonyToday">
-                <div class="text-center text-slate-400 text-sm py-4 italic">Memuat...</div>
-              </div>
-            </div>
-          </div>
-          <div class="pkt-card">
-            <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 gap-2 flex-wrap">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-                  </svg>
-                </div>
-                <div class="min-w-0">
-                  <p class="text-sm font-bold text-slate-700">Status KBM Hari Ini</p>
-                  <p class="text-xs text-slate-400">Seluruh jadwal mengajar</p>
-                </div>
-              </div>
-              <button onclick="refreshPicketPage()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition" title="Refresh data">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Refresh
-              </button>
-            </div>
-            <div class="overflow-x-auto" style="max-height: 480px; overflow-y:auto;">
-              <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold sticky top-0">
-                  <tr>
-                    <th class="px-4 py-2.5">Jam</th>
-                    <th class="px-4 py-2.5">Kelas / Mapel</th>
-                    <th class="px-4 py-2.5">Guru</th>
-                    <th class="px-4 py-2.5 text-center">Status</th>
-                    <th class="px-4 py-2.5 text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyTeacherStatusAdmin"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div id="adminPicketPanel2" class="admin-picket-panel hidden space-y-5">
-          <div class="flex items-center gap-2 px-1">
-            <div class="w-1 h-5 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full"></div>
-            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Data Guru Pengganti Aktif Hari Ini</p>
-          </div>
-          <div class="pkt-card">
-            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-slate-50">
-              <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-                </svg>
-              </div>
-              <div>
-                <p class="text-sm font-bold text-slate-700">Guru Pengganti Mengajar</p>
-                <p class="text-xs text-slate-400">Aktif hari ini</p>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-sm text-left">
-                <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold">
-                  <tr>
-                    <th class="px-4 py-2.5">Waktu</th>
-                    <th class="px-4 py-2.5">Jadwal</th>
-                    <th class="px-4 py-2.5">Guru Asli</th>
-                    <th class="px-4 py-2.5">Guru Pengganti</th>
-                    <th class="px-4 py-2.5 text-center">Status</th>
-                    <th class="px-4 py-2.5 text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyActiveSubstitutes">
-                  <tr><td colspan="6" class="text-center py-6 text-slate-400 text-sm italic">Memuat...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="pkt-card">
-            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-orange-50 to-slate-50">
-              <div class="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-                </svg>
-              </div>
-              <div>
-                <p class="text-sm font-bold text-slate-700">Guru Piket Pengganti</p>
-                <p class="text-xs text-slate-400">Aktif hari ini</p>
-              </div>
-            </div>
-            <div class="p-4" id="panelPicketSubstitutes">
-              <div class="text-center py-4 text-slate-400 text-sm italic">Memuat...</div>
-            </div>
-          </div>
-        </div>
-        <div id="adminPicketPanel3" class="admin-picket-panel hidden space-y-5">
-          <div class="flex items-center gap-2 px-1">
-            <div class="w-1 h-5 bg-gradient-to-b from-blue-500 to-violet-600 rounded-full"></div>
-            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Manajemen Jadwal Piket &amp; Upacara</p>
-          </div>
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div class="pkt-card">
-              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-slate-50">
-                <div class="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-700">Atur Jadwal Piket</p>
-                  <p class="text-xs text-slate-400">Tambah guru piket per hari</p>
-                </div>
-              </div>
-              <div class="p-4 space-y-3">
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Hari</label>
-                  <select id="inpPicketDay" onchange="onPicketDayChange()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                    <option value="1">Senin</option>
-                    <option value="2">Selasa</option>
-                    <option value="3">Rabu</option>
-                    <option value="4">Kamis</option>
-                    <option value="5">Jumat</option>
-                    <option value="6">Sabtu</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru</label>
-                  <select id="inpPicketTeacher" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"></select>
-                  <p id="msgPicketHint" class="text-[11px] text-slate-400 mt-1.5 font-medium">Daftar di-filter otomatis: guru yang sudah ditugaskan pada hari ini akan disembunyikan.</p>
-                </div>
-                <button id="btnSavePicket" onclick="savePicketScheduleAction()"
-                  class="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                  <span id="lblSavePicket">Tambah Jadwal</span>
-                </button>
-              </div>
-              <div class="border-t border-slate-100">
-                <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Daftar Jadwal Piket</p>
-                </div>
-                <div class="overflow-y-auto max-h-64">
-                  <table class="w-full text-sm">
-                    <thead class="text-[10px] text-slate-400 uppercase bg-white sticky top-0">
-                      <tr>
-                        <th class="px-4 py-2 text-left">Hari</th>
-                        <th class="px-4 py-2 text-left">Guru</th>
-                        <th class="px-4 py-2 text-center">Hapus</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tbodyPicketSchedule"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            <div class="pkt-card">
-              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-slate-50">
-                <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-700">Jadwal Upacara</p>
-                  <p class="text-xs text-slate-400">Hanya hari Senin</p>
-                </div>
-              </div>
-              <div class="p-4 space-y-3">
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Senin</label>
-                  <input type="date" id="inpCeremonyDate"
-                    class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition"
-                    onchange="checkCeremonyDate(this)">
-                  <p class="text-[11px] text-slate-400 mt-1.5 font-medium" id="msgCeremonyDate">Upacara hanya dijadwalkan pada hari Senin.</p>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pembina Upacara</label>
-                  <select id="inpCeremonyTeacher" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition"></select>
-                </div>
-                <button id="btnSaveCeremony" onclick="saveCeremonyAction()"
-                  class="w-full inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-slate-800/20 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  Jadwalkan Upacara
-                </button>
-              </div>
-              <div class="border-t border-slate-100">
-                <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Jadwal Mendatang</p>
-                </div>
-                <div class="overflow-y-auto max-h-64">
-                  <table class="w-full text-sm">
-                    <thead class="text-[10px] text-slate-400 uppercase bg-white sticky top-0">
-                      <tr>
-                        <th class="px-4 py-2 text-left">Tanggal</th>
-                        <th class="px-4 py-2 text-left">Pembina</th>
-                        <th class="px-4 py-2 text-center">Hapus</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tbodyUpcomingCeremonies"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div id="viewTeacherPicket" class="hidden space-y-5">
-        <div id="panelExamPanitia" class="hidden"></div>
-        <div id="alertPicketUnconfirmed" class="hidden flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
-          <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg class="w-5 h-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-            </svg>
-          </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-bold text-amber-800">Konfirmasi Kehadiran Piket Diperlukan</p>
-            <p class="text-xs text-amber-600 mt-0.5">Aksi pada tabel di bawah terkunci sampai Anda mengonfirmasi kehadiran piket Anda hari ini.</p>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div id="cardCeremonyPicket" class="pkt-card">
-            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-slate-50">
-              <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
-                </svg>
-              </div>
-              <div>
-                <p class="text-sm font-bold text-slate-700">Pembina Upacara</p>
-                <p class="text-xs text-slate-400">Senin hari ini</p>
-              </div>
-            </div>
-            <div class="p-4" id="panelCeremonyGuru"></div>
-          </div>
-          <div id="cardGuruSubPicketActive" class="hidden bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
-            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-white">
-              <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-                </svg>
-              </div>
-              <div class="min-w-0">
-                <p class="text-sm font-bold text-amber-800">Piket Pengganti Aktif</p>
-                <p class="text-xs text-amber-500">Guru pengganti hari ini</p>
-              </div>
-            </div>
-            <div class="p-4 space-y-2" id="listGuruSubPicket"></div>
-          </div>
-        </div>
-        <div id="cardActiveSubstitutePicket" class="hidden pkt-card">
-          <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-slate-50">
-            <div class="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm font-bold text-slate-700">Guru Pengganti Mengajar</p>
-              <p class="text-xs text-slate-400">Aktif hari ini</p>
-            </div>
-          </div>
-          <div class="p-4" id="listActiveSubstitutePicket">
-            <div class="text-center text-slate-400 text-sm py-4 italic">Memuat data...</div>
-          </div>
-        </div>
-        <div class="pkt-card">
-          <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100">
-            <div class="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-              </svg>
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-bold text-slate-700">Status KBM &amp; Guru</p>
-              <p class="text-xs text-slate-400">Semua jadwal hari ini</p>
-            </div>
-            <button onclick="refreshPicketPage()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition flex-shrink-0" title="Refresh data">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              Refresh
-            </button>
-          </div>
-          <div class="overflow-x-auto" style="max-height: 480px; overflow-y:auto;">
-            <table class="w-full text-sm text-left">
-              <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold sticky top-0">
-                <tr>
-                  <th class="px-4 py-2.5">Jam</th>
-                  <th class="px-4 py-2.5">Kelas / Mapel</th>
-                  <th class="px-4 py-2.5">Guru Pengampu</th>
-                  <th class="px-4 py-2.5 text-center">Status</th>
-                  <th class="px-4 py-2.5 text-center">Aksi Piket</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyTeacherStatusPicket"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_ExamPanitia":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6 space-y-4">
-      <!-- Hero Banner -->
-      <div class="rounded-2xl shadow-lg overflow-hidden relative" style="background:linear-gradient(135deg,#064E3B 0%,#065F46 45%,#047857 100%);">
-        <div class="absolute inset-0" style="background-image:radial-gradient(circle at 80% 20%, rgba(255,255,255,0.07) 1px, transparent 1px),radial-gradient(circle at 20% 80%, rgba(255,255,255,0.05) 1px, transparent 1px);background-size:30px 30px, 20px 20px;"></div>
-        <div class="absolute top-0 right-0 w-48 h-48 opacity-5" style="background:radial-gradient(circle,#fff 0%,transparent 70%);transform:translate(30%,-30%);"></div>
-        <div class="relative z-10 px-5 sm:px-7 py-5 sm:py-6">
-          <div class="flex items-start gap-4">
-            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-              </svg>
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-emerald-300 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest mb-0.5">Panel Khusus Panitia</p>
-              <h1 class="text-white font-extrabold text-lg sm:text-2xl leading-tight">Panitia Ujian</h1>
-              <p class="text-emerald-100/80 text-xs sm:text-sm mt-1 leading-relaxed" id="examPanitiaSubtitle">Konfirmasi kehadiran &amp; substitusi pengawas ruang ujian.</p>
-            </div>
-          </div>
-          <div class="mt-4 flex items-center justify-between gap-3 pt-4 border-t border-white/10">
-            <div class="flex items-center gap-2">
-              <div class="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></div>
-              <span class="text-emerald-200 text-xs font-medium">Sesi aktif otomatis terdeteksi</span>
-            </div>
-            <button id="btnRefreshExamPanitia" type="button" onclick="initExamPanitiaPage()"
-              class="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white border border-white/20 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all duration-150 flex-shrink-0">
-              <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              Muat Ulang
-            </button>
-          </div>
-        </div>
-      </div>
-      <!-- Period Info Card -->
-      <div id="examPanitiaPeriodInfo" class="hidden bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div class="px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-          <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-          </svg>
-          <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Info Periode Ujian Aktif</p>
-        </div>
-        <div class="px-4 sm:px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-          <div class="flex-1 min-w-0">
-            <p class="text-xs text-slate-400 mb-0.5">Periode</p>
-            <p class="text-sm font-bold text-slate-800 truncate" id="examPanitiaPeriodName">—</p>
-            <p class="text-xs text-slate-500 mt-0.5" id="examPanitiaPeriodRange">—</p>
-          </div>
-          <div class="flex-shrink-0 text-right">
-            <p class="text-xs text-slate-400 mb-0.5">Hari Ini</p>
-            <p class="text-sm font-bold text-slate-700" id="examPanitiaToday">—</p>
-          </div>
-        </div>
-      </div>
-      <!-- No Access Notice -->
-      <div id="examPanitiaNoAccess" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-sm">
-        <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/>
-            </svg>
-          </div>
-          <div class="min-w-0 flex-1">
-            <p class="font-bold text-amber-900 text-sm" id="examPanitiaNoAccessTitle">Belum Dikonfirmasi sebagai Panitia</p>
-            <p class="text-amber-700 text-xs mt-1 leading-relaxed" id="examPanitiaNoAccessMsg">
-              Halaman ini akan aktif setelah Anda dikonfirmasi sebagai panitia ujian oleh admin pada periode ujian aktif.
-            </p>
-          </div>
-        </div>
-      </div>
-      <!-- Main Panel (rendered dynamically) -->
-      <div id="panelExamPanitia" class="hidden"></div>
-      <!-- Skeleton Loader -->
-      <div id="examPanitiaSkeleton" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-5 py-4 bg-gradient-to-r from-slate-100 to-slate-50 border-b border-slate-200">
-          <div class="skeleton h-4 w-1/3 rounded-lg mb-2"></div>
-          <div class="skeleton h-3 w-1/2 rounded"></div>
-        </div>
-        <div class="p-5 space-y-4">
-          <div class="skeleton h-8 w-2/3 rounded-xl"></div>
-          <div class="border-t border-slate-100 pt-4 space-y-3">
-            <div class="flex items-center gap-3">
-              <div class="skeleton h-8 w-8 rounded-full"></div>
-              <div class="flex-1 space-y-1.5">
-                <div class="skeleton h-4 w-2/3 rounded"></div>
-                <div class="skeleton h-3 w-1/2 rounded"></div>
-              </div>
-              <div class="skeleton h-7 w-20 rounded-lg"></div>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="skeleton h-8 w-8 rounded-full"></div>
-              <div class="flex-1 space-y-1.5">
-                <div class="skeleton h-4 w-1/2 rounded"></div>
-                <div class="skeleton h-3 w-1/3 rounded"></div>
-              </div>
-              <div class="skeleton h-7 w-20 rounded-lg"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}
-<!-- Modal Ganti Pengawas (Panitia) -->
-<div id="panitiSubstModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="panitia_closeSubstModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div style="background:linear-gradient(135deg,#be185d,#9d174d);padding:18px 20px;position:relative;flex-shrink:0;">
-        <button type="button" onclick="panitia_closeSubstModal()" aria-label="Tutup"
-          style="position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.15);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:white;">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div style="display:flex;align-items:center;gap:12px;padding-right:36px;">
-          <div style="width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-          </div>
-          <div>
-            <h3 style="color:white;font-weight:700;font-size:16px;margin:0 0 2px 0;">Ganti Pengawas</h3>
-            <p style="color:rgba(255,255,255,0.75);font-size:12px;margin:0;">Pilih guru pengganti untuk hari ini</p>
-          </div>
-        </div>
-      </div>
-      <div style="padding:20px;overflow-y:auto;flex:1;" class="custom-scrollbar">
-        <input type="hidden" id="inpPanitiaSubstId">
-        <div id="panitiSubstInfo" style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:12px;font-size:12px;color:#92400e;margin-bottom:16px;"></div>
-        <div>
-          <label style="display:block;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Guru Pengganti <span style="color:#ef4444;">*</span></label>
-          <div style="position:relative;margin-bottom:8px;">
-            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:#94a3b8;pointer-events:none;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="inpPanitiaSubstSearch" placeholder="Cari nama guru..." autocomplete="off"
-              oninput="panitia_filterSubstTeacher(this.value)"
-              style="width:100%;padding:8px 10px 8px 32px;font-size:13px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;outline:none;box-sizing:border-box;">
-          </div>
-          <select id="inpPanitiaSubstTeacher" size="6" style="width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:6px 8px;font-size:13px;outline:none;cursor:pointer;box-sizing:border-box;">
-            <option value="">Memuat daftar guru...</option>
-          </select>
-          <p style="font-size:11px;color:#94a3b8;margin-top:6px;display:flex;align-items:flex-start;gap:4px;">
-            <svg style="width:12px;height:12px;margin-top:1px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            Guru asli akan ditandai "diganti" hingga Anda membatalkan penggantian.
-          </p>
-        </div>
-      </div>
-      <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 20px;display:flex;gap:10px;flex-shrink:0;">
-        <button type="button" onclick="panitia_closeSubstModal()"
-          style="flex:1;padding:10px;background:white;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:600;color:#475569;cursor:pointer;">Batal</button>
-        <button type="button" onclick="panitia_saveSubst()" id="btnSavePanitiaSubst"
-          style="flex:1;padding:10px;background:linear-gradient(135deg,#be185d,#9d174d);border:none;border-radius:10px;font-size:13px;font-weight:700;color:white;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 2px 6px rgba(190,24,93,.3);">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Konfirmasi Ganti
-        </button>
-      </div>
-    </div>
-  </div>
-</div>`;
-      case "Page_Profile":
-        return `<div class="flex h-screen overflow-hidden bg-slate-100">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      .profile-hero {
-        background: linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 40%, #0f2038 100%);
-        position: relative;
-        overflow: hidden;
-      }
-      .profile-tab-nav {
-        display: flex;
-        background: white;
-        border-radius: 14px;
-        border: 1px solid #e2e8f0;
-        padding: 5px;
-        gap: 4px;
-        box-shadow: 0 1px 3px rgba(15,23,42,0.05);
-        margin-bottom: 20px;
-        overflow-x: auto;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-        flex-wrap: nowrap;
-      }
-      .profile-tab-nav::-webkit-scrollbar { display: none; }
-      .profile-tab-btn {
-        display: inline-flex; align-items: center; gap: 8px;
-        padding: 9px 16px;
-        border-radius: 10px;
-        font-size: 0.8125rem; font-weight: 600;
-        color: #64748b;
-        cursor: pointer;
-        transition: all 0.18s ease;
-        border: none; background: transparent;
-        font-family: inherit;
-        white-space: nowrap;
-        flex: 1 1 auto;
-        justify-content: center;
-        min-width: 0;
-      }
-      .profile-tab-btn:hover { background: #f8fafc; color: #334155; }
-      .profile-tab-btn.active {
-        background: linear-gradient(135deg, #2563eb, #4f46e5);
-        color: white;
-        box-shadow: 0 3px 10px rgba(37,99,235,0.28);
-      }
-      .profile-tab-btn.active svg { color: white !important; }
-      .profile-tab-btn svg { flex-shrink: 0; }
-      .profile-tab-btn .ptab-label {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        min-width: 0;
-      }
-      @media (max-width: 640px) {
-        .profile-tab-nav {
-          gap: 2px;
-          padding: 4px;
-          border-radius: 12px;
-        }
-        .profile-tab-btn {
-          padding: 8px 10px;
-          font-size: 0.75rem;
-          gap: 5px;
-        }
-      }
-      @media (max-width: 420px) {
-        .profile-tab-btn {
-          padding: 8px 8px;
-          flex: 1 1 0;
-        }
-        .profile-tab-btn:not(.active) .ptab-label { display: none; }
-        .profile-tab-btn.active .ptab-label {
-          font-size: 0.72rem;
-          letter-spacing: -0.01em;
-        }
-      }
-      .profile-tab-panel { display: none; }
-      .profile-tab-panel.active { display: block; }
-      .profile-hero::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background:
-          radial-gradient(ellipse 60% 80% at 80% 50%, rgba(59,130,246,0.18) 0%, transparent 60%),
-          radial-gradient(ellipse 40% 60% at 10% 80%, rgba(99,102,241,0.12) 0%, transparent 50%);
-        pointer-events: none;
-      }
-      .profile-hero::after {
-        content: '';
-        position: absolute;
-        top: -60px; right: -60px;
-        width: 260px; height: 260px;
-        border-radius: 50%;
-        border: 1px solid rgba(255,255,255,0.05);
-        pointer-events: none;
-      }
-      .profile-avatar-ring {
-        background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
-        padding: 3px;
-        border-radius: 50%;
-        box-shadow: 0 0 0 4px rgba(59,130,246,0.2), 0 8px 24px rgba(0,0,0,0.3);
-      }
-      .profile-avatar-inner {
-        background: linear-gradient(135deg, #1d4ed8, #4338ca);
-        border-radius: 50%;
-        width: 72px; height: 72px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.75rem; font-weight: 800; color: white;
-        letter-spacing: -0.02em;
-      }
-      .profile-card {
-        background: #ffffff;
-        border-radius: 16px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(15,23,42,0.05), 0 4px 16px rgba(15,23,42,0.04);
-        transition: box-shadow 0.2s ease;
-        overflow: hidden;
-      }
-      .profile-card:hover {
-        box-shadow: 0 2px 8px rgba(15,23,42,0.08), 0 8px 24px rgba(15,23,42,0.06);
-      }
-      .pwd-strength-wrap {
-        margin-top: 10px;
-      }
-      .pwd-strength-bar {
-        position: relative;
-        height: 6px;
-        background: #e2e8f0;
-        border-radius: 999px;
-        overflow: hidden;
-      }
-      .pwd-strength-fill {
-        position: absolute;
-        inset: 0;
-        width: 0%;
-        background: #ef4444;
-        border-radius: 999px;
-        transition: width 0.25s ease, background 0.25s ease;
-      }
-      .pwd-strength-label {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 6px;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .pwd-strength-text {
-        color: #94a3b8;
-        transition: color 0.25s;
-      }
-      .pwd-strength-fill.s1 { background: #ef4444; }
-      .pwd-strength-fill.s2 { background: #f97316; }
-      .pwd-strength-fill.s3 { background: #eab308; }
-      .pwd-strength-fill.s4 { background: #22c55e; }
-      .pwd-strength-fill.s5 { background: #16a34a; }
-      .username-copy-btn {
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: #e2e8f0;
-        color: #64748b;
-        border: none;
-        border-radius: 6px;
-        width: 28px;
-        height: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-      .username-copy-btn:hover {
-        background: #cbd5e1;
-        color: #334155;
-      }
-      .username-copy-btn.copied {
-        background: #d1fae5;
-        color: #047857;
-      }
-      .profile-card-header {
-        padding: 18px 24px 16px;
-        border-bottom: 1px solid #f1f5f9;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .profile-card-icon {
-        width: 36px; height: 36px;
-        border-radius: 10px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-      }
-      .profile-card-body {
-        padding: 20px 24px 24px;
-      }
-      .profile-field-label {
-        display: block;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #64748b;
-        margin-bottom: 6px;
-      }
-      .profile-input {
-        width: 100%;
-        padding: 10px 16px;
-        border: 1.5px solid #e2e8f0;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        color: #1e293b;
-        background: #f8fafc;
-        outline: none;
-        transition: all 0.15s ease;
-        font-family: inherit;
-      }
-      .profile-input:focus {
-        border-color: #3b82f6;
-        background: #ffffff;
-        box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-      }
-      .profile-input::placeholder { color: #94a3b8; }
-      .profile-input-wrap {
-        position: relative;
-      }
-      .profile-input-wrap .profile-input {
-        padding-right: 44px;
-      }
-      .profile-eye-btn {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #94a3b8;
-        cursor: pointer;
-        background: none;
-        border: none;
-        padding: 2px;
-        display: flex;
-        align-items: center;
-        transition: color 0.15s;
-      }
-      .profile-eye-btn:hover { color: #475569; }
-      .profile-btn-primary {
-        display: inline-flex; align-items: center; gap: 8px;
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
-        color: white;
-        padding: 10px 22px;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        font-weight: 700;
-        border: none;
-        cursor: pointer;
-        transition: all 0.18s ease;
-        box-shadow: 0 4px 12px rgba(37,99,235,0.3);
-        letter-spacing: 0.01em;
-      }
-      .profile-btn-primary:hover {
-        background: linear-gradient(135deg, #1d4ed8, #1e40af);
-        box-shadow: 0 6px 16px rgba(37,99,235,0.4);
-        transform: translateY(-1px);
-      }
-      .profile-btn-primary:active { transform: translateY(0); }
-      .profile-btn-secondary {
-        display: inline-flex; align-items: center; gap: 8px;
-        background: #1e293b;
-        color: white;
-        padding: 10px 22px;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        font-weight: 700;
-        border: none;
-        cursor: pointer;
-        transition: all 0.18s ease;
-        box-shadow: 0 4px 12px rgba(15,23,42,0.2);
-        letter-spacing: 0.01em;
-      }
-      .profile-btn-secondary:hover {
-        background: #0f172a;
-        box-shadow: 0 6px 16px rgba(15,23,42,0.3);
-        transform: translateY(-1px);
-      }
-      .profile-btn-secondary:active { transform: translateY(0); }
-      .profile-role-badge {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-      .profile-role-badge.admin {
-        background: rgba(251,191,36,0.15);
-        color: #f59e0b;
-        border: 1px solid rgba(251,191,36,0.25);
-      }
-      .profile-role-badge.guru {
-        background: rgba(52,211,153,0.15);
-        color: #10b981;
-        border: 1px solid rgba(52,211,153,0.25);
-      }
-      .val-rule-item {
-        display: flex; align-items: center; gap: 8px;
-        padding: 4px 0;
-        font-size: 0.775rem;
-        color: #94a3b8;
-        transition: color 0.2s;
-      }
-      .val-rule-item .rule-dot {
-        width: 6px; height: 6px; border-radius: 50%;
-        background: #cbd5e1;
-        flex-shrink: 0;
-        transition: background 0.2s;
-      }
-      .val-rule-item.text-green-600 { color: #16a34a; font-weight: 600; }
-      .val-rule-item.text-green-600 .rule-dot { background: #16a34a; }
-      .profile-page-enter {
-        animation: profileEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-      @keyframes profileEnter {
-        from { opacity: 0; transform: translateY(16px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .stat-chip {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 8px;
-        padding: 5px 12px;
-        font-size: 0.72rem;
-        color: rgba(255,255,255,0.7);
-        font-weight: 500;
-      }
-      .stat-chip svg { opacity: 0.6; }
-    </style>
-    <main class="w-full grow pb-6">
-      <div class="profile-hero px-6 pt-8 pb-10 profile-page-enter" style="animation-delay:0s">
-        <div class="max-w-2xl mx-auto">
-          <div class="flex flex-col sm:flex-row sm:items-center gap-5">
-            <div class="profile-avatar-ring flex-shrink-0 self-start sm:self-auto">
-              <div class="profile-avatar-inner" id="divProfileInit">U</div>
-            </div>
-            <div class="flex-1 min-w-0">
-              <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight truncate" id="navUserName_Big">Nama Pengguna</h1>
-              <div class="flex flex-wrap items-center gap-2 mt-2">
-                <span class="profile-role-badge guru" id="navUserRole_Big">Role</span>
-                <span class="stat-chip">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                  Akun Aktif
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="max-w-2xl mx-auto px-4 sm:px-6 -mt-4">
-        <div class="profile-tab-nav">
-          <button class="profile-tab-btn active" id="ptab-diri" onclick="switchProfileTab('diri')">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-            <span class="ptab-label">Data Diri</span>
-          </button>
-          <button class="profile-tab-btn" id="ptab-guru" onclick="switchProfileTab('guru')" style="display:none;">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-            <span class="ptab-label">Profil Guru</span>
-          </button>
-          <button class="profile-tab-btn" id="ptab-keamanan" onclick="switchProfileTab('keamanan')">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-            <span class="ptab-label">Ganti Password</span>
-          </button>
-          <button class="profile-tab-btn" id="ptab-security-q" onclick="switchProfileTab('security-q')">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            <span class="ptab-label">Pertanyaan Keamanan</span>
-            <span id="sqTabBadge" class="hidden w-2 h-2 rounded-full bg-amber-400 inline-block flex-shrink-0"></span>
-          </button>
-        </div>
-        <div id="ppanel-diri" class="profile-tab-panel active profile-page-enter">
-          <div id="profileEmailVerifyBanner" class="hidden mb-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 overflow-hidden shadow-sm">
-            <div class="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div class="w-11 h-11 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="font-bold text-amber-900 text-sm">Email Belum Diverifikasi</p>
-                <p class="text-amber-700 text-xs mt-1 leading-relaxed">
-                  Untuk meningkatkan keamanan akun Anda, silakan tambahkan dan verifikasi email Anda terlebih dahulu. Setelah email terverifikasi, Anda dapat mengakses semua halaman lain dengan normal.
-                </p>
-              </div>
-              <button type="button" onclick="profile_focusEmailField()"
-                class="self-start sm:self-center inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition shadow-sm shadow-amber-200 flex-shrink-0">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-                Isi Email Sekarang
-              </button>
-            </div>
-          </div>
-          <div class="profile-card">
-            <div class="profile-card-header">
-              <div class="profile-card-icon" style="background:#eff6ff;">
-                <svg style="width:18px;height:18px;color:#2563eb;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-sm font-bold text-slate-800 leading-tight">Data Diri</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Perbarui nama tampilan akun Anda</p>
-              </div>
-            </div>
-            <div class="profile-card-body">
-              <div class="mb-5">
-                <label class="profile-field-label" for="inpProfileName">Nama Lengkap</label>
-                <input type="text" id="inpProfileName" class="profile-input" placeholder="Masukkan nama lengkap Anda">
-              </div>
-              <div class="grid grid-cols-2 gap-4 mb-5">
-                <div>
-                  <label class="profile-field-label">Username</label>
-                  <div class="relative">
-                    <input type="text" id="inpProfileUsername" class="profile-input" readonly style="background:#f1f5f9;color:#64748b;cursor:default;padding-right:42px;">
-                    <button type="button" id="btnCopyUsername" onclick="copyUsernameAction()" class="username-copy-btn" title="Salin username">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label class="profile-field-label">Role</label>
-                  <input type="text" id="inpProfileRole" class="profile-input capitalize" readonly style="background:#f1f5f9;color:#64748b;cursor:default;">
-                </div>
-              </div>
-              <div class="mb-5">
-                <label class="profile-field-label" for="inpProfilePhone">
-                  Nomor HP / WhatsApp
-                  <span class="text-[10px] text-slate-400 font-normal ml-1">(Nomor harus berawalan 62)</span>
-                </label>
-                <div class="profile-input-wrap">
-                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">+</span>
-                  <input type="tel" id="inpProfilePhone"
-                    inputmode="tel" pattern="[0-9+]*"
-                    class="profile-input"
-                    style="padding-left:24px;font-family:'JetBrains Mono',monospace;letter-spacing:0.02em;"
-                    placeholder="62812345678"
-                    oninput="profile_normalizePhoneOnInput(this)">
-                </div>
-                <p id="profilePhoneHint" class="text-[10px] text-slate-400 mt-1.5">Sistem akan menyimpan dengan kode negara <strong>62</strong> di awal.</p>
-              </div>
-              <div class="mb-5">
-                <div class="flex items-center justify-between mb-1.5">
-                  <label class="profile-field-label" for="inpProfileEmail" style="margin-bottom:0;">
-                    Email
-                    <span id="profileEmailVerifiedBadge" class="hidden ml-1 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
-                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                      Terverifikasi
-                    </span>
-                  </label>
-                  <div class="flex items-center gap-2">
-                    <button type="button" id="btnChangeEmail" onclick="profile_startChangeEmail()"
-                      class="hidden inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 active:scale-95 border border-indigo-200 px-2 py-1 rounded-md transition">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                      Ganti Email
-                    </button>
-                    <button type="button" id="btnCancelChangeEmail" onclick="profile_cancelChangeEmail()"
-                      class="hidden inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 active:scale-95 border border-slate-200 px-2 py-1 rounded-md transition">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                      Batal
-                    </button>
-                  </div>
-                </div>
-                <div class="profile-input-wrap">
-                  <input type="email" id="inpProfileEmail"
-                    class="profile-input"
-                    placeholder="email@anda.com"
-                    autocomplete="email"
-                    oninput="profile_validateEmailOnInput()">
-                </div>
-                <p id="profileEmailHint" class="text-[10px] text-slate-400 mt-1.5">Email akan diverifikasi via kode OTP sebelum disimpan.</p>
-                <p id="profileEmailError" class="hidden text-[11px] text-rose-600 mt-1.5 font-medium"></p>
-                <div id="profileEmailOtpWrap" class="hidden mt-3 p-3 rounded-xl border border-indigo-200 bg-indigo-50/40">
-                  <div class="flex items-center gap-2 mb-2">
-                    <svg class="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/></svg>
-                    <span class="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">Verifikasi Email</span>
-                  </div>
-                  <div class="flex flex-col sm:flex-row gap-2">
-                    <input type="text" id="inpProfileEmailOtp" maxlength="6"
-                      inputmode="numeric" pattern="\\d{6}"
-                      class="profile-input flex-1"
-                      style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;letter-spacing:0.4em;"
-                      placeholder="••••••"
-                      oninput="this.value = this.value.replace(/\\D/g,'').slice(0,6); profile_updateOtpVerifyButton();">
-                    <button type="button" id="btnVerifyEmailOtp" onclick="profile_verifyEmailOtp()" disabled
-                      class="profile-btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                      Verifikasi
-                    </button>
-                  </div>
-                  <div class="mt-2 flex items-center justify-between text-[11px] gap-2 flex-wrap">
-                    <p id="profileOtpInfo" class="text-indigo-700 font-medium">Kode dikirim ke <strong id="profileOtpTargetEmail">—</strong></p>
-                    <button type="button" id="btnResendOtp" onclick="profile_requestEmailOtp(true)"
-                      class="text-indigo-600 hover:text-indigo-800 font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled>
-                      Kirim ulang (<span id="profileOtpCooldown">60</span>s)
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end gap-2 flex-wrap">
-                <button type="button" id="btnRequestEmailOtp" onclick="profile_requestEmailOtp(false)" class="profile-btn-secondary hidden">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                  Kirim Kode OTP ke Email
-                </button>
-                <button id="btnSaveProfile" onclick="saveProfileName()" class="profile-btn-primary">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                  Simpan Perubahan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="ppanel-guru" class="profile-tab-panel profile-page-enter">
-          <div class="profile-card">
-            <div class="profile-card-header">
-              <div class="profile-card-icon" style="background:#dcfce7;">
-                <svg style="width:18px;height:18px;color:#16a34a;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-sm font-bold text-slate-800 leading-tight">Detail Profil Guru</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Informasi khusus untuk Guru</p>
-              </div>
-            </div>
-            <div class="profile-card-body">
-              <!-- NIP & Status Kepegawaian -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-                <div>
-                  <label class="profile-field-label" for="inpGuruNIP">NIP / NPK</label>
-                  <input type="text" id="inpGuruNIP" class="profile-input" readonly style="background:#f1f5f9;color:#64748b;cursor:default;" placeholder="Data NIP/NPK (Dari Database)">
-                </div>
-                <div>
-                  <label class="profile-field-label" for="inpGuruStatus">Status Kepegawaian</label>
-                  <select id="inpGuruStatus" class="profile-input bg-white">
-                    <option value="" disabled selected>Pilih Status Kepegawaian</option>
-                    <option value="PNS">Pegawai Negeri Sipil (PNS)</option>
-                    <option value="PPPK">Pegawai Pemerintah (PPPK)</option>
-                    <option value="Honorer">Honorer / GTT</option>
-                    <option value="Tetap Yayasan">Guru Tetap Yayasan</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
-                </div>
-              </div>
-              <!-- Jabatan & Pangkat -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-                <div>
-                  <label class="profile-field-label" for="listGuruJabatan">Jabatan / Tugas Tambahan</label>
-                  <div id="listGuruJabatan" class="profile-input custom-scrollbar overflow-y-auto max-h-32 p-3 cursor-default" style="background:#f1f5f9;color:#64748b;height:auto;min-height:42px;">
-                    <div class="text-slate-400 italic text-sm">Memuat data...</div>
-                  </div>
-                </div>
-                <div>
-                  <label class="profile-field-label" for="inpGuruGolongan">Pangkat / Golongan</label>
-                  <input type="text" id="inpGuruGolongan" class="profile-input" placeholder="Contoh: Penata Muda, III/a">
-                </div>
-              </div>
-              <!-- Mata Pelajaran & Kelas -->
-              <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label class="profile-field-label" for="listGuruMapel">Mata Pelajaran yang Diampu</label>
-                  <div id="listGuruMapel" class="profile-input custom-scrollbar overflow-y-auto max-h-32 p-3 cursor-default" style="background:#f1f5f9;color:#64748b;height:auto;min-height:42px;">
-                    <div class="text-slate-400 italic text-sm">Memuat data...</div>
-                  </div>
-                </div>
-                <div>
-                  <label class="profile-field-label" for="inpGuruJarak">Jarak Rumah ke Madrasah (km)</label>
-                  <input type="text" id="inpGuruJarak" class="profile-input" readonly style="background:#f1f5f9;color:#64748b;cursor:default;" placeholder="Jarak dalam km (Dari Database)">
-                </div>
-              </div>
-              <!-- Alamat Lengkap -->
-              <div class="mb-6">
-                <label class="profile-field-label" for="inpGuruAlamat">Alamat Lengkap Domisili</label>
-                <textarea id="inpGuruAlamat" class="profile-input custom-scrollbar" rows="3" placeholder="Masukkan alamat lengkap tempat tinggal Anda saat ini..."></textarea>
-              </div>
-              <!-- Action Buttons -->
-              <div class="flex items-center justify-end gap-3 pt-6 border-t border-slate-100 mt-2">
-                  <button type="button" class="profile-btn-secondary" onclick="document.getElementById('inpGuruGolongan').value=''; document.getElementById('inpGuruAlamat').value=''; showToast('Formulir direset', 'info'); document.getElementById('inpGuruGolongan').focus();">
-                    Reset
-                  </button>
-                  <button type="button" id="btnSaveGuruProfileDetails" class="profile-btn-primary" onclick="saveGuruProfileDetails()">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                    Simpan Profil Guru
-                  </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="ppanel-keamanan" class="profile-tab-panel profile-page-enter">
-          <div class="profile-card">
-            <div class="profile-card-header">
-              <div class="profile-card-icon" style="background:#fef9ec;">
-                <svg style="width:18px;height:18px;color:#d97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-sm font-bold text-slate-800 leading-tight">Keamanan Akun</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Ganti password untuk menjaga keamanan akun</p>
-              </div>
-            </div>
-            <div class="profile-card-body">
-              <div class="mb-4">
-                <label class="profile-field-label">Password Saat Ini</label>
-                <div class="profile-input-wrap">
-                  <input type="password" id="inpOldPass" class="profile-input" placeholder="Masukkan password saat ini">
-                  <button type="button" onclick="togglePassword('inpOldPass', this)" class="profile-eye-btn" title="Tampilkan/Sembunyikan">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="mb-4">
-                <label class="profile-field-label">Password Baru</label>
-                <div class="profile-input-wrap">
-                  <input type="password" id="inpNewPass" class="profile-input" placeholder="Buat password baru (min. 8 karakter)">
-                  <button type="button" onclick="togglePassword('inpNewPass', this)" class="profile-eye-btn" title="Tampilkan/Sembunyikan">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                  </button>
-                </div>
-                <div id="pwdStrengthWrap" class="pwd-strength-wrap hidden">
-                  <div class="pwd-strength-bar">
-                    <div id="pwdStrengthFill" class="pwd-strength-fill"></div>
-                  </div>
-                  <div class="pwd-strength-label">
-                    <span class="pwd-strength-text" id="pwdStrengthText">Belum diisi</span>
-                    <span class="text-slate-300 text-[10px]" id="pwdStrengthScore">0/5</span>
-                  </div>
-                </div>
-                <div id="val-rules" class="hidden mt-3 rounded-xl border border-slate-100 overflow-hidden" style="background:#f8fafc;">
-                  <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Persyaratan Password</span>
-                  </div>
-                  <div class="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-0.5">
-                    <div id="rule-len" class="val-rule-item"><span class="rule-dot"></span> Minimal 8 karakter</div>
-                    <div id="rule-upper" class="val-rule-item"><span class="rule-dot"></span> Huruf besar (A–Z)</div>
-                    <div id="rule-lower" class="val-rule-item"><span class="rule-dot"></span> Huruf kecil (a–z)</div>
-                    <div id="rule-num" class="val-rule-item"><span class="rule-dot"></span> Angka (0–9)</div>
-                    <div id="rule-spec" class="val-rule-item"><span class="rule-dot"></span> Simbol (!@#\$%^&*)</div>
-                    <div id="rule-name" class="val-rule-item"><span class="rule-dot"></span> Tidak mengandung nama</div>
-                    <div id="rule-different" class="val-rule-item sm:col-span-2"><span class="rule-dot"></span> Berbeda dari password lama</div>
-                  </div>
-                </div>
-              </div>
-              <div class="flex justify-end">
-                <button id="btnChangePass" onclick="changePasswordAction()" class="profile-btn-secondary">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                  Ganti Password
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="ppanel-security-q" class="profile-tab-panel profile-page-enter">
-          <div class="profile-card">
-            <div class="profile-card-header">
-              <div class="profile-card-icon" style="background:#f0fdf4;">
-                <svg style="width:18px;height:18px;color:#16a34a;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                </svg>
-              </div>
-              <div>
-                <h2 class="text-sm font-bold text-slate-800 leading-tight">Pertanyaan Keamanan</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Wajib diisi — digunakan untuk memverifikasi identitas saat reset password</p>
-              </div>
-            </div>
-            <div class="profile-card-body">
-              <div id="sqWarningBanner" class="hidden mb-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                <p class="text-xs text-amber-700 leading-relaxed">Anda belum mengatur pertanyaan keamanan. Tanpa ini, permintaan reset password tidak dapat diproses secara otomatis.</p>
-              </div>
-              <div id="sqSetBanner" class="hidden mb-4 flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <svg class="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <p class="text-xs text-green-700 leading-relaxed">Pertanyaan keamanan sudah diatur. Anda dapat memperbaruinya kapan saja.</p>
-              </div>
-              <div class="mb-4">
-                <label class="profile-field-label" for="inpSecurityQuestion">Pilih Pertanyaan Keamanan</label>
-                <select id="inpSecurityQuestion" class="profile-input" style="cursor:pointer;">
-                  <option value="">-- Pilih Pertanyaan --</option>
-                  <option value="Siapa nama ibu kandung Anda?">Siapa nama ibu kandung Anda?</option>
-                  <option value="Apa nama hewan peliharaan pertama Anda?">Apa nama hewan peliharaan pertama Anda?</option>
-                  <option value="Di kota mana Anda dilahirkan?">Di kota mana Anda dilahirkan?</option>
-                  <option value="Apa nama sekolah dasar Anda?">Apa nama sekolah dasar Anda?</option>
-                  <option value="Siapa nama teman masa kecil terbaik Anda?">Siapa nama teman masa kecil terbaik Anda?</option>
-                  <option value="Apa makanan favorit Anda sejak kecil?">Apa makanan favorit Anda sejak kecil?</option>
-                  <option value="Apa nama jalan tempat Anda dibesarkan?">Apa nama jalan tempat Anda dibesarkan?</option>
-                  <option value="Siapa nama guru favorit Anda sewaktu SD?">Siapa nama guru favorit Anda sewaktu SD?</option>
-                </select>
-              </div>
-              <div class="mb-5">
-                <label class="profile-field-label" for="inpSecurityAnswer">Jawaban Anda</label>
-                <div class="profile-input-wrap">
-                  <input type="password" id="inpSecurityAnswer" class="profile-input" placeholder="Tulis jawaban (tidak peka huruf besar/kecil)" autocomplete="off">
-                  <button type="button" onclick="togglePassword('inpSecurityAnswer', this)" class="profile-eye-btn" title="Tampilkan/Sembunyikan jawaban">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                  </button>
-                </div>
-                <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Jawaban disimpan dalam huruf kecil. Pastikan Anda ingat jawaban ini karena akan digunakan saat lupa password.</p>
-              </div>
-              <div class="flex justify-end">
-                <button id="btnSaveSecurityQ" onclick="saveSecurityQuestionAction()" class="profile-btn-primary" style="background:linear-gradient(135deg,#16a34a,#15803d);">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                  Simpan Pertanyaan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_AdminDailyAttendance":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6" id="menuAdminDailyAttendance">
-      <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Riwayat Kehadiran Harian</h1>
-          <p class="text-xs sm:text-sm text-slate-500 mt-1" id="adminDailyAttendanceDateLabel">Memuat tanggal...</p>
-        </div>
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <div class="relative grow sm:grow-0">
-            <input type="text" id="inpAdminDailyAttendanceSearch" placeholder="Cari nama guru..." class="w-full sm:w-64 pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-shadow" onkeyup="filterAdminDailyAttendance()">
-            <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          </div>
-          <input type="date" id="inpAdminDailyAttendanceDate" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none shrink-0" onchange="loadAdminDailyAttendance()">
-          <button onclick="loadAdminDailyAttendance()" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition shadow-sm shrink-0" title="Refresh">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            <span class="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <div class="overflow-auto max-h-[calc(100vh-12rem)] custom-scrollbar">
-          <table class="w-full text-left border-collapse min-w-[900px]">
-            <thead class="sticky top-0 z-10 bg-slate-50/95 backdrop-blur shadow-sm">
-              <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
-                <th class="py-3.5 px-4 font-semibold w-14 text-center">No</th>
-                <th class="py-3.5 px-4 font-semibold">Nama Guru</th>
-                <th class="py-3.5 px-4 font-semibold text-center">Status</th>
-                <th class="py-3.5 px-4 font-semibold text-center">Jadwal</th>
-                <th class="py-3.5 px-4 font-semibold text-center">Waktu Aktual</th>
-                <th class="py-3.5 px-4 font-semibold text-center">Durasi</th>
-                <th class="py-3.5 px-4 font-semibold text-center">Persentase</th>
-                <th class="py-3.5 px-4 font-semibold text-center whitespace-nowrap">Nominal Transport</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyAdminDailyAttendance" class="divide-y divide-slate-100">
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Attendance":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6" id="menuKehadiranHarian">
-      <!-- Header -->
-      <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Kehadiran Harian</h1>
-          <p class="text-xs sm:text-sm text-slate-500 mt-1" id="attendanceDateLabel">Memuat tanggal...</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="date" id="inpAttendanceDate" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="onAttendanceDateChange()">
-          <button onclick="refreshActiveAttendanceTab()" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition shadow-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Refresh
-          </button>
-        </div>
-      </div>
-      <!-- Daftar Kehadiran (no tabs — admin navigates via sidebar) -->
-      <div id="tabPanelKehadiran">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div class="overflow-auto max-h-[calc(100vh-14rem)] custom-scrollbar">
-            <table class="w-full text-left border-collapse min-w-[800px]">
-              <thead class="sticky top-0 z-10 bg-slate-50/95 backdrop-blur shadow-sm">
-                <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
-                  <th class="py-3.5 px-4 font-semibold w-14 text-center">No</th>
-                  <th class="py-3.5 px-4 font-semibold">Nama Guru</th>
-                  <th class="py-3.5 px-4 font-semibold text-center">Status</th>
-                  <th class="py-3.5 px-4 font-semibold text-center">Waktu Masuk</th>
-                  <th class="py-3.5 px-4 font-semibold text-center">Waktu Pulang</th>
-                  <th class="py-3.5 px-4 font-semibold text-center w-40">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyAttendanceList" class="divide-y divide-slate-100">
-              </tbody>
-            </table>
-          </div>
-          <!-- Tombol Tambah Guru — ditampilkan/disembunyikan via JS sesuai otorisasi -->
-          <div id="addAttendeeBar" class="hidden px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3">
-            <p class="text-xs text-slate-500">Guru tidak terjadwal hari ini dapat ditambahkan secara manual.</p>
-            <button onclick="openAddAttendeeModal()"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition active:scale-95 flex-shrink-0">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-              Tambah Guru
-            </button>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_AttendanceList":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6" id="menuKehadiranHarian">
-      <!-- Header -->
-      <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">📋 Daftar Kehadiran</h1>
-          <p class="text-xs sm:text-sm text-slate-500 mt-1" id="attendanceDateLabel">Memuat tanggal...</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="date" id="inpAttendanceDate" class="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" onchange="onAttendanceDateChange()">
-          <button onclick="refreshActiveAttendanceTab()" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 transition shadow-sm">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Refresh
-          </button>
-        </div>
-      </div>
-      <!-- Daftar Kehadiran -->
-      <div id="tabPanelKehadiran">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div class="overflow-auto max-h-[calc(100vh-14rem)] custom-scrollbar">
-            <table class="w-full text-left border-collapse min-w-[800px]">
-              <thead class="sticky top-0 z-10 bg-slate-50/95 backdrop-blur shadow-sm">
-                <tr class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 font-bold">
-                  <th class="py-3.5 px-4 font-semibold w-14 text-center">No</th>
-                  <th class="py-3.5 px-4 font-semibold">Nama Guru</th>
-                  <th class="py-3.5 px-4 font-semibold text-center">Status</th>
-                  <th class="py-3.5 px-4 font-semibold text-center">Waktu Masuk</th>
-                  <th class="py-3.5 px-4 font-semibold text-center">Waktu Pulang</th>
-                  <th class="py-3.5 px-4 font-semibold text-center w-40">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyAttendanceList" class="divide-y divide-slate-100">
-              </tbody>
-            </table>
-          </div>
-          <!-- Tombol Tambah Guru — ditampilkan/disembunyikan via JS sesuai otorisasi -->
-          <div id="addAttendeeBar" class="hidden px-4 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-3">
-            <p class="text-xs text-slate-500">Guru tidak terjadwal hari ini dapat ditambahkan secara manual.</p>
-            <button onclick="openAddAttendeeModal()"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg transition active:scale-95 flex-shrink-0">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-              Tambah Guru
-            </button>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_AttendanceSchedule":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6" id="menuAturJamJadwal">
-      <!-- Header -->
-      <div class="mb-4 sm:mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">⚙️ Atur Jam Jadwal</h1>
-          <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola jam masuk &amp; pulang untuk KBM dan Ujian</p>
-        </div>
-      </div>
-      <!-- Info tipe aktif -->
-      <div id="schedTypeInfoBanner" class="hidden mb-4 flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-medium"></div>
-      <!-- Tabel jam jadwal sederhana: 2 bagian KBM dan Ujian -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <!-- Kartu KBM -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <div class="flex items-center gap-2">
-              <span id="badgeKBMActive" class="hidden inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full">● AKTIF</span>
-              <h3 class="text-sm font-bold text-slate-700">📚 Jam Jadwal KBM</h3>
-            </div>
-          </div>
-          <div class="overflow-auto custom-scrollbar">
-            <table class="w-full text-left border-collapse min-w-[360px]">
-              <thead class="bg-slate-50">
-                <tr class="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                  <th class="py-3 px-4">Hari</th>
-                  <th class="py-3 px-4 text-center">Jam Masuk</th>
-                  <th class="py-3 px-4 text-center">Jam Pulang</th>
-                  <th class="py-3 px-4 text-center w-16">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodySchedKBM" class="divide-y divide-slate-100">
-                <tr><td colspan="4" class="text-center py-6 text-slate-400 text-xs italic">Memuat...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <!-- Kartu Ujian -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <div class="flex items-center gap-2">
-              <span id="badgeUjianActive" class="hidden inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 text-violet-700 text-[10px] font-bold rounded-full">● AKTIF</span>
-              <h3 class="text-sm font-bold text-slate-700">📋 Jam Jadwal Ujian</h3>
-            </div>
-          </div>
-          <div class="overflow-auto custom-scrollbar">
-            <table class="w-full text-left border-collapse min-w-[360px]">
-              <thead class="bg-slate-50">
-                <tr class="border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                  <th class="py-3 px-4">Hari</th>
-                  <th class="py-3 px-4 text-center">Jam Masuk</th>
-                  <th class="py-3 px-4 text-center">Jam Pulang</th>
-                  <th class="py-3 px-4 text-center w-16">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodySchedUjian" class="divide-y divide-slate-100">
-                <tr><td colspan="4" class="text-center py-6 text-slate-400 text-xs italic">Memuat...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <!-- Tombol apply manual (opsional, untuk force re-apply setelah ganti template) -->
-      <div class="mt-4 flex justify-end">
-        <button id="btnApplyTplToDate" onclick="applyTemplateToDate()"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold rounded-xl transition border border-slate-200">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Paksa Re-apply ke Tanggal Ini
-        </button>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Config":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Konfigurasi Umum</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Data sekolah dan parameter honorarium.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div id="spanel-cfg" class="p-4 sm:p-6">
-          <div class="flex items-center gap-3 mb-5 sm:mb-6">
-            <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-            </div>
-            <div class="min-w-0">
-              <h3 class="text-sm sm:text-base font-bold text-slate-800">Konfigurasi Umum</h3>
-              <p class="text-[11px] sm:text-xs text-slate-400">Data sekolah dan parameter honorarium</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6">
-            <div class="lg:col-span-5 xl:col-span-4 space-y-5">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="sm:col-span-2">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Kepala Sekolah</label>
-                  <input type="text" id="cfgKepsek" placeholder="Masukkan nama kepala sekolah..."
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Gaji Pokok / JTM (Rp)</label>
-                  <div class="relative">
-                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
-                    <input type="number" id="cfgSalary" placeholder="0"
-                      class="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white">
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tingkatan Sekolah</label>
-                  <select id="cfgLevel" onchange="renderClassInputs()"
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition">
-                    <option value="SD">SD / MI</option>
-                    <option value="SMP">SMP / MTs</option>
-                    <option value="SMA">SMA / MA / SMK</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tahun Pelajaran</label>
-                  <input type="text" id="cfgTahunPelajaran" placeholder="cth: 2025/2026"
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Semester Aktif</label>
-                  <select id="cfgSemester"
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-slate-50 focus:bg-white transition">
-                    <option value="Ganjil">Semester Ganjil (1)</option>
-                    <option value="Genap">Semester Genap (2)</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Waktu per JTM (Menit)</label>
-                  <input type="number" id="cfgWaktuPerJTM" placeholder="Misal: 40" min="1" max="120"
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Versi Aplikasi</label>
-                  <input type="text" id="cfgAppVersion" placeholder="Misal: 2.1.1"
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white">
-                </div>
-              </div>
-              <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
-                <div class="flex items-center gap-3">
-                  <div class="flex-1">
-                    <p class="text-xs font-bold text-slate-600 mb-0.5">Kelas Paralel</p>
-                    <p class="text-[11px] text-slate-400">Aktifkan jika kelas menggunakan huruf A, B, C, dst.</p>
-                  </div>
-                  <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="chkUseParallel" onchange="renderClassInputs()" class="sr-only peer">
-                    <div class="w-9 h-5 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
-                  </label>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Sampai Huruf Paralel</label>
-                  <select id="selParallelMax" onchange="renderClassInputs()"
-                    class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer bg-white transition">
-                    <option value="A">A</option><option value="B">B</option><option value="C">C</option>
-                    <option value="D">D</option><option value="E">E</option><option value="F">F</option>
-                    <option value="G">G</option><option value="H">H</option><option value="I">I</option>
-                    <option value="J">J</option><option value="K">K</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="lg:col-span-7 xl:col-span-8">
-              <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 h-full flex flex-col">
-                <div class="flex items-center justify-between gap-3 mb-3">
-                  <div class="min-w-0">
-                    <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Jumlah Siswa per Rombel</p>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Standar siswa per kelas untuk perhitungan kebutuhan ruang</p>
-                  </div>
-                </div>
-                <div id="containerClassInputs" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5 flex-1"></div>
-              </div>
-            </div>
-
-            <div class="lg:col-span-12">
-              <button id="btnSaveConfig" onclick="saveSystemConfig()"
-                class="w-full sm:w-auto sm:ml-auto sm:flex bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition shadow-sm shadow-blue-200 inline-flex items-center justify-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                Simpan Konfigurasi
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Transportasi":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Transportasi Harian</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Konfigurasi tarif per kilometer dan status fitur transportasi.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div class="p-4 sm:p-6">
-          <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-            <div class="flex items-center justify-between gap-3 mb-4">
-              <div class="min-w-0">
-                <h3 class="text-sm font-bold text-slate-800">Tunjangan Transportasi Harian</h3>
-                <p class="text-[11px] text-slate-400 mt-0.5">Konfigurasi tarif per kilometer dan status fitur</p>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" id="cfgTransportEnabled" class="sr-only peer">
-                <div class="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-              </label>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-              <div class="sm:col-span-2">
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tarif per KM (Rp)</label>
-                <div class="relative">
-                  <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
-                  <input type="number" id="cfgTarifPerKm" placeholder="Misal: 2000" min="1"
-                    class="w-full pl-9 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition bg-slate-50 focus:bg-white">
-                </div>
-              </div>
-              <div class="sm:col-span-1">
-                <button id="btnSaveTransportConfig" onclick="saveTransportConfigUI()"
-                  class="w-full bg-slate-800 hover:bg-slate-900 active:bg-black text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm inline-flex items-center justify-center gap-2">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                  Simpan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Maintenance":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Mode Maintenance</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Pengaturan mode pemeliharaan sistem.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div class="p-4 sm:p-6">
-          <div class="rounded-xl border-2 border-red-200 bg-red-50/60 p-4 sm:p-5" id="maintenanceConfigCard">
-            <div class="flex items-center justify-between gap-3 mb-4">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="w-9 h-9 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                </div>
-                <div class="min-w-0">
-                  <h3 class="text-sm font-bold text-red-800">Mode Maintenance</h3>
-                  <p class="text-[11px] text-red-500 mt-0.5">Saat aktif, semua pengguna non-admin tidak dapat login</p>
-                </div>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input type="checkbox" id="cfgMaintenanceEnabled" class="sr-only peer" onchange="toggleMaintenanceMsgField()">
-                <div class="w-12 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-red-500"></div>
-              </label>
-            </div>
-            <div id="maintenanceMsgSection" class="space-y-3 hidden">
-              <div class="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <svg class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <p class="text-[11px] text-amber-700 font-medium leading-relaxed">Pengguna non-admin yang mencoba login akan melihat pesan di bawah ini sebagai notifikasi maintenance.</p>
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-red-700 uppercase tracking-wider mb-1.5">Pesan Maintenance (akan ditampilkan ke pengguna)</label>
-                <textarea id="cfgMaintenanceMessage" rows="3" placeholder="Contoh: Sistem sedang dalam pemeliharaan untuk peningkatan layanan. Mohon tunggu dan coba lagi dalam beberapa saat. Hubungi admin jika ada keperluan mendesak."
-                  class="w-full px-3.5 py-2.5 border border-red-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:border-red-300 outline-none transition bg-white resize-none placeholder-slate-400"></textarea>
-              </div>
-            </div>
-            <hr class="border-red-200/60 my-5" />
-            <div class="flex items-center justify-between gap-3 mb-4">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="w-9 h-9 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <div class="min-w-0">
-                  <h3 class="text-sm font-bold text-red-800">Jadwal Maintenance</h3>
-                  <p class="text-[11px] text-red-500 mt-0.5">Aktifkan maintenance secara otomatis sesuai jadwal</p>
-                </div>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input type="checkbox" id="cfgMaintenanceScheduledEnabled" class="sr-only peer" onchange="toggleScheduledMsgField()">
-                <div class="w-12 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[18px] after:w-[18px] after:transition-all peer-checked:bg-orange-500"></div>
-              </label>
-            </div>
-            <div id="scheduledMaintenanceSection" class="space-y-3 hidden">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-bold text-red-700 uppercase tracking-wider mb-1.5">Waktu Mulai</label>
-                  <input type="datetime-local" id="cfgMaintenanceStart"
-                    class="w-full px-3.5 py-2.5 border border-red-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:border-red-300 outline-none transition bg-white text-slate-800">
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-red-700 uppercase tracking-wider mb-1.5">Waktu Selesai</label>
-                  <input type="datetime-local" id="cfgMaintenanceEnd"
-                    class="w-full px-3.5 py-2.5 border border-red-200 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:border-red-300 outline-none transition bg-white text-slate-800">
-                </div>
-              </div>
-            </div>
-            <div class="mt-4 flex items-center gap-3">
-              <button id="btnSaveMaintenanceConfig" onclick="saveMaintenanceModeUI()"
-                class="bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-sm shadow-red-200 inline-flex items-center justify-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                Simpan Pengaturan Maintenance
-              </button>
-              <span id="maintenanceStatusBadge" class="hidden text-[11px] font-bold px-2.5 py-1 rounded-full"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Kalender":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Kalender Libur</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola hari libur dan acara sekolah.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div id="spanel-kalender" class="p-4 sm:p-5">
-          <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
-            <div class="lg:col-span-4 xl:col-span-3 p-4 sm:p-5 bg-slate-50/50">
-              <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Tambah / Edit Libur</p>
-              <div class="space-y-3">
-                <input type="hidden" id="inpLiburId">
-                <div class="flex items-center bg-white border border-slate-200 rounded-lg p-1 gap-1">
-                  <button onclick="setLiburMode('single')" id="btnModeSingle"
-                    class="flex-1 py-1.5 rounded-md text-xs font-bold bg-slate-800 text-white transition">Tanggal Tunggal</button>
-                  <button onclick="setLiburMode('range')" id="btnModeRange"
-                    class="flex-1 py-1.5 rounded-md text-xs font-bold text-slate-500 hover:bg-slate-100 transition">Rentang Tanggal</button>
-                </div>
-                <div id="libur-single-mode">
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal</label>
-                  <input type="date" id="inpLiburDate"
-                    class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
-                </div>
-                <div id="libur-range-mode" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mulai</label>
-                    <input type="date" id="inpLiburDateFrom"
-                      class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
-                  </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Selesai</label>
-                    <input type="date" id="inpLiburDateTo"
-                      class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Keterangan</label>
-                  <input type="text" id="inpLiburDesc" placeholder="Contoh: Hari Raya Idul Fitri..."
-                    class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none transition">
-                </div>
-                <div>
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" id="chkIsBonus" class="w-4 h-4 rounded text-amber-500 accent-amber-500">
-                    <span class="text-xs font-semibold text-slate-600">Hitung sebagai Bonus JTM</span>
-                  </label>
-                </div>
-                <div class="flex gap-2 pt-1">
-                  <button id="btnCancelLibur" onclick="resetLiburForm()" class="hidden flex-1 text-xs text-slate-500 hover:text-slate-700 font-bold py-2 rounded-xl hover:bg-slate-200 border border-slate-200 bg-white transition">Batal</button>
-                  <button id="btnAddHoliday" onclick="addHolidayAction()"
-                    class="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl text-xs font-bold transition shadow-sm shadow-amber-100">Simpan</button>
-                </div>
-              </div>
-            </div>
-            <div class="lg:col-span-8 xl:col-span-9 flex flex-col">
-              <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-white">
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Daftar Kalender</p>
-              </div>
-              <div class="overflow-y-auto custom-scrollbar flex-1 settings-table-scroll">
-                <table class="w-full text-sm text-left settings-mobile-cards">
-                  <thead class="sticky top-0 z-10">
-                    <tr class="bg-slate-50 border-b border-slate-200">
-                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal</th>
-                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
-                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Bonus</th>
-                      <th class="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tbodyHolidays" class="divide-y divide-slate-50"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Mapel":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Mata Pelajaran</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola daftar mata pelajaran.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div id="spanel-mapel" class="">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/40">
-            <div class="min-w-0">
-              <p class="text-sm font-bold text-slate-700">Daftar Mata Pelajaran</p>
-              <p class="text-xs text-slate-400 mt-0.5">Kelola mata pelajaran yang tersedia untuk jadwal</p>
-            </div>
-            <button onclick="openSubjectModal()"
-              class="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm shadow-emerald-100 self-start sm:self-auto active:scale-95">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-              </svg>
-              Tambah Mapel
-            </button>
-          </div>
-          <div class="overflow-y-auto custom-scrollbar settings-table-scroll">
-            <table class="w-full text-sm text-left settings-mobile-cards">
-              <thead class="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
-                <tr>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nama Mata Pelajaran</th>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodySubjects" class="divide-y divide-slate-50"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Tunjangan":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Tunjangan</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Kelola tunjangan tugas tambahan.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div id="spanel-tunjangan" class="">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/40">
-            <div class="min-w-0">
-              <p class="text-sm font-bold text-slate-700">Tunjangan &amp; Tugas Tambahan</p>
-              <p class="text-xs text-slate-400 mt-0.5">Tunjangan per guru per jenis tugas</p>
-            </div>
-            <button onclick="openAllowanceModal()"
-              class="inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm shadow-indigo-100 self-start sm:self-auto active:scale-95">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-              </svg>
-              Tambah Tunjangan
-            </button>
-          </div>
-          <div class="overflow-y-auto custom-scrollbar settings-table-scroll">
-            <table class="w-full text-sm text-left settings-mobile-cards">
-              <thead class="sticky top-0 z-10 bg-slate-50 border-b border-slate-100">
-                <tr>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-10">No.</th>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Jenis Tugas</th>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Guru</th>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Nominal</th>
-                  <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyAllowances" class="divide-y divide-slate-50"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_Settings_Pengumuman":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-3 sm:p-6">
-      <div class="mb-4 sm:mb-5">
-        <h1 class="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Pengumuman</h1>
-        <p class="text-xs sm:text-sm text-slate-500 mt-1">Buat dan kelola pengumuman untuk guru.</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div id="spanel-pengumuman" class="">
-          <div class="border-b border-slate-100 bg-slate-50/40">
-            <div class="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-6 sm:px-6 py-4 sm:py-5">
-              <div class="min-w-0 flex-1">
-                <h3 class="text-base font-bold text-slate-800">Pengumuman untuk Guru</h3>
-                <p class="text-[11px] sm:text-xs text-slate-400 mt-1 leading-relaxed">
-                  Pengumuman aktif akan ditampilkan dalam modal saat guru berhasil login atau memuat ulang aplikasi.
-                </p>
-              </div>
-              <button onclick="openAnnouncementEditor()" type="button"
-                class="inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm shadow-blue-100 self-start sm:self-auto active:scale-95 flex-shrink-0 w-full sm:w-auto">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                Buat Pengumuman
-              </button>
-            </div>
-          </div>
-          <div id="annAdminList" class="p-4 sm:p-6 space-y-3 max-w-3xl mx-auto">
-            <div class="text-center py-8 text-slate-400 text-sm italic">Memuat...</div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}
-<style>
-  #annEditorModal .ann-ed-card {
-    background: #fff; border-radius: 22px; max-width: 640px; width: 100%;
-    box-shadow: 0 30px 80px -20px rgba(15,23,42,0.55), 0 0 0 1px rgba(15,23,42,0.04);
-    display: flex; flex-direction: column; max-height: 92vh;
-  }
-  #annEditorModal .ann-ed-header {
-    background: linear-gradient(135deg,#4F46E5 0%,#7C3AED 100%);
-    color: #fff; padding: 18px 22px;
-    border-radius: 22px 22px 0 0;
-  }
-  #annEditorModal label { font-size: 12px; font-weight: 600; color: #475569; }
-  #annEditorModal .ann-input,
-  #annEditorModal textarea,
-  #annEditorModal select {
-    width: 100%; border: 1px solid #E2E8F0; border-radius: 10px;
-    padding: 9px 12px; font-size: 13.5px; color: #0F172A;
-    background: #fff; transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  #annEditorModal .ann-input:focus,
-  #annEditorModal textarea:focus,
-  #annEditorModal select:focus {
-    outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,0.15);
-  }
-  #annEditorModal textarea { resize: vertical; min-height: 110px; line-height: 1.55; }
-  #annEditorModal .ann-sev {
-    display: flex; gap: 8px; flex-wrap: wrap;
-  }
-  #annEditorModal .ann-sev-opt {
-    flex: 1 1 0; min-width: 70px; padding: 8px 10px;
-    border: 1.5px solid #E2E8F0; border-radius: 10px;
-    background: #fff; cursor: pointer; text-align: center;
-    font-size: 12px; font-weight: 700; color: #475569;
-    transition: all 0.15s;
-  }
-  #annEditorModal .ann-sev-opt:hover { border-color: #94A3B8; }
-  #annEditorModal .ann-sev-opt.is-active { border-width: 2px; }
-  #annEditorModal .ann-sev-opt[data-sev="info"].is-active     { border-color: #2563EB; background: #EFF6FF; color: #1E40AF; }
-  #annEditorModal .ann-sev-opt[data-sev="success"].is-active  { border-color: #059669; background: #ECFDF5; color: #047857; }
-  #annEditorModal .ann-sev-opt[data-sev="warning"].is-active  { border-color: #D97706; background: #FFFBEB; color: #B45309; }
-  #annEditorModal .ann-sev-opt[data-sev="critical"].is-active { border-color: #DC2626; background: #FEF2F2; color: #991B1B; }
-  #annEditorModal .ann-toggle {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 12px;
-    background: #FAFBFC; cursor: pointer;
-  }
-  #annEditorModal .ann-toggle input { width: 38px; height: 22px; appearance: none; -webkit-appearance: none; background: #CBD5E1; border-radius: 999px; position: relative; transition: background 0.2s; cursor: pointer; flex-shrink:0; }
-  #annEditorModal .ann-toggle input::before { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; background: #fff; border-radius: 999px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
-  #annEditorModal .ann-toggle input:checked { background: #4F46E5; }
-  #annEditorModal .ann-toggle input:checked::before { transform: translateX(16px); }
-  #annEditorModal .ann-toggle-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  #annEditorModal .ann-toggle-text strong { font-size: 13px; color: #0F172A; }
-  #annEditorModal .ann-toggle-text span { font-size: 11.5px; color: #64748B; line-height: 1.4; }
-  #annEditorModal .ann-userpick {
-    border: 1px solid #E2E8F0; border-radius: 12px; background: #FAFBFC;
-    padding: 8px;
-  }
-  #annEditorModal .ann-userpick-search { position: relative; }
-  #annEditorModal .ann-userpick-search input {
-    width: 100%; padding: 8px 10px 8px 32px; border: 1px solid #E2E8F0;
-    border-radius: 8px; background: #fff; font-size: 12.5px; color: #0F172A;
-  }
-  #annEditorModal .ann-userpick-search svg {
-    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    color: #94A3B8;
-  }
-  #annEditorModal .ann-userpick-list {
-    max-height: 180px; overflow-y: auto;
-    margin-top: 8px; border: 1px solid #F1F5F9; border-radius: 8px;
-    background: #fff;
-  }
-  #annEditorModal .ann-userpick-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 10px; cursor: pointer; user-select: none;
-    border-bottom: 1px solid #F8FAFC; font-size: 12.5px; color: #334155;
-    transition: background 0.1s;
-  }
-  #annEditorModal .ann-userpick-item:last-child { border-bottom: 0; }
-  #annEditorModal .ann-userpick-item:hover { background: #F8FAFC; }
-  #annEditorModal .ann-userpick-item input {
-    width: 14px; height: 14px; accent-color: #4F46E5; flex-shrink: 0;
-  }
-  #annEditorModal .ann-userpick-item .ann-up-name { font-weight: 600; color: #0F172A; }
-  #annEditorModal .ann-userpick-item .ann-up-meta {
-    margin-left: auto; font-size: 11px; color: #94A3B8; flex-shrink: 0;
-  }
-  #annEditorModal .ann-userpick-empty {
-    padding: 14px; text-align: center; font-size: 12px; color: #94A3B8; font-style: italic;
-  }
-  #annEditorModal .ann-userpick-counter {
-    display: flex; align-items: center; justify-content: space-between;
-    padding-top: 6px; font-size: 11px; color: #64748B;
-  }
-  #annEditorModal .ann-userpick-counter button {
-    background: none; border: 0; color: #4F46E5; font-weight: 600; cursor: pointer; font-size: 11px;
-    padding: 2px 6px; border-radius: 6px;
-  }
-  #annEditorModal .ann-userpick-counter button:hover { background: #EEF2FF; }
-  #annEditorModal .ann-userpick-counter button:disabled { opacity: 0.4; cursor: not-allowed; background: none; }
-  #annEditorModal .ann-section {
-    border-top: 1px solid #F1F5F9; padding-top: 12px; margin-top: 4px;
-  }
-  #annEditorModal .ann-section-title {
-    font-size: 13px; font-weight: 700; color: #0F172A;
-    display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
-  }
-  #annEditorModal .ann-section-hint {
-    font-size: 11.5px; color: #64748B; line-height: 1.5; margin-bottom: 10px;
-  }
-</style>
-<div id="annEditorModal" class="hidden fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-modal="true">
-  <div class="fixed inset-0 backdrop-blur-sm" style="background:rgba(15,23,42,0.6);" onclick="closeAnnouncementEditor()"></div>
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4 relative">
-    <div class="ann-ed-card">
-      <div class="ann-ed-header flex items-start gap-3 flex-shrink-0">
-        <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-[10.5px] uppercase tracking-wider font-bold text-white/80">Editor Pengumuman</p>
-          <h3 class="text-white font-bold text-base sm:text-lg" id="annEditorTitle">Buat Pengumuman Baru</h3>
-        </div>
-        <button onclick="closeAnnouncementEditor()" aria-label="Tutup"
-          class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition active:scale-95 flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <form id="formAnnouncement" onsubmit="event.preventDefault(); submitAnnouncement();" class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
-        <input type="hidden" id="inpAnnId">
-        <div>
-          <label for="inpAnnTitle">Judul <span class="text-red-500">*</span></label>
-          <input type="text" id="inpAnnTitle" class="ann-input mt-1" maxlength="160" required placeholder="Contoh: Rapat Koordinasi Bulan Ini">
-        </div>
-        <div>
-          <label for="inpAnnBody">Isi Pengumuman <span class="text-red-500">*</span></label>
-          <textarea id="inpAnnBody" class="mt-1" maxlength="3000" required placeholder="Tulis isi pengumuman. Anda boleh menggunakan tag HTML dasar: <b>, <i>, <u>, <a href>, <ul>/<ol>/<li>, <br>, <strong>, <em>"></textarea>
-          <p class="text-[11px] text-slate-400 mt-1">HTML dasar diperbolehkan. Untuk link tambahan, isi CTA URL di bawah agar tampil sebagai tombol.</p>
-        </div>
-        <div>
-          <label>Tingkat Pengumuman</label>
-          <div class="ann-sev mt-1.5" id="annSevPicker">
-            <button type="button" data-sev="info"     class="ann-sev-opt is-active" onclick="annPickSeverity('info')">ℹ️ Info</button>
-            <button type="button" data-sev="success"  class="ann-sev-opt"            onclick="annPickSeverity('success')">✅ Sukses</button>
-            <button type="button" data-sev="warning"  class="ann-sev-opt"            onclick="annPickSeverity('warning')">⚠️ Penting</button>
-            <button type="button" data-sev="critical" class="ann-sev-opt"            onclick="annPickSeverity('critical')">🚨 Kritis</button>
-          </div>
-          <input type="hidden" id="inpAnnSeverity" value="info">
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label for="inpAnnStart">Tanggal Mulai (opsional)</label>
-            <input type="date" id="inpAnnStart" class="ann-input mt-1">
-          </div>
-          <div>
-            <label for="inpAnnEnd">Tanggal Selesai (opsional)</label>
-            <input type="date" id="inpAnnEnd" class="ann-input mt-1">
-          </div>
-        </div>
-        <div>
-          <label for="inpAnnTarget">Sasaran berdasarkan Peran</label>
-          <select id="inpAnnTarget" class="ann-input mt-1">
-            <option value="guru">Hanya Guru</option>
-            <option value="all">Semua Pengguna</option>
-            <option value="admin">Hanya Admin</option>
-          </select>
-          <p class="text-[11px] text-slate-400 mt-1">Diabaikan jika daftar pengguna spesifik di bawah diisi.</p>
-        </div>
-        <div class="ann-section">
-          <p class="ann-section-title">
-            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-            Sasaran Pengguna Spesifik (opsional)
-          </p>
-          <p class="ann-section-hint">
-            Pilih akun pengguna tertentu yang akan menerima pengumuman ini. Jika kosong, sistem akan memakai sasaran berdasarkan peran di atas.
-          </p>
-          <div class="ann-userpick" data-list="target">
-            <div class="ann-userpick-search">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-              <input type="text" placeholder="Cari nama, username, NIP, atau peran..." oninput="annUserPickFilter('target', this.value)">
-            </div>
-            <div class="ann-userpick-list" id="annUserPickList_target">
-              <div class="ann-userpick-empty">Memuat daftar pengguna...</div>
-            </div>
-            <div class="ann-userpick-counter">
-              <span id="annUserPickCounter_target">0 dipilih</span>
-              <span>
-                <button type="button" onclick="annUserPickAll('target')">Pilih semua yang terlihat</button>
-                <button type="button" onclick="annUserPickClear('target')">Hapus pilihan</button>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div class="ann-section">
-          <p class="ann-section-title">
-            <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-            Pengaturan "Boleh Tutup" per Pengguna (opsional)
-          </p>
-          <p class="ann-section-hint">
-            Override toggle "Boleh ditutup" di atas untuk akun-akun tertentu.
-            <strong>Tidak boleh tutup</strong> selalu menang dari <strong>Boleh tutup</strong>.
-            User yang tidak masuk daftar akan mengikuti pengaturan global.
-          </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="text-[11.5px] text-emerald-700 font-bold flex items-center gap-1 mb-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                BOLEH TUTUP
-              </label>
-              <div class="ann-userpick" data-list="dismissible">
-                <div class="ann-userpick-search">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                  <input type="text" placeholder="Cari pengguna..." oninput="annUserPickFilter('dismissible', this.value)">
-                </div>
-                <div class="ann-userpick-list" id="annUserPickList_dismissible">
-                  <div class="ann-userpick-empty">Memuat daftar pengguna...</div>
-                </div>
-                <div class="ann-userpick-counter">
-                  <span id="annUserPickCounter_dismissible">0 dipilih</span>
-                  <button type="button" onclick="annUserPickClear('dismissible')">Hapus</button>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label class="text-[11.5px] text-rose-700 font-bold flex items-center gap-1 mb-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                TIDAK BOLEH TUTUP
-              </label>
-              <div class="ann-userpick" data-list="nondismissible">
-                <div class="ann-userpick-search">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                  <input type="text" placeholder="Cari pengguna..." oninput="annUserPickFilter('nondismissible', this.value)">
-                </div>
-                <div class="ann-userpick-list" id="annUserPickList_nondismissible">
-                  <div class="ann-userpick-empty">Memuat daftar pengguna...</div>
-                </div>
-                <div class="ann-userpick-counter">
-                  <span id="annUserPickCounter_nondismissible">0 dipilih</span>
-                  <button type="button" onclick="annUserPickClear('nondismissible')">Hapus</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label for="inpAnnCtaText">Teks Tombol CTA (opsional)</label>
-            <input type="text" id="inpAnnCtaText" class="ann-input mt-1" maxlength="40" placeholder="Contoh: Buka Tautan">
-          </div>
-          <div>
-            <label for="inpAnnCtaUrl">URL Tombol CTA (opsional)</label>
-            <input type="url" id="inpAnnCtaUrl" class="ann-input mt-1" placeholder="https://...">
-          </div>
-        </div>
-        <label class="ann-toggle" for="inpAnnDismissible">
-          <input type="checkbox" id="inpAnnDismissible" checked>
-          <div class="ann-toggle-text">
-            <strong>Boleh ditutup oleh pengguna</strong>
-            <span>Jika dimatikan, pengguna wajib menekan tombol "Mengerti" untuk lanjut.</span>
-          </div>
-        </label>
-        <label class="ann-toggle" for="inpAnnActive">
-          <input type="checkbox" id="inpAnnActive" checked>
-          <div class="ann-toggle-text">
-            <strong>Aktifkan pengumuman</strong>
-            <span>Hanya yang aktif yang akan ditampilkan ke pengguna.</span>
-          </div>
-        </label>
-        <label class="ann-toggle" for="inpAnnSendEmail">
-          <input type="checkbox" id="inpAnnSendEmail">
-          <div class="ann-toggle-text">
-            <strong>Kirim Email Notifikasi</strong>
-            <span>Email akan dikirim otomatis ke guru pada tanggal mulai.</span>
-          </div>
-        </label>
-      </form>
-      <div class="px-5 sm:px-6 pb-5 sm:pb-6 pt-3 border-t border-slate-100 flex items-center justify-end gap-2 flex-shrink-0 flex-wrap">
-        <button type="button" onclick="closeAnnouncementEditor()"
-          class="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-sm font-semibold hover:bg-slate-50">
-          Batal
-        </button>
-        <button type="button" id="btnPreviewAnnouncement" onclick="previewAnnouncementFromForm()"
-          class="inline-flex items-center gap-2 bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 px-4 py-2 rounded-xl text-sm font-semibold transition" title="Lihat tampilan untuk pengguna">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-          Pratinjau
-        </button>
-        <button type="button" id="btnSubmitAnnouncement" onclick="submitAnnouncement()"
-          class="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md shadow-indigo-600/25">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          Simpan Pengumuman
-        </button>
-      </div>
-    </div>
-  </div>
-</div>`;
-      case "Page_Users":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Data Pengguna</h1>
-          <p class="text-sm text-slate-500 mt-0.5">Kelola akun admin dan guru dalam sistem</p>
-        </div>
-        <button onclick="openUserModal()"
-          class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-sm shadow-blue-200 self-start sm:self-auto">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-          </svg>
-          Tambah Pengguna
-        </button>
-      </div>
-      <div class="grid grid-cols-3 gap-4 mb-5">
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 flex items-center gap-3.5">
-          <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total</p>
-            <p class="text-2xl font-bold text-slate-800 leading-none mt-0.5" id="statTotalUsers">—</p>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 flex items-center gap-3.5">
-          <div class="w-10 h-10 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-            </svg>
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Admin</p>
-            <p class="text-2xl font-bold text-violet-700 leading-none mt-0.5" id="statTotalAdmins">—</p>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 flex items-center gap-3.5">
-          <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-            </svg>
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Guru</p>
-            <p class="text-2xl font-bold text-emerald-700 leading-none mt-0.5" id="statTotalGurus">—</p>
-          </div>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 border-b border-slate-100">
-          <div class="relative flex-1 max-w-sm">
-            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-            <input type="text" id="searchUsers" placeholder="Cari nama atau username..."
-              oninput="filterUsersTable()"
-              class="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-400 outline-none transition">
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="filterUsersByRole('')" id="filterAll"
-              class="user-role-filter px-4 py-2 rounded-xl text-xs font-bold border bg-blue-600 text-white border-blue-600 transition">Semua</button>
-            <button onclick="filterUsersByRole('admin')" id="filterAdmin"
-              class="user-role-filter px-4 py-2 rounded-xl text-xs font-bold border bg-white text-slate-500 border-slate-200 hover:bg-slate-50 transition">Admin</button>
-            <button onclick="filterUsersByRole('guru')" id="filterGuru"
-              class="user-role-filter px-4 py-2 rounded-xl text-xs font-bold border bg-white text-slate-500 border-slate-200 hover:bg-slate-50 transition">Guru</button>
-          </div>
-          <p class="text-xs text-slate-400 sm:ml-auto font-medium whitespace-nowrap" id="lblUserCount"></p>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm text-left">
-            <thead class="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Pengguna</th>
-                <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Username</th>
-                <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">NIP</th>
-                <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Role</th>
-                <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyUsers" class="divide-y divide-slate-50"></tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_ExamSchedule":
-        return `<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-hidden">
-    ${_navbar()}
-    <style>
-      .exam-tab {
-        flex-shrink: 0;
-      }
-      @media (max-width: 480px) {
-        .exam-tab {
-          padding: 0.45rem 0.75rem !important;
-          font-size: 0.7rem !important;
-        }
-      }
-      #examPanel_periods {
-        position: relative;
-      }
-      #examPeriodList {
-        width: 18rem;
-      }
-      @media (max-width: 1023px) {
-        #examPeriodList {
-          width: 100%;
-          border-right: 0;
-          border-bottom: 1px solid #e2e8f0;
-        }
-        #examPeriodDetail {
-          display: none;
-          width: 100%;
-        }
-        #examPanel_periods.is-detail-view #examPeriodList {
-          display: none;
-        }
-        #examPanel_periods.is-detail-view #examPeriodDetail {
-          display: block;
-        }
-      }
-      @media (min-width: 1024px) {
-        #examPanel_periods.is-detail-view #examPeriodList,
-        #examPanel_periods.is-detail-view #examPeriodDetail {
-          display: flex;
-        }
-        #examPeriodDetail { display: block; }
-      }
-      #examMobileBackBar {
-        display: none;
-      }
-      @media (max-width: 1023px) {
-        #examMobileBackBar.is-detail-view {
-          display: flex;
-        }
-      }
-      .exam-rekap-table-wrap {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }
-      .exam-rekap-table-wrap table {
-        min-width: 640px;
-      }
-      @media (max-width: 480px) {
-        #examPanel_jtm, #examPanel_bap {
-          padding: 0.75rem !important;
-        }
-        #examPeriodDetail .exam-detail-section,
-        #examPeriodDetail > div {
-          padding-left: 0.75rem;
-          padding-right: 0.75rem;
-        }
-      }
-      #examLoadingOverlay > div {
-        max-width: calc(100vw - 2rem);
-      }
-    </style>
-    <div class="flex-1 flex flex-col overflow-hidden relative">
-      <div id="examLoadingOverlay"
-        class="hidden absolute inset-0 z-50 flex items-center justify-center"
-        style="background:rgba(248,250,252,0.75);backdrop-filter:blur(2px);">
-        <div class="bg-white rounded-2xl shadow-2xl px-5 sm:px-7 py-4 sm:py-5 flex items-center gap-3 sm:gap-4 border border-slate-200">
-          <div class="w-7 h-7 sm:w-8 sm:h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
-          <div class="min-w-0">
-            <p class="text-sm font-bold text-slate-800 truncate" id="examLoadingMsg">Memproses...</p>
-            <p class="text-xs text-slate-400 mt-0.5">Mohon tunggu sebentar</p>
-          </div>
-        </div>
-      </div>
-      <div class="shrink-0 bg-white border-b border-slate-200 px-3 sm:px-6">
-        <div class="flex items-center justify-between gap-3 pt-3 sm:pt-4 flex-wrap">
-          <div class="flex items-center gap-1 overflow-x-auto no-scrollbar pb-3 flex-1 min-w-0">
-            <button onclick="exam_switchTab('periods')" id="examTabBtn_periods"
-              class="exam-tab whitespace-nowrap px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition border border-blue-600 text-blue-600 bg-blue-50">
-              📋 <span class="hidden sm:inline">Daftar </span>Periode
-            </button>
-            <button onclick="exam_switchTab('jtm')" id="examTabBtn_jtm"
-              class="exam-tab whitespace-nowrap px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition border border-transparent text-slate-500 hover:bg-slate-100">
-              📊 <span class="hidden sm:inline">Rekap </span>JTM
-            </button>
-            <button onclick="exam_switchTab('bap')" id="examTabBtn_bap"
-              class="exam-tab whitespace-nowrap px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition border border-transparent text-slate-500 hover:bg-slate-100">
-              📝 <span class="hidden sm:inline">Rekap </span>BAP
-            </button>
-          </div>
-          <button onclick="exam_openPeriodModal(null)"
-            class="shrink-0 mb-3 inline-flex items-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-xl shadow transition active:scale-95">
-            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-            <span class="hidden xs:inline sm:inline">Buat Periode<span class="hidden sm:inline"> Baru</span></span>
-            <span class="xs:hidden sm:hidden">Tambah</span>
-          </button>
-        </div>
-      </div>
-      <div id="examMobileBackBar" class="shrink-0 bg-white border-b border-slate-200 px-3 py-2 items-center gap-2">
-        <button type="button" onclick="exam_backToPeriodList()"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 active:scale-95 rounded-lg transition">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
-          Kembali ke Daftar Periode
-        </button>
-      </div>
-      <div id="examPanel_periods" class="relative flex-1 overflow-hidden flex flex-col lg:flex-row">
-        <div id="examPeriodList"
-          class="shrink-0 lg:border-r border-slate-200 bg-white overflow-y-auto custom-scrollbar flex flex-col lg:max-w-xs">
-          <div class="p-3 flex flex-col gap-2">
-            <div class="skeleton h-16 rounded-xl"></div>
-            <div class="skeleton h-16 rounded-xl"></div>
-            <div class="skeleton h-16 rounded-xl"></div>
-          </div>
-        </div>
-        <div id="examPeriodDetail" class="flex-1 overflow-y-auto custom-scrollbar bg-slate-50">
-          <div class="flex flex-col items-center justify-center h-full text-center p-4 sm:p-8">
-            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-              <svg class="w-8 h-8 sm:w-10 sm:h-10 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-              </svg>
-            </div>
-            <p class="text-slate-500 font-medium text-sm">Pilih periode ujian di sebelah kiri</p>
-            <p class="text-slate-400 text-xs mt-1">untuk melihat detail sesi, ruang, dan jadwal pengawas</p>
-          </div>
-        </div>
-      </div>
-      <div id="examPanel_jtm" class="hidden flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-6">
-        <div id="examJtmContent">
-          <div class="flex flex-col items-center justify-center h-64 text-center">
-            <p class="text-slate-400 text-sm">Pilih periode dari tab <strong>Daftar Periode</strong> terlebih dahulu</p>
-          </div>
-        </div>
-      </div>
-      <div id="examPanel_bap" class="hidden flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-6">
-        <div id="examBapContent">
-          <div class="flex flex-col items-center justify-center h-64 text-center">
-            <p class="text-slate-400 text-sm">Pilih periode dari tab <strong>Daftar Periode</strong> terlebih dahulu</p>
-          </div>
-        </div>
-      </div>
-    </div>
-    ${_footer()}
-  </div>
-</div>
-<div id="examPeriodModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="exam_closePeriodModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="exam_closePeriodModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3 pr-9">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white flex-shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 id="examPeriodModalTitle" class="text-white font-bold text-base sm:text-lg truncate">Buat Periode Ujian</h3>
-            <p class="text-blue-100 text-xs mt-0.5">Tentukan rentang tanggal &amp; parameter honor panitia</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-        <input type="hidden" id="inpExamPeriodId">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Periode <span class="text-red-500">*</span></label>
-          <input id="inpExamPeriodName" type="text" placeholder="cth. Ujian Akhir Semester Ganjil 2025/2026" maxlength="100"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Mulai <span class="text-red-500">*</span></label>
-            <input id="inpExamPeriodStart" type="date" oninput="_examPeriodPreviewDuration()"
-              class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Selesai <span class="text-red-500">*</span></label>
-            <input id="inpExamPeriodEnd" type="date" oninput="_examPeriodPreviewDuration()"
-              class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-          </div>
-        </div>
-        <div id="examPeriodDurationPreview" class="hidden bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5">
-          <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <p class="text-xs text-blue-700 font-semibold" id="examPeriodDurationText">—</p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">JTM Panitia per Hari <span class="text-red-500">*</span></label>
-          <input id="inpExamPeriodJtm" type="number" min="0" step="0.5" placeholder="cth. 4"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-          <p class="text-xs text-slate-400 mt-1 flex items-start gap-1"><svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Nilai JTM yang dicatat untuk setiap Panitia per hari kehadiran</p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Deskripsi <span class="text-slate-400 font-normal normal-case">(opsional)</span></label>
-          <textarea id="inpExamPeriodDesc" rows="2" placeholder="Catatan tambahan, mis. info penting buat panitia"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"></textarea>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="exam_closePeriodModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl font-semibold text-sm transition active:scale-95">Batal</button>
-        <button type="button" onclick="exam_savePeriod()" id="btnSaveExamPeriod" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-md active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Simpan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="examSessionModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="exam_closeSessionModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="exam_closeSessionModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3 pr-9">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 id="examSessionModalTitle" class="text-white font-bold text-base sm:text-lg truncate">Tambah Sesi Ujian</h3>
-            <p class="text-emerald-100 text-xs mt-0.5">Tentukan tanggal, jam, &amp; JTM pengawas</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-        <input type="hidden" id="inpExamSessionId">
-        <input type="hidden" id="inpExamSessionPeriodId">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Sesi <span class="text-red-500">*</span></label>
-          <input id="inpExamSessionDate" type="date" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama Sesi <span class="text-red-500">*</span></label>
-          <input id="inpExamSessionName" type="text" placeholder="cth. Sesi Pagi / Sesi 1" maxlength="50"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Mulai <span class="text-red-500">*</span></label>
-            <input id="inpExamSessionStart" type="time" oninput="_examSessionPreviewDuration()"
-              class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Jam Selesai <span class="text-red-500">*</span></label>
-            <input id="inpExamSessionEnd" type="time" oninput="_examSessionPreviewDuration()"
-              class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-          </div>
-        </div>
-        <div id="examSessionDurationPreview" class="hidden bg-emerald-50 border border-emerald-100 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5">
-          <svg class="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <p class="text-xs text-emerald-700 font-semibold" id="examSessionDurationText">—</p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">JTM per Sesi (Pengawas) <span class="text-red-500">*</span></label>
-          <input id="inpExamSessionJtm" type="number" min="0" step="0.5" placeholder="cth. 2"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
-          <p class="text-xs text-slate-400 mt-1 flex items-start gap-1"><svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>JTM ini menjadi default untuk setiap pengawas yang ditugaskan di sesi ini</p>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="exam_closeSessionModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl font-semibold text-sm transition active:scale-95">Batal</button>
-        <button type="button" onclick="exam_saveSession()" id="btnSaveExamSession" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition shadow-md active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Simpan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="examRoomModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="exam_closeRoomModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-violet-600 to-purple-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="exam_closeRoomModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3 pr-9">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 id="examRoomModalTitle" class="text-white font-bold text-base sm:text-lg truncate">Tambah Ruang Ujian</h3>
-            <p class="text-purple-100 text-xs mt-0.5">Satu ruang = satu mata ujian + satu kelas</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-        <input type="hidden" id="inpExamRoomId">
-        <input type="hidden" id="inpExamRoomSessionId">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nama / Nomor Ruang <span class="text-red-500">*</span></label>
-          <input id="inpExamRoomName" type="text" placeholder="cth. Ruang 1 / Lab Komputer" maxlength="50"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mata Ujian <span class="text-red-500">*</span></label>
-          <input id="inpExamRoomSubject" type="text" placeholder="cth. Matematika" maxlength="50"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Kelas <span class="text-red-500">*</span></label>
-          <input id="inpExamRoomClass" type="text" placeholder="cth. VII-A, VIII, IX" maxlength="30"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Total Siswa di Ruang <span class="text-slate-400">(Opsional)</span></label>
-          <input id="inpExamRoomTotalSiswa" type="number" min="0" placeholder="cth. 30 (kosongkan jika belum tahu)"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none">
-          <p class="text-xs text-slate-500 mt-1">Jika diisi, sistem akan memvalidasi total siswa saat pengawas mengisi BAP.</p>
-        </div>
-        <div class="bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2.5 flex items-start gap-2.5">
-          <svg class="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <p class="text-xs text-violet-700 leading-relaxed">Setelah ruang dibuat, Anda bisa menugaskan satu atau beberapa pengawas pada ruang ini.</p>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="exam_closeRoomModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl font-semibold text-sm transition active:scale-95">Batal</button>
-        <button type="button" onclick="exam_saveRoom()" id="btnSaveExamRoom" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-sm hover:bg-violet-700 transition shadow-md active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Simpan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="examSupModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="exam_closeSupModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="exam_closeSupModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3 pr-9">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 id="examSupModalTitle" class="text-white font-bold text-base sm:text-lg truncate">Tetapkan Pengawas</h3>
-            <p id="examSupModalSub" class="text-amber-100 text-xs mt-0.5 truncate">Pilih guru pengawas ruang</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-        <input type="hidden" id="inpExamSupId">
-        <input type="hidden" id="inpExamSupRoomId">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Pengawas <span class="text-red-500">*</span></label>
-          <div class="relative mb-2">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="inpExamSupTeacherSearch" placeholder="Cari nama guru..." autocomplete="off"
-              oninput="_examFilterTeacherSelect('inpExamSupTeacher', this.value)"
-              class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition">
-          </div>
-          <select id="inpExamSupTeacher" size="6" class="w-full border border-slate-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer">
-            <option value="">Pilih Guru...</option>
-          </select>
-          <p class="text-xs text-slate-400 mt-1.5 flex items-start gap-1" id="examSupHint">
-            <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span>Guru dapat ditugaskan sebagai panitia dan pengawas di hari yang sama</span>
-          </p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">JTM untuk Pengawas Ini <span class="text-red-500">*</span></label>
-          <input id="inpExamSupJtm" type="number" min="0" step="0.5" placeholder="cth. 2"
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
-          <p class="text-xs text-slate-400 mt-1">Default dari JTM sesi. Ubah jika pengawas ini mendapat JTM berbeda.</p>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="exam_closeSupModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl font-semibold text-sm transition active:scale-95">Batal</button>
-        <button type="button" onclick="exam_saveAssignSup()" id="btnSaveExamSup" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition shadow-md active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Tetapkan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="examComModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="exam_closeComModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-cyan-600 to-sky-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="exam_closeComModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3 pr-9">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 class="text-white font-bold text-base sm:text-lg truncate">Tetapkan Panitia</h3>
-            <p id="examComModalSub" class="text-cyan-100 text-xs mt-0.5 truncate">Pilih guru panitia untuk tanggal ini</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-        <input type="hidden" id="inpExamComPeriodId">
-        <input type="hidden" id="inpExamComDate">
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal</label>
-          <input id="inpExamComDateDisplay" type="date" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 outline-none cursor-not-allowed" disabled>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Panitia <span class="text-red-500">*</span></label>
-          <div class="relative mb-2">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="inpExamComTeacherSearch" placeholder="Cari nama guru..." autocomplete="off"
-              oninput="_examFilterTeacherSelect('inpExamComTeacher', this.value)"
-              class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500 outline-none transition">
-          </div>
-          <select id="inpExamComTeacher" size="6" class="w-full border border-slate-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none cursor-pointer">
-            <option value="">Pilih Guru...</option>
-          </select>
-          <p class="text-xs text-slate-400 mt-1.5 flex items-start gap-1">
-            <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            <span>Guru yang sudah jadi pengawas di hari yang sama tidak bisa dipilih</span>
-          </p>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="exam_closeComModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl font-semibold text-sm transition active:scale-95">Batal</button>
-        <button type="button" onclick="exam_saveAssignCom()" id="btnSaveExamCom" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-cyan-600 text-white rounded-xl font-bold text-sm hover:bg-cyan-700 transition shadow-md active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Tetapkan
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="examSubstModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-  <div class="flex items-end sm:items-center justify-center min-h-screen p-0 sm:p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="exam_closeSubstModal()"></div>
-    <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md overflow-hidden flex flex-col" style="max-height:92vh;">
-      <div class="bg-gradient-to-r from-rose-600 to-pink-600 px-5 sm:px-6 py-4 sm:py-5 relative flex-shrink-0">
-        <button type="button" onclick="exam_closeSubstModal()" aria-label="Tutup"
-          class="absolute top-3 right-3 w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
-        <div class="flex items-start gap-3 pr-9">
-          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <h3 id="examSubstModalTitle" class="text-white font-bold text-base sm:text-lg truncate">Ganti Pengawas</h3>
-            <p id="examSubstModalSub" class="text-rose-100 text-xs mt-0.5">Pilih guru pengganti untuk hari ini</p>
-          </div>
-        </div>
-      </div>
-      <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-        <input type="hidden" id="inpExamSubstId">
-        <input type="hidden" id="inpExamSubstType">
-        <div id="examSubstInfo" class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700"></div>
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru Pengganti <span class="text-red-500">*</span></label>
-          <div class="relative mb-2">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input type="text" id="inpExamSubstTeacherSearch" placeholder="Cari nama guru..." autocomplete="off"
-              oninput="_examFilterTeacherSelect('inpExamSubstTeacher', this.value)"
-              class="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-2 focus:ring-rose-500 outline-none transition">
-          </div>
-          <select id="inpExamSubstTeacher" size="6" class="w-full border border-slate-200 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none cursor-pointer">
-            <option value="">Pilih Guru Pengganti...</option>
-          </select>
-          <p class="text-xs text-slate-400 mt-1.5 flex items-start gap-1">
-            <svg class="w-3 h-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            <span>Guru asli akan di-mark sebagai "diganti" sampai Anda klik Batal Ganti</span>
-          </p>
-        </div>
-      </div>
-      <div class="bg-slate-50 border-t border-slate-200 px-5 sm:px-6 py-3 flex gap-3 flex-shrink-0">
-        <button type="button" onclick="exam_closeSubstModal()" class="flex-1 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl font-semibold text-sm transition active:scale-95">Batal</button>
-        <button type="button" onclick="exam_saveSubst()" id="btnSaveExamSubst" class="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition shadow-md active:scale-95">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-          Konfirmasi Ganti
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-${_modal()}`;
-      case "Page_MyAttendance":
-        return `<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <style>
-      #page-myattendance-root, #page-myattendance-root * { box-sizing: border-box; }
-      .mah-hero {
-        background: linear-gradient(135deg, #0F172A 0%, #1a2e4a 55%, #1e3a5f 100%);
-        padding: 2rem 2rem 2.5rem; position: relative; overflow: hidden; min-width: 0;
-      }
-      @media (max-width: 640px) { .mah-hero { padding: 1.25rem 1rem 1.5rem; } }
-      .mah-hero::before {
-        content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%;
-        background: radial-gradient(circle, rgba(14,165,233,0.18) 0%, transparent 70%);
-        top: -60px; right: -40px; pointer-events: none;
-      }
-      .mah-hero-tag {
-        display: inline-flex; align-items: center; gap: 6px;
-        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 999px; padding: 4px 12px;
-        font-size: 0.7rem; font-weight: 700; color: #7DD3FC;
-        letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.75rem;
-      }
-      .mah-hero-title {
-        font-size: clamp(1.2rem, 3.5vw, 2rem); font-weight: 800;
-        color: #F1F5F9; letter-spacing: -0.5px; line-height: 1.2; position: relative; z-index: 1;
-      }
-      .mah-hero-sub { font-size: 0.825rem; color: #94A3B8; margin-top: 0.35rem; position: relative; z-index: 1; }
-      .mah-filter-bar {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem;
-        padding: 1rem 1.5rem; background: #fff;
-        border-bottom: 1px solid #E2E8F0; position: sticky; top: 0; z-index: 10;
-      }
-      @media (max-width: 480px) { .mah-filter-bar { padding: 0.75rem 1rem; } }
-      .mah-filter-bar label { font-size: 0.75rem; font-weight: 700; color: #64748B; white-space: nowrap; }
-      .mah-filter-select, .mah-filter-input {
-        border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 7px 12px;
-        font-size: 0.8125rem; color: #1E293B; background: #F8FAFC; outline: none;
-        transition: border-color 0.18s, box-shadow 0.18s;
-      }
-      .mah-filter-select:focus, .mah-filter-input:focus {
-        border-color: #0EA5E9; box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
-      }
-      .mah-btn-refresh {
-        display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;
-        background: #0F172A; color: #fff; border: none; border-radius: 10px;
-        font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background 0.18s, transform 0.1s;
-        white-space: nowrap;
-      }
-      .mah-btn-refresh:hover { background: #1E3A5F; }
-      .mah-btn-refresh:active { transform: scale(0.97); }
-      .mah-btn-export-pdf {
-        display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;
-        background: #DC2626; color: #fff; border: none; border-radius: 10px;
-        font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: background 0.18s, transform 0.1s;
-        white-space: nowrap; margin-left: auto;
-      }
-      .mah-btn-export-pdf:hover { background: #B91C1C; }
-      .mah-btn-export-pdf:active { transform: scale(0.97); }
-      .mah-btn-export-pdf:disabled { background: #FCA5A5; cursor: not-allowed; }
-      .mah-content { padding: 1.25rem 1.5rem; min-width: 0; }
-      @media (max-width: 480px) { .mah-content { padding: 0.875rem 1rem; } }
-      .mah-list { display: flex; flex-direction: column; gap: 0.625rem; }
-      .mah-day-card {
-        background: #fff; border-radius: 1rem; border: 1px solid #E2E8F0;
-        box-shadow: 0 1px 4px rgba(15,23,42,0.04);
-        overflow: hidden; transition: box-shadow 0.18s;
-      }
-      .mah-day-card:hover { box-shadow: 0 4px 14px rgba(15,23,42,0.08); }
-      .mah-day-header {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0.75rem 1.25rem; gap: 0.75rem; flex-wrap: wrap;
-        border-bottom: 1px solid #F1F5F9;
-        background: linear-gradient(to right, #FAFBFD, #F8FAFC);
-      }
-      .mah-day-date { font-size: 0.8125rem; font-weight: 700; color: #1E293B; }
-      .mah-day-dow { font-size: 0.7rem; color: #94A3B8; font-weight: 500; margin-top: 2px; }
-      .mah-status-badge {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 3px 10px; border-radius: 999px; font-size: 0.65rem; font-weight: 800;
-        white-space: nowrap; flex-shrink: 0;
-      }
-      .mah-badge-hadir    { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
-      .mah-badge-working  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
-      .mah-badge-absent   { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
-      .mah-badge-noschedule { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
-      .mah-badge-holiday  { background: #F0FDF4; color: #166534; border: 1px solid #86EFAC; }
-      .mah-holiday-banner {
-        display: flex; align-items: center; gap: 7px;
-        background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px;
-        padding: 6px 12px; font-size: 0.775rem; color: #15803D; font-weight: 600;
-        margin-bottom: 0.375rem;
-      }
-      .mah-day-body { padding: 0.875rem 1.25rem; }
-      .mah-time-row {
-        display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.625rem;
-      }
-      .mah-time-chip {
-        display: flex; align-items: center; gap: 6px;
-        background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
-        padding: 5px 10px; font-size: 0.75rem;
-      }
-      .mah-time-chip-label { font-weight: 600; color: #64748B; }
-      .mah-time-chip-val   { font-family: 'Courier New', monospace; font-weight: 800; color: #1E293B; font-size: 0.8125rem; }
-      .mah-time-chip-val.empty { color: #CBD5E1; font-family: inherit; font-weight: 500; font-size: 0.75rem; }
-      .mah-leaves { margin-top: 0.625rem; }
-      .mah-leaves-title { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem; }
-      .mah-leave-item {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-        padding: 5px 10px; background: #FFF7ED; border: 1px solid #FED7AA;
-        border-radius: 8px; font-size: 0.75rem; margin-bottom: 0.375rem;
-      }
-      .mah-leave-time { font-family: 'Courier New', monospace; font-weight: 800; color: #9A3412; }
-      .mah-leave-reason { color: #78350F; font-style: italic; }
-      .mah-empty-day {
-        font-size: 0.8rem; color: #94A3B8; font-style: italic; padding: 0.25rem 0;
-      }
-      .mah-skeleton-card {
-        background: #fff; border-radius: 1rem; border: 1px solid #E2E8F0;
-        padding: 1rem 1.25rem; animation: mah-pulse 1.4s ease-in-out infinite;
-      }
-      @keyframes mah-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
-      .mah-sk-line { background: #E2E8F0; border-radius: 6px; height: 12px; margin-bottom: 8px; }
-      .mah-empty-state {
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        padding: 3rem 1rem; text-align: center; color: #94A3B8;
-      }
-      .mah-empty-state svg { color: #CBD5E1; margin-bottom: 0.75rem; }
-      .mah-empty-state p { font-size: 0.875rem; font-weight: 600; color: #64748B; }
-      .mah-empty-state span { font-size: 0.75rem; margin-top: 0.25rem; }
-      .mah-summary-bar {
-        display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;
-      }
-      .mah-sum-chip {
-        display: flex; align-items: center; gap: 8px;
-        background: #fff; border: 1px solid #E2E8F0; border-radius: 10px;
-        padding: 8px 14px; font-size: 0.8rem; box-shadow: 0 1px 3px rgba(15,23,42,0.04);
-      }
-      .mah-sum-num { font-size: 1.15rem; font-weight: 800; color: #1E293B; }
-      .mah-sum-lbl { font-size: 0.7rem; color: #64748B; font-weight: 600; }
-    </style>
-    <main class="w-full grow" id="page-myattendance-root">
-      <!-- Hero -->
-      <div class="mah-hero">
-        <div class="mah-hero-tag">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-          Riwayat Kehadiran
-        </div>
-        <h1 class="mah-hero-title">Riwayat Kehadiran Saya</h1>
-        <p class="mah-hero-sub">Data jam masuk, jam pulang, dan izin keluar sementara per hari</p>
-      </div>
-      <!-- Filter bar -->
-      <div class="mah-filter-bar">
-        <label for="mahMonth">Bulan:</label>
-        <select id="mahMonth" class="mah-filter-select"></select>
-        <label for="mahYear">Tahun:</label>
-        <select id="mahYear" class="mah-filter-select"></select>
-        <button class="mah-btn-refresh" onclick="loadMyAttendanceHistory()">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Tampilkan
-        </button>
-        <button id="mahBtnExportPdf" class="mah-btn-export-pdf" onclick="exportMyAttendancePDF()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Export PDF
-        </button>
-      </div>
-      <!-- Content -->
-      <div class="mah-content">
-        <div id="mahSummaryBar" class="mah-summary-bar" style="display:none;"></div>
-        <div id="mahListContainer" class="mah-list">
-          <!-- populated by JS -->
-          <div class="mah-skeleton-card"><div class="mah-sk-line w-1/3"></div><div class="mah-sk-line w-2/3"></div><div class="mah-sk-line w-1/2"></div></div>
-          <div class="mah-skeleton-card"><div class="mah-sk-line w-1/4"></div><div class="mah-sk-line w-3/4"></div><div class="mah-sk-line w-2/5"></div></div>
-          <div class="mah-skeleton-card"><div class="mah-sk-line w-2/5"></div><div class="mah-sk-line w-1/2"></div></div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_EventManagement":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6 lg:p-8">
-      <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-indigo-600 tracking-tight">Manajemen Acara / Kegiatan</h1>
-          <p class="text-sm text-slate-500 mt-2 font-medium">Kelola definisi acara dan kegiatan sekolah dengan mudah</p>
-        </div>
-        <button onclick="openEventDefinitionModal(null)"
-          class="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-200 transform hover:-translate-y-0.5 transition-all duration-300">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Tambah Acara
-        </button>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
-        <div id="eventMgmtTableContainer">
-          <div class="p-8 space-y-4">
-            <div class="h-4 bg-slate-100 rounded-full animate-pulse w-3/4"></div>
-            <div class="h-4 bg-slate-100 rounded-full animate-pulse w-1/2"></div>
-            <div class="h-4 bg-slate-100 rounded-full animate-pulse w-2/3"></div>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-<!-- Event Definition Modal -->
-<div id="eventDefModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 transition-all duration-300">
-  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto transform transition-all border border-slate-100">
-    <div class="flex items-center justify-between p-6 border-b border-slate-100/60 bg-slate-50/50">
-      <h3 id="eventDefModalTitle" class="text-xl font-bold text-slate-800 tracking-tight">Tambah Acara</h3>
-      <button onclick="closeEventDefModal()" class="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 p-2 rounded-full transition-all duration-200 shadow-sm border border-slate-100">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <form id="eventDefForm" class="p-6 space-y-5" onsubmit="submitEventDefForm(event)">
-      <input type="hidden" id="evdId">
-      <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nama Acara <span class="text-rose-500">*</span></label>
-        <input id="evdName" type="text" required class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200" placeholder="Contoh: Upacara Bendera">
-      </div>
-      <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Tipe <span class="text-rose-500">*</span></label>
-        <select id="evdType" onchange="toggleEventTypeFields()" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200">
-          <option value="insidental">Insidental (Tanggal Tertentu)</option>
-          <option value="rutin">Rutin (Berulang Mingguan)</option>
-        </select>
-      </div>
-      <div id="evdInsidentalSection" class="p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
-        <label class="block text-sm font-semibold text-slate-700 mb-2">Tanggal Pelaksanaan <span class="text-rose-500">*</span></label>
-        <div id="evdDateList" class="space-y-2.5"></div>
-        <button type="button" onclick="addEventDateRow()" class="mt-3 text-sm text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1.5 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Tambah Tanggal
-        </button>
-      </div>
-      <div id="evdRutinSection" class="hidden p-4 bg-slate-50/50 border border-slate-100 rounded-xl">
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Hari Berulang <span class="text-rose-500">*</span></label>
-        <select id="evdDayIndex" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200">
-          <option value="0">Minggu</option><option value="1">Senin</option><option value="2">Selasa</option>
-          <option value="3">Rabu</option><option value="4">Kamis</option><option value="5">Jumat</option><option value="6">Sabtu</option>
-        </select>
-      </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Jam Mulai <span class="text-rose-500">*</span></label>
-          <input id="evdTimeStart" type="time" required class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200">
-        </div>
-        <div>
-          <label class="block text-sm font-semibold text-slate-700 mb-1.5">Jam Selesai <span class="text-rose-500">*</span></label>
-          <input id="evdTimeEnd" type="time" required class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200">
-        </div>
-      </div>
-      <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Nilai JTM <span class="text-rose-500">*</span></label>
-        <input id="evdJtmVal" type="number" min="1" max="99" required class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200" placeholder="1–99">
-      </div>
-      <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Deskripsi</label>
-        <textarea id="evdDesc" rows="3" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 focus:bg-white transition-all duration-200" placeholder="Tuliskan deskripsi opsional..."></textarea>
-      </div>
-      <div class="flex gap-3 pt-4 border-t border-slate-100">
-        <button type="button" onclick="closeEventDefModal()" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all duration-200 shadow-sm">Batal</button>
-        <button type="submit" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm py-2.5 rounded-xl shadow-md shadow-indigo-200 transform hover:-translate-y-0.5 transition-all duration-300">Simpan Acara</button>
-      </div>
-    </form>
-  </div>
-</div>
-${_modal()}`;
-      case "Page_EventAttendance":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6 lg:p-8">
-      <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-indigo-600 tracking-tight">Kehadiran Acara / Kegiatan</h1>
-          <p class="text-sm text-slate-500 mt-2 font-medium" id="evtAttDateLabel">Hari ini</p>
-        </div>
-      </div>
-      <div id="evtAttEventList" class="mb-8">
-        <div class="p-6 space-y-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-          <div class="h-14 bg-slate-100 rounded-xl animate-pulse"></div>
-          <div class="h-14 bg-slate-100 rounded-xl animate-pulse w-3/4"></div>
-        </div>
-      </div>
-      <div id="evtAttTableWrap" class="hidden">
-        <h2 id="evtAttTableTitle" class="text-lg font-bold text-slate-700 mb-4 tracking-tight"></h2>
-        <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
-                <tr>
-                  <th class="py-4 px-5 text-left">Nama Guru</th>
-                  <th class="py-4 px-5 text-center">Jam Masuk</th>
-                  <th class="py-4 px-5 text-center">Status</th>
-                  <th class="py-4 px-5 text-center">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="evtAttTableBody" class="divide-y divide-slate-100 text-slate-700">
-                <tr><td colspan="4" class="py-12 text-center text-slate-400">Pilih acara di atas untuk melihat data kehadiran</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-${_modal()}`;
-      case "Page_EventJournal":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6 lg:p-8">
-      <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-indigo-600 tracking-tight">Jurnal Kehadiran Acara</h1>
-          <p class="text-sm text-slate-500 mt-2 font-medium">Isi jurnal untuk acara yang Anda hadiri hari ini</p>
-        </div>
-      </div>
-      <div id="evtJournalList" class="mb-8">
-        <div class="p-6 space-y-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-          <div class="h-16 bg-slate-100 rounded-xl animate-pulse"></div>
-          <div class="h-16 bg-slate-100 rounded-xl animate-pulse w-3/4"></div>
-        </div>
-      </div>
-      <!-- Riwayat Kehadiran Acara -->
-      <div class="mt-12">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <h2 class="text-xl font-bold text-slate-800 tracking-tight">Riwayat Kehadiran Acara</h2>
-          <div class="flex items-center gap-3 flex-wrap">
-            <select id="evtHistMonth" class="border border-slate-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-white">
-              <option value="1">Januari</option><option value="2">Februari</option>
-              <option value="3">Maret</option><option value="4">April</option>
-              <option value="5">Mei</option><option value="6">Juni</option>
-              <option value="7">Juli</option><option value="8">Agustus</option>
-              <option value="9">September</option><option value="10">Oktober</option>
-              <option value="11">November</option><option value="12">Desember</option>
-            </select>
-            <input type="number" id="evtHistYear" min="2020" max="2099"
-              class="border border-slate-300 rounded-xl px-4 py-2 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-white">
-            <button onclick="renderEventHistorySection(parseInt(document.getElementById('evtHistMonth').value),parseInt(document.getElementById('evtHistYear').value))"
-              class="bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-5 py-2 rounded-xl transition shadow-sm hover:shadow">Tampilkan</button>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
-                <tr>
-                  <th class="py-4 px-5 text-left">Nama Acara</th>
-                  <th class="py-4 px-5 text-center">Tanggal</th>
-                  <th class="py-4 px-5 text-center">Jam Masuk</th>
-                  <th class="py-4 px-5 text-center">Status Jurnal</th>
-                  <th class="py-4 px-5 text-center">JTM</th>
-                </tr>
-              </thead>
-              <tbody id="evtHistoryTableBody" class="divide-y divide-slate-100 text-slate-700">
-                <tr><td colspan="5" class="py-12 text-center text-slate-400 text-sm">Pilih bulan dan tahun, lalu klik Tampilkan.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-<!-- Event Journal Modal -->
-<div id="evtJournalModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-  <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onclick="closeEvtJournalModal()"></div>
-  <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden flex flex-col max-h-[90vh]">
-    <div class="flex items-center justify-between p-6 border-b border-slate-100/60 bg-slate-50/50">
-      <h3 class="text-xl font-extrabold text-slate-800 tracking-tight">Isi Jurnal Acara</h3>
-      <button onclick="closeEvtJournalModal()" class="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-full transition-all">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-      </button>
-    </div>
-    <div class="p-6 space-y-5 overflow-y-auto">
-      <div>
-        <label class="block text-sm font-bold text-slate-700 mb-1.5">Nama Acara</label>
-        <input id="evtJrnEventName" type="text" readonly class="w-full border border-slate-200 bg-slate-50/80 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 focus:outline-none mb-4">
-        <label class="block text-sm font-bold text-slate-700 mb-1.5">Tanggal Acara</label>
-        <input id="evtJrnDateDisplay" type="text" readonly class="w-full border border-slate-200 bg-slate-50/80 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 focus:outline-none">
-      </div>
-      <div>
-        <label class="block text-sm font-bold text-slate-700 mb-1.5">Deskripsi Kegiatan <span class="text-rose-500">*</span></label>
-        <textarea id="evtJrnDesc" rows="4" maxlength="1000"
-          oninput="document.getElementById('evtJrnCharCount').textContent=this.value.length"
-          class="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-white"
-          placeholder="Deskripsikan kegiatan yang berlangsung..."></textarea>
-        <p class="text-right text-xs font-medium text-slate-400 mt-1.5"><span id="evtJrnCharCount">0</span> / 1000</p>
-      </div>
-      <input type="hidden" id="evtJrnAttendanceId">
-    </div>
-    <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3">
-      <button type="button" onclick="closeEvtJournalModal()" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">Batal</button>
-      <button id="submitEvtJournalBtn" type="button" onclick="submitEvtJournal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm py-2.5 rounded-xl transition-all shadow-sm hover:shadow hover:-translate-y-0.5">Simpan Jurnal</button>
-    </div>
-  </div>
-</div>
-${_modal()}`;
-      case "Page_EventJournalHistory":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-    ${_navbar()}
-    <main class="w-full grow p-4 sm:p-6 lg:p-8">
-      <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div class="p-3 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg shadow-indigo-200">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          </div>
-          <div>
-            <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-indigo-600 tracking-tight">Riwayat Jurnal Acara</h1>
-            <p class="text-sm text-slate-500 mt-1.5 font-medium">Lihat dan tinjau riwayat jurnal acara kegiatan yang telah Anda isi</p>
-          </div>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
-          <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-          <h2 class="text-xl font-bold text-slate-800 tracking-tight">Filter Riwayat</h2>
-        </div>
-        <div class="flex items-center gap-3 flex-wrap">
-          <div class="relative">
-            <select id="evtJrnHistMonth" class="appearance-none border border-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-sm font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-slate-50 hover:bg-slate-100 cursor-pointer">
-              <option value="1">Januari</option><option value="2">Februari</option>
-              <option value="3">Maret</option><option value="4">April</option>
-              <option value="5">Mei</option><option value="6">Juni</option>
-              <option value="7">Juli</option><option value="8">Agustus</option>
-              <option value="9">September</option><option value="10">Oktober</option>
-              <option value="11">November</option><option value="12">Desember</option>
-            </select>
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-            </div>
-          </div>
-          <input type="number" id="evtJrnHistYear" min="2020" max="2099"
-            class="border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow bg-slate-50 hover:bg-slate-100">
-          <button onclick="renderEventJournalHistorySection(parseInt(document.getElementById('evtJrnHistMonth').value),parseInt(document.getElementById('evtJrnHistYear').value))"
-            class="bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            Tampilkan
-          </button>
-        </div>
-      </div>
-      <div class="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden relative">
-        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-emerald-400"></div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50/80 text-slate-500 text-[11px] font-black uppercase tracking-widest border-b border-slate-100">
-              <tr>
-                <th class="py-5 px-6 text-left">Tanggal</th>
-                <th class="py-5 px-6 text-left">Nama Acara</th>
-                <th id="th-guru-name" class="py-5 px-6 text-left hidden">Nama Guru</th>
-                <th class="py-5 px-6 text-left">Deskripsi Jurnal</th>
-                <th class="py-5 px-6 text-center">Waktu Submit</th>
-                <th class="py-5 px-6 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="evtJrnHistoryTableBody" class="divide-y divide-slate-100 text-slate-700">
-              <tr><td id="td-empty-jrn-history" colspan="6" class="py-16 text-center text-slate-400 text-sm">Pilih bulan dan tahun, lalu klik Tampilkan.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-    ${_footer()}
-  </div>
-</div>
-<!-- Modal Detail Jurnal -->
-<div id="evtJournalDetailModal" class="fixed inset-0 z-[60] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-  <!-- Backdrop -->
-  <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity opacity-0" id="evtJournalDetailBackdrop" onclick="closeEventJournalDetailModal()"></div>
-  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-      <!-- Modal Panel -->
-      <div id="evtJournalDetailPanel" class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 border border-slate-100">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-slate-50 to-white px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="p-2 bg-indigo-50 rounded-xl text-indigo-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            </div>
-            <h3 class="text-xl font-bold text-slate-800" id="modal-title">Detail Jurnal Acara</h3>
-          </div>
-          <button type="button" onclick="closeEventJournalDetailModal()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors focus:outline-none">
-            <span class="sr-only">Close</span>
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <!-- Body -->
-        <div class="px-6 py-6 space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div class="space-y-1">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Nama Acara</p>
-              <p id="dtlEventName" class="text-sm font-semibold text-slate-800"></p>
-            </div>
-            <div class="space-y-1">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tanggal Acara</p>
-              <p id="dtlEventDate" class="text-sm font-medium text-slate-700"></p>
-            </div>
-            <div class="space-y-1" id="dtlGuruNameContainer">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Nama Guru</p>
-              <p id="dtlGuruName" class="text-sm font-medium text-slate-700"></p>
-            </div>
-            <div class="space-y-1">
-              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Waktu Submit</p>
-              <div id="dtlSubmitTime" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100"></div>
-            </div>
-          </div>
-          <div class="space-y-2 pt-4 border-t border-slate-100">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Isi Jurnal / Deskripsi</p>
-            <div class="bg-slate-50 rounded-2xl p-5 border border-slate-100">
-              <div id="dtlDescription" class="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap break-words leading-relaxed font-medium"></div>
-            </div>
-          </div>
-        </div>
-        <!-- Footer -->
-        <div class="bg-slate-50/50 px-6 py-5 border-t border-slate-100 flex justify-end">
-          <button type="button" onclick="closeEventJournalDetailModal()" class="bg-white border border-slate-200 text-slate-700 font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">Tutup</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-${_modal()}`;
-
-      case "Page_StudentAttendanceInput":
-        return getPageContent("Page_StudentAttendance");
-
-      case "Page_StudentAttendance":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="flex flex-col flex-1 overflow-hidden">
-    ${_navbar()}
-    <main class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
-      <div class="max-w-4xl mx-auto">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            </div>
-            <div>
-              <h1 class="text-lg font-extrabold text-slate-800 leading-tight">Absensi Siswa</h1>
-              <p class="text-xs text-slate-500" id="saHeaderSubtitle">Rekap kehadiran siswa per kelas hari ini</p>
-            </div>
-          </div>
-          <button onclick="initStudentAttendance()" class="no-print inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 transition-colors shadow-sm">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            Muat Ulang
-          </button>
-        </div>
-        <div id="saBannerInfo" class="mb-5 flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <p class="text-sm text-blue-700">Lengkapi rekap absensi siswa untuk membuka akses <strong>Halaman Piket &amp; Upacara</strong> dan <strong>Halaman Kehadiran Harian</strong>.</p>
-        </div>
-        <div class="mb-5 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-600">Progress Rekap Hari Ini</span>
-            <span class="text-xs font-mono font-semibold text-slate-700" id="saProgressLabel">— / —</span>
-          </div>
-          <div class="w-full bg-slate-100 rounded-full h-2">
-            <div id="saProgressBar" class="bg-teal-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
-          </div>
-          <p class="text-[11px] text-slate-400 mt-1.5" id="saProgressSub">Memuat data...</p>
-        </div>
-        <div id="saClassGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div class="animate-pulse bg-white rounded-2xl h-28 border border-slate-100 shadow-sm"></div>
-          <div class="animate-pulse bg-white rounded-2xl h-28 border border-slate-100 shadow-sm"></div>
-          <div class="animate-pulse bg-white rounded-2xl h-28 border border-slate-100 shadow-sm"></div>
-          <div class="animate-pulse bg-white rounded-2xl h-28 border border-slate-100 shadow-sm"></div>
-        </div>
-      </div>
-    </main>
-  </div>
-</div>
-${_modal()}`;
-
-      case "Page_StudentAttendanceHistory":
-        return `<div class="flex h-screen overflow-hidden bg-slate-50">
-  ${_sidebar()}
-  <div class="flex flex-col flex-1 overflow-hidden">
-    ${_navbar()}
-    <main class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
-      <div class="max-w-5xl mx-auto">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
-            </div>
-            <div>
-              <h1 class="text-lg font-extrabold text-slate-800 leading-tight">Riwayat Absensi Siswa</h1>
-              <p class="text-xs text-slate-500">Data rekap absensi siswa yang telah diinput</p>
-            </div>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-5">
-          <div class="flex flex-wrap items-end gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1.5">Bulan</label>
-              <select id="saHistMonthFilter" class="text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent">
-                <option value="1">Januari</option><option value="2">Februari</option><option value="3">Maret</option>
-                <option value="4">April</option><option value="5">Mei</option><option value="6">Juni</option>
-                <option value="7">Juli</option><option value="8">Agustus</option><option value="9">September</option>
-                <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1.5">Tahun</label>
-              <select id="saHistYearFilter" class="text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"></select>
-            </div>
-            <button id="btnLoadSaHist" onclick="loadStudentAttendanceHistory()" class="inline-flex items-center gap-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl shadow-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0118 0z"/></svg>
-              Tampilkan
-            </button>
-          </div>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="bg-slate-50 border-b border-slate-200">
-                  <th class="py-3 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-10">No</th>
-                  <th class="py-3 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Tanggal</th>
-                  <th class="py-3 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Kelas</th>
-                  <th class="py-3 px-4 text-center text-xs font-bold text-emerald-600 uppercase tracking-wide">Hadir</th>
-                  <th class="py-3 px-4 text-center text-xs font-bold text-amber-600 uppercase tracking-wide">Sakit</th>
-                  <th class="py-3 px-4 text-center text-xs font-bold text-blue-600 uppercase tracking-wide">Izin</th>
-                  <th class="py-3 px-4 text-center text-xs font-bold text-red-600 uppercase tracking-wide">Alpa</th>
-                  <th class="py-3 px-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wide">Total</th>
-                  <th id="saHistColDiisiOleh" class="py-3 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Diisi Oleh</th>
-                  <th class="py-3 px-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Waktu Input</th>
-                </tr>
-              </thead>
-              <tbody id="saHistTableBody">
-                <tr><td colspan="10" class="py-16 text-center text-slate-400 italic text-sm">Pilih bulan dan tahun lalu klik Tampilkan.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-</div>
-${_modal()}`;
-
-      default:
-        return (
-          "<div class=\'p-4 text-red-500 font-bold\'>Halaman tidak ditemukan: " +
-          pageName +
-          "</div>"
-        );
-    }
-  } catch (e) {
-    return (
-      "<div class=\'p-4 text-red-500 font-bold\'>Error: " +
-      e.toString() +
-      "</div>"
+  return false;
+}
+function getAllSchedulesAdmin(token) {
+  const user = verifySession(token);
+  if (!user || String(user.role).toLowerCase() !== "admin") return [];
+  const rawSchedules = getData("Schedules");
+  const teachers = getData("Users");
+  return rawSchedules.map((s) => {
+    const teacher = teachers.find(
+      (t) => String(t.id).trim() === String(s.user_id).trim(),
     );
+    let tStart = s.time_start;
+    let tEnd = s.time_end;
+    if (tStart instanceof Date)
+      tStart = Utilities.formatDate(tStart, "Asia/Jakarta", "HH:mm");
+    if (tEnd instanceof Date)
+      tEnd = Utilities.formatDate(tEnd, "Asia/Jakarta", "HH:mm");
+    const days = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+    return {
+      id: s.id,
+      user_id: s.user_id,
+      guru_name: teacher ? teacher.full_name : "Unknown",
+      day_name: days[Number(s.day_index)] || "-",
+      day_index: s.day_index,
+      time_start: String(tStart).substring(0, 5),
+      time_end: String(tEnd).substring(0, 5),
+      subject: s.subject,
+      class_name: s.class_name,
+      jtm_val: s.jtm_val,
+      tahun_pelajaran: s.tahun_pelajaran || "",
+      semester: s.semester || "",
+    };
+  });
+}
+function saveScheduleAdmin(token, data) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin")
+    return { status: "error", message: "Akses ditolak" };
+  const sheet = getSheet("Schedules");
+  if (data.id) {
+    const rows = sheet.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(data.id)) {
+        sheet.getRange(i + 1, 2).setValue(data.user_id);
+        sheet.getRange(i + 1, 3).setValue(getDayName(data.day_index));
+        sheet.getRange(i + 1, 4).setValue(data.day_index);
+        sheet.getRange(i + 1, 5).setValue(data.time_start);
+        sheet.getRange(i + 1, 6).setValue(data.time_end);
+        sheet.getRange(i + 1, 7).setValue(data.subject);
+        sheet.getRange(i + 1, 8).setValue(data.class_name);
+        sheet.getRange(i + 1, 9).setValue(data.jtm_val);
+        sheet.getRange(i + 1, 10).setValue(data.tahun_pelajaran || "");
+        sheet.getRange(i + 1, 11).setValue(data.semester || "");
+        return { status: "success" };
+      }
+    }
+  } else {
+    const newId = generateId("SCH");
+    sheet.appendRow([
+      newId,
+      data.user_id,
+      getDayName(data.day_index),
+      data.day_index,
+      data.time_start,
+      data.time_end,
+      data.subject,
+      data.class_name,
+      data.jtm_val,
+      data.tahun_pelajaran || "",
+      data.semester || "",
+    ]);
   }
+  return { status: "success" };
+}
+function deleteScheduleAdmin(token, id) {
+  return deleteRowById(token, "Schedules", id);
+}
+function deleteMultipleSchedulesAdmin(token, ids) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin") {
+    return { status: "error", message: "Akses ditolak." };
+  }
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { status: "error", message: "Tidak ada data yang dipilih." };
+  }
+  let successCount = 0;
+  for (const id of ids) {
+    const res = deleteRowById(token, "Schedules", id);
+    if (res && res.status === "success") {
+      successCount++;
+    }
+  }
+  return {
+    status: "success",
+    message: `${successCount} dari ${ids.length} jadwal berhasil dihapus.`,
+  };
+}
+function getMyWeeklyData(token) {
+  const user = verifySession(token);
+  if (!user) return { status: "error" };
+  const allSchedules = getData("Schedules");
+  const config = {};
+  (getData("Config") || []).forEach((c) => {
+    config[c.key] = c.value;
+  });
+  const activeTP = config.tahun_pelajaran || "";
+  const activeSem = config.semester || "";
+  const mySchedules = allSchedules.filter((s) => {
+    const isMe = String(s.user_id).trim() === String(user.id).trim();
+    const sTP = s.tahun_pelajaran || activeTP;
+    const sSem = s.semester || activeSem;
+    return isMe && sTP === activeTP && sSem === activeSem;
+  });
+  const formattedSchedules = mySchedules.map((s) => {
+    let tStart = s.time_start;
+    let tEnd = s.time_end;
+    if (tStart instanceof Date)
+      tStart = Utilities.formatDate(tStart, "Asia/Jakarta", "HH:mm");
+    if (tEnd instanceof Date)
+      tEnd = Utilities.formatDate(tEnd, "Asia/Jakarta", "HH:mm");
+    const days = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+    return {
+      ...s,
+      day_name: days[Number(s.day_index)] || "-",
+      time_start: String(tStart).substring(0, 5),
+      time_end: String(tEnd).substring(0, 5),
+    };
+  });
+  formattedSchedules.sort((a, b) => {
+    if (Number(a.day_index) !== Number(b.day_index))
+      return Number(a.day_index) - Number(b.day_index);
+    return a.time_start.localeCompare(b.time_start);
+  });
+  const pickets = getData("Picket_Schedules").filter(
+    (p) => String(p.user_id).trim() === String(user.id).trim(),
+  );
+  const picketDays = pickets.map((p) => {
+    const days = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+    return days[Number(p.day_index)];
+  });
+  const allowances = getData("Allowances").filter(
+    (a) => String(a.user_id).trim() === String(user.id).trim(),
+  );
+  const cleanAllowances = allowances.map((a) => ({
+    duty_name: a.duty_name,
+    amount: formatRupiah(a.amount),
+    raw_amount: Number(a.amount) || 0
+  }));
+  const allCeremonies = getData("Ceremony_Schedules");
+  const todayDate = new Date();
+  const todayStr = Utilities.formatDate(
+    todayDate,
+    "Asia/Jakarta",
+    "yyyy-MM-dd",
+  );
+  const allLogs = getData("Teaching_Logs");
+  const myCeremonies = allCeremonies
+    .filter((c) => {
+      const isMe = String(c.user_id).trim() === String(user.id).trim();
+      const cTP = c.tahun_pelajaran || activeTP;
+      const cSem = c.semester || activeSem;
+      return isMe && cTP === activeTP && cSem === activeSem;
+    })
+    .map((c) => {
+      const dateStr = safeDate(c.date);
+      const cDate = new Date(dateStr + "T00:00:00");
+      const tDate = new Date(todayStr + "T00:00:00");
+      const isPast = cDate < tDate;
+      const isToday = dateStr === todayStr;
+      const isConfirmed = allLogs.some(
+        (l) =>
+          String(l.schedule_id) === "CEREMONY-DUTY" &&
+          safeDate(l.date) === dateStr &&
+          String(l.user_id) === String(user.id),
+      );
+      return {
+        id: String(c.id),
+        date: dateStr,
+        date_formatted: formatDateIndo(dateStr),
+        is_past: isPast,
+        is_today: isToday,
+        is_confirmed: isConfirmed,
+      };
+    })
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  return {
+    status: "success",
+    schedules: formattedSchedules,
+    picket_days: picketDays,
+    allowances: cleanAllowances,
+    ceremony_assignments: myCeremonies,
+  };
+}
+function getDayName(index) {
+  const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+  return days[index] || "";
+}
+function saveTeachingJournal(token, data) {
+  const user = verifySession(token);
+  if (!user) return { status: "error", message: "Unauthorized" };
+  const scheduleId = data.schedule_id;
+  const schedules = getData("Schedules");
+  const targetSchedule = schedules.find(
+    (s) => String(s.id) === String(scheduleId),
+  );
+  let expectedStd = null;
+  if (targetSchedule) {
+    const className = targetSchedule.class_name;
+    const configData = getData("Config");
+    let configMap = {};
+    configData.forEach((c) => (configMap[c.key] = c.value));
+    const configKey = "std_kelas_" + className;
+    const dbTotal = parseInt(configMap[configKey]);
+    const inputHadir = parseInt(data.siswa_hadir) || 0;
+    const inputAbsen = parseInt(data.siswa_absen) || 0;
+    const inputTotal = inputHadir + inputAbsen;
+    if (!isNaN(dbTotal)) {
+      expectedStd = dbTotal;
+      if (inputTotal !== dbTotal) {
+        return {
+          status: "error",
+          code: "STUDENT_COUNT_MISMATCH",
+          expected: dbTotal,
+          actual: inputTotal,
+          message:
+            "Validasi Gagal: Total siswa (" +
+            inputTotal +
+            ") tidak sesuai dengan standar kelas " +
+            className +
+            " (" +
+            dbTotal +
+            " siswa). Harap sesuaikan jumlah hadir dan absen.",
+        };
+      }
+    }
+  }
+  // Validasi rekap absensi siswa dari guru piket
+  if (targetSchedule) {
+    const _saClassName = String(targetSchedule.class_name || "").trim();
+    const _saTz = Session.getScriptTimeZone();
+    const _saTodayStr = Utilities.formatDate(new Date(), _saTz, "yyyy-MM-dd");
+    const _saAllData = getData("Student_Attendance");
+    const _saRekap = _saAllData.find(function(r) {
+      return String(r.class_name || "").trim() === _saClassName && safeDate(r.date) === _saTodayStr;
+    });
+    if (_saRekap) {
+      const _saExpHadir = parseInt(_saRekap.hadir) || 0;
+      const _saExpAbsen = (parseInt(_saRekap.sakit) || 0) + (parseInt(_saRekap.izin) || 0) + (parseInt(_saRekap.alpa) || 0);
+      const _saActHadir = parseInt(data.siswa_hadir) || 0;
+      const _saActAbsen = parseInt(data.siswa_absen) || 0;
+      if (_saActHadir !== _saExpHadir || _saActAbsen !== _saExpAbsen) {
+        return {
+          status: "error",
+          code: "STUDENT_ATTENDANCE_MISMATCH",
+          class_name: _saClassName,
+          expected_hadir: _saExpHadir,
+          expected_absen: _saExpAbsen,
+          actual_hadir: _saActHadir,
+          actual_absen: _saActAbsen,
+          rekap_detail: {
+            sakit: parseInt(_saRekap.sakit) || 0,
+            izin:  parseInt(_saRekap.izin)  || 0,
+            alpa:  parseInt(_saRekap.alpa)  || 0
+          },
+          message: "Data absensi tidak sesuai rekap guru piket untuk kelas " + _saClassName +
+            ". Rekap piket — Hadir: " + _saExpHadir + ", Sakit+Izin+Alpa: " + _saExpAbsen +
+            ". Anda mengisi — Hadir: " + _saActHadir + ", Absen: " + _saActAbsen + "."
+        };
+      }
+    }
+  }
+  const tz = Session.getScriptTimeZone();
+  const todayStr = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
+  let targetDateStr = todayStr;
+  if (data.date && /^\d{4}-\d{2}-\d{2}$/.test(String(data.date))) {
+    targetDateStr = String(data.date);
+  }
+  const existingLogs = getData("Teaching_Logs");
+  const isDuplicate = existingLogs.some((log) => {
+    const logDate = Utilities.formatDate(new Date(log.date), tz, "yyyy-MM-dd");
+    return (
+      String(log.schedule_id) === String(scheduleId) &&
+      String(log.user_id) === String(user.id) &&
+      logDate === targetDateStr
+    );
+  });
+  if (isDuplicate) {
+    return {
+      status: "error",
+      code: "DUPLICATE",
+      message:
+        "Jurnal untuk jadwal ini sudah pernah diisi pada tanggal yang sama. Anda tidak dapat mengisi jurnal yang sama dua kali.",
+    };
+  }
+  const sheet = getSheet("Teaching_Logs");
+  const newId = generateId("LOG");
+  const now = new Date();
+  const timeStr = Utilities.formatDate(now, tz, "HH:mm:ss");
+  let jtmVal = targetSchedule ? targetSchedule.jtm_val : 0;
+  const jtmAdjustment = _jtmReadAdjustment_("KBM", scheduleId);
+  if (jtmAdjustment) {
+    const adjDateStr =
+      jtmAdjustment.date instanceof Date
+        ? Utilities.formatDate(jtmAdjustment.date, tz, "yyyy-MM-dd")
+        : String(jtmAdjustment.date);
+    const storedAdjusted = jtmAdjustment.adjusted_jtm;
+    if (
+      adjDateStr === targetDateStr &&
+      storedAdjusted !== null &&
+      storedAdjusted !== undefined &&
+      storedAdjusted !== "" &&
+      !isNaN(Number(storedAdjusted))
+    ) {
+      jtmVal = Number(storedAdjusted);
+    }
+  }
+  sheet.appendRow([
+    newId,
+    data.schedule_id,
+    user.id,
+    targetDateStr,
+    data.material,
+    data.siswa_hadir,
+    data.siswa_absen,
+    data.notes,
+    jtmVal,
+    timeStr,
+  ]);
+  _invalidateDataSnapshot();
+  return {
+    status: "success",
+    log_id: newId,
+    expected_std: expectedStd,
+  };
+}
+function getClassExpectedStudents(token, scheduleId) {
+  try {
+    const user = verifySession(token);
+    if (!user) return { status: "error", message: "Unauthorized" };
+    const schedules = getData("Schedules");
+    const sched = schedules.find((s) => String(s.id) === String(scheduleId));
+    if (!sched) return { status: "success", expected: null, class_name: null };
+    const configData = getData("Config");
+    let configMap = {};
+    configData.forEach((c) => (configMap[c.key] = c.value));
+    const dbTotal = parseInt(configMap["std_kelas_" + sched.class_name]);
+    return {
+      status: "success",
+      expected: isNaN(dbTotal) ? null : dbTotal,
+      class_name: sched.class_name,
+    };
+  } catch (e) {
+    return { status: "error", message: "Server Error: " + e.toString() };
+  }
+}
+function updateTeachingLog(token, payload) {
+  try {
+    const user = verifySession(token);
+    if (!user) return { status: "error", message: "Unauthorized" };
+    const logId = payload && payload.log_id;
+    if (!logId) return { status: "error", message: "Log ID wajib diisi." };
+    const sheet = getSheet("Teaching_Logs");
+    const range = sheet.getDataRange();
+    const values = range.getValues();
+    const header = values[0].map((h) => String(h).trim());
+    const idCol = header.indexOf("log_id");
+    const schedCol = header.indexOf("schedule_id");
+    const userCol = header.indexOf("user_id");
+    const dateCol = header.indexOf("date");
+    const matCol = header.indexOf("materi");
+    const hadirCol = header.indexOf("siswa_hadir");
+    const absenCol = header.indexOf("siswa_absen");
+    const notesCol = header.indexOf("notes");
+    if (
+      [idCol, schedCol, userCol, matCol, hadirCol, absenCol, notesCol].some(
+        (c) => c < 0,
+      )
+    ) {
+      return {
+        status: "error",
+        message: "Struktur sheet Teaching_Logs tidak sesuai.",
+      };
+    }
+    let rowIndex = -1;
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][idCol]).trim() === String(logId).trim()) {
+        rowIndex = i;
+        break;
+      }
+    }
+    if (rowIndex === -1)
+      return { status: "error", message: "Jurnal tidak ditemukan." };
+    const row = values[rowIndex];
+    const isOwner = String(row[userCol]).trim() === String(user.id).trim();
+    const isAdmin = String(user.role).toLowerCase() === "admin";
+    if (!isOwner && !isAdmin) {
+      return {
+        status: "error",
+        message: "Anda tidak memiliki akses untuk mengubah jurnal ini.",
+      };
+    }
+    const schedId = row[schedCol];
+    const schedules = getData("Schedules");
+    const sched = schedules.find((s) => String(s.id) === String(schedId));
+    const inputHadir = parseInt(payload.siswa_hadir) || 0;
+    const inputAbsen = parseInt(payload.siswa_absen) || 0;
+    const inputTotal = inputHadir + inputAbsen;
+    if (sched) {
+      const configData = getData("Config");
+      let configMap = {};
+      configData.forEach((c) => (configMap[c.key] = c.value));
+      const dbTotal = parseInt(configMap["std_kelas_" + sched.class_name]);
+      if (!isNaN(dbTotal) && inputTotal !== dbTotal) {
+        return {
+          status: "error",
+          code: "STUDENT_COUNT_MISMATCH",
+          expected: dbTotal,
+          actual: inputTotal,
+          message:
+            "Validasi Gagal: Total siswa (" +
+            inputTotal +
+            ") tidak sesuai dengan standar kelas " +
+            sched.class_name +
+            " (" +
+            dbTotal +
+            " siswa). Harap sesuaikan jumlah hadir dan absen.",
+        };
+      }
+    }
+    // Validasi rekap absensi siswa dari guru piket
+    if (sched) {
+      const _saClassName2 = String(sched.class_name || "").trim();
+      const _saTz2 = Session.getScriptTimeZone();
+      const _saLogDate = safeDate(values[rowIndex][dateCol]);
+      const _saAllData2 = getData("Student_Attendance");
+      const _saRekap2 = _saAllData2.find(function(r) {
+        return String(r.class_name || "").trim() === _saClassName2 && safeDate(r.date) === _saLogDate;
+      });
+      if (_saRekap2) {
+        const _saExpHadir2 = parseInt(_saRekap2.hadir) || 0;
+        const _saExpAbsen2 = (parseInt(_saRekap2.sakit) || 0) + (parseInt(_saRekap2.izin) || 0) + (parseInt(_saRekap2.alpa) || 0);
+        const _saActHadir2 = parseInt(payload.siswa_hadir) || 0;
+        const _saActAbsen2 = parseInt(payload.siswa_absen) || 0;
+        if (_saActHadir2 !== _saExpHadir2 || _saActAbsen2 !== _saExpAbsen2) {
+          return {
+            status: "error",
+            code: "STUDENT_ATTENDANCE_MISMATCH",
+            class_name: _saClassName2,
+            expected_hadir: _saExpHadir2,
+            expected_absen: _saExpAbsen2,
+            actual_hadir: _saActHadir2,
+            actual_absen: _saActAbsen2,
+            rekap_detail: {
+              sakit: parseInt(_saRekap2.sakit) || 0,
+              izin:  parseInt(_saRekap2.izin)  || 0,
+              alpa:  parseInt(_saRekap2.alpa)  || 0
+            },
+            message: "Data absensi tidak sesuai rekap guru piket untuk kelas " + _saClassName2 +
+              ". Rekap piket — Hadir: " + _saExpHadir2 + ", Sakit+Izin+Alpa: " + _saExpAbsen2 +
+              ". Anda mengisi — Hadir: " + _saActHadir2 + ", Absen: " + _saActAbsen2 + "."
+          };
+        }
+      }
+    }
+    const materi = String(payload.material || "").trim();
+    if (!materi)
+      return { status: "error", message: "Materi pembelajaran wajib diisi." };
+    const rowNumber = rowIndex + 1;
+    sheet.getRange(rowNumber, matCol + 1).setValue(materi);
+    sheet.getRange(rowNumber, hadirCol + 1).setValue(inputHadir);
+    sheet.getRange(rowNumber, absenCol + 1).setValue(inputAbsen);
+    sheet
+      .getRange(rowNumber, notesCol + 1)
+      .setValue(String(payload.notes || ""));
+    try {
+      _invalidateDataSnapshot();
+    } catch (_) {}
+    return { status: "success", log_id: logId };
+  } catch (e) {
+    return { status: "error", message: "Server Error: " + e.toString() };
+  }
+}
+function getSettingsMasterData(token) {
+  try {
+    const user = verifySession(token);
+    if (!user) return { status: "error", message: "Akses ditolak" };
+    const configRaw = getData("Config");
+    let config = {};
+    configRaw.forEach((c) => {
+      config[c.key] = c.value;
+    });
+    const holidays = getData("Academic_Calendar").map((h) => ({
+      id: h.event_id,
+      date: h.date,
+      desc: h.description,
+      is_holiday: h.is_holiday,
+    }));
+    const users = getData("Users");
+    const subjects = getData("Subjects").map((s) => {
+      return {
+        id: s.id,
+        name: s.name,
+      };
+    });
+    const allowancesRaw = getData("Allowances");
+    const allowances = allowancesRaw.map((a) => {
+      const u = users.find((usr) => String(usr.id) === String(a.user_id));
+      return {
+        id: a.id,
+        name: a.duty_name,
+        user_id: a.user_id,
+        guru_name: u ? u.full_name : "Unknown",
+        amount: a.amount,
+      };
+    });
+    const result = {
+      status: "success",
+      config: config,
+      holidays: holidays,
+      subjects: subjects,
+      allowances: allowances,
+    };
+    return JSON.parse(JSON.stringify(result));
+  } catch (e) {
+    return {
+      status: "error",
+      message: "Server Error in getSettingsMasterData: " + e.toString(),
+    };
+  }
+}
+function saveSystemConfig(token, data) {
+  try {
+    const user = verifySession(token);
+    if (!user || user.role !== "admin")
+      return { status: "error", message: "Akses hanya untuk Admin" };
+    const sheet = getSheet("Config");
+    const existingData = sheet.getDataRange().getValues();
+    const updateKey = (key, val) => {
+      let rowIndex = -1;
+      for (let i = 1; i < existingData.length; i++) {
+        if (existingData[i][0] === key) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+      if (rowIndex > 0) {
+        const cell = sheet.getRange(rowIndex, 2);
+        if (key === "app_version" || key === "maintenance_start" || key === "maintenance_end") cell.setNumberFormat("@");
+        cell.setValue(val);
+      } else {
+        sheet.appendRow([key, ""]);
+        const cell = sheet.getRange(sheet.getLastRow(), 2);
+        if (key === "app_version" || key === "maintenance_start" || key === "maintenance_end") cell.setNumberFormat("@");
+        cell.setValue(val);
+      }
+    };
+    for (const [key, value] of Object.entries(data)) {
+      updateKey(key, value);
+    }
+    try {
+      _invalidateDataSnapshot();
+    } catch (_) {}
+    return { status: "success" };
+  } catch (e) {
+    console.error("saveSystemConfig error: " + e);
+    return { status: "error", message: "Terjadi kesalahan server. Coba lagi." };
+  }
+}
+function saveSubject(token, data) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin")
+    return { status: "error", message: "Unauthorized" };
+  const nameTrimmed = (data.name || "").trim();
+  if (!nameTrimmed)
+    return { status: "error", message: "Nama mapel tidak boleh kosong." };
+  const sheet = getSheet("Subjects");
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]).trim().toLowerCase() === nameTrimmed.toLowerCase()) {
+      if (!data.id || String(rows[i][0]) !== String(data.id)) {
+        return {
+          status: "error",
+          message: "Mata pelajaran dengan nama tersebut sudah ada.",
+        };
+      }
+    }
+  }
+  if (data.id) {
+    let found = false;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === data.id) {
+        sheet.getRange(i + 1, 2, 1, 1).setValue(nameTrimmed);
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      return { status: "error", message: "Data Mapel tidak ditemukan." };
+  } else {
+    const newId = generateId("SBJ");
+    sheet.appendRow([newId, nameTrimmed]);
+  }
+  return { status: "success" };
+}
+function deleteSubject(token, id) {
+  return deleteRowById(token, "Subjects", id);
+}
+function saveAllowance(token, data) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin")
+    return { status: "error", message: "Unauthorized" };
+  const sheet = getSheet("Allowances");
+  if (data.id) {
+    const rows = sheet.getDataRange().getValues();
+    let found = false;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === data.id) {
+        sheet.getRange(i + 1, 2).setValue(data.duty_name);
+        sheet.getRange(i + 1, 3).setValue(data.user_id);
+        sheet.getRange(i + 1, 4).setValue(data.amount);
+        found = true;
+        break;
+      }
+    }
+    if (!found)
+      return { status: "error", message: "Tunjangan tidak ditemukan." };
+  } else {
+    const newId = generateId("ALW");
+    sheet.appendRow([newId, data.duty_name, data.user_id, data.amount]);
+  }
+  try {
+    _invalidateDataSnapshot();
+  } catch (_) {}
+  return { status: "success" };
+}
+function deleteAllowance(token, id) {
+  return deleteRowById(token, "Allowances", id);
+}
+function addHoliday(token, date, desc, isHoliday, id) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin")
+    return { status: "error", message: "Unauthorized" };
+  const sheet = getSheet("Academic_Calendar");
+  const isHolStr = isHoliday ? "True" : "False";
+  if (id) {
+    const data = sheet.getDataRange().getValues();
+    let found = false;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(id)) {
+        let existingDate = String(data[i][1]).trim();
+        let todayStr = Utilities.formatDate(
+          new Date(),
+          "Asia/Jakarta",
+          "yyyy-MM-dd",
+        );
+        if (existingDate < todayStr) {
+          return {
+            status: "error",
+            message: "Hari libur yang sudah lewat tidak dapat diubah",
+          };
+        }
+        sheet.getRange(i + 1, 2).setValue(date);
+        sheet.getRange(i + 1, 3).setValue(desc);
+        sheet.getRange(i + 1, 4).setValue(isHolStr);
+        found = true;
+        break;
+      }
+    }
+    if (!found) return { status: "error", message: "Data tidak ditemukan" };
+  } else {
+    const newId = generateId("HOL");
+    sheet.appendRow([newId, date, desc, isHolStr]);
+  }
+  try {
+    _invalidateDataSnapshot();
+  } catch (_) {}
+  return { status: "success" };
+}
+function deleteHoliday(token, id) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin")
+    return { status: "error", message: "Unauthorized" };
+  const sheet = getSheet("Academic_Calendar");
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      let existingDate = String(data[i][1]).trim();
+      let todayStr = Utilities.formatDate(
+        new Date(),
+        "Asia/Jakarta",
+        "yyyy-MM-dd",
+      );
+      if (existingDate < todayStr) {
+        return {
+          status: "error",
+          message: "Hari libur yang sudah lewat tidak dapat dihapus",
+        };
+      }
+      sheet.deleteRow(i + 1);
+      try {
+        _invalidateDataSnapshot();
+      } catch (_) {}
+      return { status: "success" };
+    }
+  }
+  return { status: "error", message: "Data tidak ditemukan" };
+}
+function deleteRowById(token, sheetName, id) {
+  const user = verifySession(token);
+  if (!user || user.role !== "admin")
+    return { status: "error", message: "Unauthorized" };
+  const sheet = getSheet(sheetName);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      try {
+        _invalidateDataSnapshot();
+      } catch (_) {}
+      return { status: "success" };
+    }
+  }
+  return { status: "error", message: "Data tidak ditemukan" };
+}
+function _annBool_(v) {
+  if (v === true || v === 1) return true;
+  if (v === false || v === 0 || v == null) return false;
+  var s = String(v).trim().toLowerCase();
+  return s === "true" || s === "yes" || s === "y" || s === "1";
+}
+function _annDateOnly_(v) {
+  if (v == null) return "";
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return "";
+    return Utilities.formatDate(v, "Asia/Jakarta", "yyyy-MM-dd");
+  }
+  var s = String(v).trim();
+  if (!s) return "";
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return Utilities.formatDate(d, "Asia/Jakarta", "yyyy-MM-dd");
+  }
+  return "";
+}
+function _annParseIdList_(v) {
+  if (v == null) return [];
+  var s = String(v).trim();
+  if (!s) return [];
+  if (s.charAt(0) === "[" || s.charAt(0) === "{") {
+    try {
+      var j = JSON.parse(s);
+      if (Array.isArray(j)) {
+        return j
+          .map(function (x) {
+            return String(x || "").trim();
+          })
+          .filter(function (x) {
+            return x.length > 0;
+          });
+      }
+    } catch (_) {}
+  }
+  return s
+    .split(/[,;\n]+/)
+    .map(function (x) {
+      return x.trim();
+    })
+    .filter(function (x) {
+      return x.length > 0;
+    });
+}
+function _annStringifyIdList_(arr) {
+  if (!arr || !arr.length) return "";
+  var seen = {};
+  var clean = [];
+  for (var i = 0; i < arr.length; i++) {
+    var v = String(arr[i] || "").trim();
+    if (!v || seen[v]) continue;
+    seen[v] = true;
+    clean.push(v);
+  }
+  return clean.length ? JSON.stringify(clean) : "";
+}
+function _annEnsureSheet_() {
+  var headers = [
+    "id",
+    "title",
+    "body",
+    "severity",
+    "is_dismissible",
+    "is_active",
+    "starts_at",
+    "ends_at",
+    "target_role",
+    "cta_text",
+    "cta_url",
+    "created_by",
+    "created_at",
+    "updated_at",
+    "target_user_ids",
+    "dismissible_user_ids",
+    "nondismissible_user_ids",
+    "send_email_notification",
+    "email_sent",
+    "reminder_3_sent",
+    "reminder_2_sent",
+    "reminder_1_sent",
+  ];
+  var ss = SpreadsheetApp.openById(getDbId());
+  var sheet = ss.getSheetByName(SHEET_NAME.ANNOUNCEMENTS);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME.ANNOUNCEMENTS);
+    sheet.appendRow(headers);
+    return sheet;
+  }
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) {
+    sheet.appendRow(headers);
+    return sheet;
+  }
+  var current = sheet
+    .getRange(1, 1, 1, lastCol)
+    .getValues()[0]
+    .map(function (h) {
+      return String(h || "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "_");
+    });
+  if (headers.length > current.length) {
+    var missing = headers.slice(current.length);
+    sheet
+      .getRange(1, current.length + 1, 1, missing.length)
+      .setValues([missing]);
+  }
+  return sheet;
+}
+function getActiveAnnouncementsForUser(token) {
+  try {
+    const user = verifySession(token);
+    if (!user) return { status: "error", message: "Unauthorized", items: [] };
+    _annEnsureSheet_();
+    const today = Utilities.formatDate(
+      new Date(),
+      "Asia/Jakarta",
+      "yyyy-MM-dd",
+    );
+    const role = String(user.role || "").toLowerCase();
+    const myId = String(user.id || "");
+    const all = getData(SHEET_NAME.ANNOUNCEMENTS) || [];
+    const items = all
+      .filter((a) => {
+        if (!_annBool_(a.is_active)) return false;
+        const sa = _annDateOnly_(a.starts_at);
+        const ea = _annDateOnly_(a.ends_at);
+        if (sa && today < sa) return false;
+        if (ea && today > ea) return false;
+        const targetUsers = _annParseIdList_(a.target_user_ids);
+        if (targetUsers.length > 0) {
+          return targetUsers.indexOf(myId) >= 0;
+        }
+        const tgt = String(a.target_role || "all").toLowerCase();
+        if (tgt !== "all" && tgt !== role) return false;
+        return true;
+      })
+      .map((a) => {
+        const ndList = _annParseIdList_(a.nondismissible_user_ids);
+        const dList = _annParseIdList_(a.dismissible_user_ids);
+        let resolvedDismissible = _annBool_(a.is_dismissible);
+        if (ndList.indexOf(myId) >= 0) resolvedDismissible = false;
+        else if (dList.indexOf(myId) >= 0) resolvedDismissible = true;
+        if (role === "admin") resolvedDismissible = true;
+        return {
+          id: String(a.id),
+          title: String(a.title || ""),
+          body: String(a.body || ""),
+          severity: String(a.severity || "info").toLowerCase(),
+          is_dismissible: resolvedDismissible,
+          starts_at: _annDateOnly_(a.starts_at),
+          ends_at: _annDateOnly_(a.ends_at),
+          target_role: String(a.target_role || "all").toLowerCase(),
+          cta_text: String(a.cta_text || ""),
+          cta_url: String(a.cta_url || ""),
+          updated_at: String(a.updated_at || a.created_at || ""),
+        };
+      });
+    const sevRank = { critical: 0, warning: 1, success: 2, info: 3 };
+    items.sort((a, b) => {
+      const ra = sevRank[a.severity] != null ? sevRank[a.severity] : 4;
+      const rb = sevRank[b.severity] != null ? sevRank[b.severity] : 4;
+      if (ra !== rb) return ra - rb;
+      return String(b.updated_at).localeCompare(String(a.updated_at));
+    });
+    return { status: "success", items: items };
+  } catch (e) {
+    return { status: "error", message: e.toString(), items: [] };
+  }
+}
+function listAnnouncementsAdmin(token) {
+  const user = verifySession(token);
+  if (!user || String(user.role).toLowerCase() !== "admin") {
+    return { status: "error", message: "Hanya admin yang dapat mengakses." };
+  }
+  try {
+    _annEnsureSheet_();
+    const all = (getData(SHEET_NAME.ANNOUNCEMENTS) || []).map((a) => ({
+      id: String(a.id),
+      title: String(a.title || ""),
+      body: String(a.body || ""),
+      severity: String(a.severity || "info").toLowerCase(),
+      is_dismissible: _annBool_(a.is_dismissible),
+      is_active: _annBool_(a.is_active),
+      starts_at: _annDateOnly_(a.starts_at),
+      ends_at: _annDateOnly_(a.ends_at),
+      target_role: String(a.target_role || "all").toLowerCase(),
+      cta_text: String(a.cta_text || ""),
+      cta_url: String(a.cta_url || ""),
+      created_by: String(a.created_by || ""),
+      created_at: String(a.created_at || ""),
+      updated_at: String(a.updated_at || ""),
+      target_user_ids: _annParseIdList_(a.target_user_ids),
+      dismissible_user_ids: _annParseIdList_(a.dismissible_user_ids),
+      nondismissible_user_ids: _annParseIdList_(a.nondismissible_user_ids),
+      send_email_notification: _annBool_(a.send_email_notification),
+    }));
+    all.sort((a, b) => {
+      if (a.is_active !== b.is_active) return a.is_active ? -1 : 1;
+      return String(b.updated_at || b.created_at).localeCompare(
+        String(a.updated_at || a.created_at),
+      );
+    });
+    return { status: "success", items: all };
+  } catch (e) {
+    return { status: "error", message: e.toString() };
+  }
+}
+function saveAnnouncement(token, data) {
+  const user = verifySession(token);
+  if (!user || String(user.role).toLowerCase() !== "admin") {
+    return {
+      status: "error",
+      message: "Hanya admin yang dapat menyimpan pengumuman.",
+    };
+  }
+  if (!data || !String(data.title || "").trim()) {
+    return { status: "error", message: "Judul pengumuman wajib diisi." };
+  }
+  if (!String(data.body || "").trim()) {
+    return { status: "error", message: "Isi pengumuman wajib diisi." };
+  }
+  const validSeverity = ["info", "success", "warning", "critical"];
+  const validRole = ["all", "guru", "admin"];
+  const severity =
+    validSeverity.indexOf(String(data.severity || "").toLowerCase()) >= 0
+      ? String(data.severity).toLowerCase()
+      : "info";
+  const targetRole =
+    validRole.indexOf(String(data.target_role || "").toLowerCase()) >= 0
+      ? String(data.target_role).toLowerCase()
+      : "guru";
+  const starts = String(data.starts_at || "").trim();
+  const ends = String(data.ends_at || "").trim();
+  if (starts && !/^\d{4}-\d{2}-\d{2}$/.test(starts)) {
+    return {
+      status: "error",
+      message: "Format tanggal mulai tidak valid (yyyy-MM-dd).",
+    };
+  }
+  if (ends && !/^\d{4}-\d{2}-\d{2}$/.test(ends)) {
+    return {
+      status: "error",
+      message: "Format tanggal selesai tidak valid (yyyy-MM-dd).",
+    };
+  }
+  if (starts && ends && ends < starts) {
+    return {
+      status: "error",
+      message: "Tanggal selesai harus setelah tanggal mulai.",
+    };
+  }
+  const sheet = _annEnsureSheet_();
+  const now = Utilities.formatDate(
+    new Date(),
+    "Asia/Jakarta",
+    "yyyy-MM-dd HH:mm:ss",
+  );
+  const isDismissible = _annBool_(data.is_dismissible);
+  const isActive =
+    data.is_active === undefined ? true : _annBool_(data.is_active);
+  const ctaText = String(data.cta_text || "")
+    .trim()
+    .slice(0, 120);
+  const ctaUrl = String(data.cta_url || "").trim();
+  if (ctaUrl && !/^https?:\/\//i.test(ctaUrl)) {
+    return {
+      status: "error",
+      message: "CTA URL harus diawali http:// atau https://",
+    };
+  }
+  const allUsers = getData("Users") || [];
+  const validIds = {};
+  allUsers.forEach((u) => {
+    if (u && u.id != null) validIds[String(u.id)] = true;
+  });
+  function _validateIds(arr, label) {
+    var clean = [];
+    var invalid = [];
+    (arr || []).forEach((id) => {
+      var s = String(id || "").trim();
+      if (!s) return;
+      if (validIds[s]) clean.push(s);
+      else invalid.push(s);
+    });
+    return { clean: clean, invalid: invalid };
+  }
+  const targetCheck = _validateIds(data.target_user_ids, "sasaran");
+  const dismCheck = _validateIds(data.dismissible_user_ids, "boleh tutup");
+  const ndCheck = _validateIds(
+    data.nondismissible_user_ids,
+    "tidak boleh tutup",
+  );
+  if (
+    targetCheck.invalid.length ||
+    dismCheck.invalid.length ||
+    ndCheck.invalid.length
+  ) {
+    return {
+      status: "error",
+      message:
+        "Beberapa ID pengguna tidak ditemukan: " +
+        []
+          .concat(targetCheck.invalid, dismCheck.invalid, ndCheck.invalid)
+          .join(", "),
+    };
+  }
+  var conflict = dismCheck.clean.filter((id) => ndCheck.clean.indexOf(id) >= 0);
+  if (conflict.length) {
+    return {
+      status: "error",
+      message:
+        'Pengguna tidak boleh berada di kedua daftar "boleh tutup" dan "tidak boleh tutup": ' +
+        conflict.join(", "),
+    };
+  }
+  const targetIdsStr = _annStringifyIdList_(targetCheck.clean);
+  const dismIdsStr = _annStringifyIdList_(dismCheck.clean);
+  const ndIdsStr = _annStringifyIdList_(ndCheck.clean);
+  const sendEmailNotification = _annBool_(data.send_email_notification);
+  if (data.id) {
+    const rows = sheet.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(data.id)) {
+        // Cek apakah konten signifikan berubah — jika ya, reset email_sent
+        // agar email dikirim ulang ke penerima yang sesuai.
+        const titleChanged = String(rows[i][1] || "") !== String(data.title || "").trim();
+        const bodyChanged  = String(rows[i][2] || "") !== String(data.body  || "");
+        const shouldResetEmail = titleChanged || bodyChanged;
+        const prevEmailSent = rows[i][18]; // col 19 (0-indexed: 18) = email_sent
+        const newEmailSent  = shouldResetEmail ? false : prevEmailSent;
+        // Jika email di-reset, juga reset semua flag reminder
+        const prevRem3 = shouldResetEmail ? false : rows[i][19];
+        const prevRem2 = shouldResetEmail ? false : rows[i][20];
+        const prevRem1 = shouldResetEmail ? false : rows[i][21];
+
+        // Kolom 2–22 (1-indexed), total 21 kolom:
+        // title, body, severity, is_dismissible, is_active, starts_at, ends_at,
+        // target_role, cta_text, cta_url, created_by, created_at, updated_at,
+        // target_user_ids, dismissible_user_ids, nondismissible_user_ids,
+        // send_email_notification, email_sent, reminder_3_sent, reminder_2_sent, reminder_1_sent
+        sheet
+          .getRange(i + 1, 2, 1, 21)
+          .setValues([
+            [
+              String(data.title).trim(),       // col 2: title
+              String(data.body),               // col 3: body
+              severity,                        // col 4: severity
+              isDismissible,                   // col 5: is_dismissible
+              isActive,                        // col 6: is_active
+              starts,                          // col 7: starts_at
+              ends,                            // col 8: ends_at
+              targetRole,                      // col 9: target_role
+              ctaText,                         // col 10: cta_text
+              ctaUrl,                          // col 11: cta_url
+              rows[i][11] || user.full_name || user.id, // col 12: created_by (preserve)
+              rows[i][12] || now,              // col 13: created_at (preserve)
+              now,                             // col 14: updated_at
+              targetIdsStr,                    // col 15: target_user_ids
+              dismIdsStr,                      // col 16: dismissible_user_ids
+              ndIdsStr,                        // col 17: nondismissible_user_ids
+              sendEmailNotification,           // col 18: send_email_notification
+              newEmailSent,                    // col 19: email_sent (reset jika konten berubah)
+              prevRem3,                        // col 20: reminder_3_sent
+              prevRem2,                        // col 21: reminder_2_sent
+              prevRem1,                        // col 22: reminder_1_sent
+            ],
+          ]);
+        try {
+          _invalidateDataSnapshot();
+        } catch (_) {}
+        if (sendEmailNotification) {
+          checkAndSendAnnouncementEmails();
+        }
+        return {
+          status: "success",
+          message: "Pengumuman diperbarui.",
+          id: String(data.id),
+        };
+      }
+    }
+    return { status: "error", message: "Pengumuman tidak ditemukan." };
+  }
+  const newId = "ANN-" + new Date().getTime();
+  sheet.appendRow([
+    newId,
+    String(data.title).trim(),  // col 2: title
+    String(data.body),          // col 3: body
+    severity,                   // col 4: severity
+    isDismissible,              // col 5: is_dismissible
+    isActive,                   // col 6: is_active
+    starts,                     // col 7: starts_at
+    ends,                       // col 8: ends_at
+    targetRole,                 // col 9: target_role
+    ctaText,                    // col 10: cta_text
+    ctaUrl,                     // col 11: cta_url
+    user.full_name || user.id,  // col 12: created_by
+    now,                        // col 13: created_at
+    now,                        // col 14: updated_at
+    targetIdsStr,               // col 15: target_user_ids
+    dismIdsStr,                 // col 16: dismissible_user_ids
+    ndIdsStr,                   // col 17: nondismissible_user_ids
+    sendEmailNotification,      // col 18: send_email_notification
+    "",                         // col 19: email_sent
+    "",                         // col 20: reminder_3_sent
+    "",                         // col 21: reminder_2_sent
+    "",                         // col 22: reminder_1_sent
+  ]);
+  try {
+    _invalidateDataSnapshot();
+  } catch (_) {}
+  if (sendEmailNotification) {
+    checkAndSendAnnouncementEmails();
+  }
+  return { status: "success", message: "Pengumuman dibuat.", id: newId };
+}
+function toggleAnnouncement(token, id, isActive) {
+  const user = verifySession(token);
+  if (!user || String(user.role).toLowerCase() !== "admin") {
+    return { status: "error", message: "Hanya admin." };
+  }
+  const sheet = _annEnsureSheet_();
+  const rows = sheet.getDataRange().getValues();
+  const now = Utilities.formatDate(
+    new Date(),
+    "Asia/Jakarta",
+    "yyyy-MM-dd HH:mm:ss",
+  );
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(id)) {
+      sheet.getRange(i + 1, 6).setValue(_annBool_(isActive));
+      sheet.getRange(i + 1, 14).setValue(now);
+      try {
+        _invalidateDataSnapshot();
+      } catch (_) {}
+      return { status: "success" };
+    }
+  }
+  return { status: "error", message: "Pengumuman tidak ditemukan." };
+}
+function deleteAnnouncement(token, id) {
+  return deleteRowById(token, SHEET_NAME.ANNOUNCEMENTS, id);
+}
+function checkAndSendAnnouncementEmails() {
+  const sheet = _annEnsureSheet_();
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+  const headers = data[0];
+  const todayDate = new Date();
+  todayDate.setHours(0, 0, 0, 0);
+  const today = Utilities.formatDate(todayDate, "Asia/Jakarta", "yyyy-MM-dd");
+  const idxId = headers.indexOf("id");
+  const idxTitle = headers.indexOf("title");
+  const idxBody = headers.indexOf("body");
+  const idxIsActive = headers.indexOf("is_active");
+  const idxStartsAt = headers.indexOf("starts_at");
+  const idxEndsAt = headers.indexOf("ends_at");
+  const idxTargetRole = headers.indexOf("target_role");
+  const idxTargetUserIds = headers.indexOf("target_user_ids");
+  const idxSendEmail = headers.indexOf("send_email_notification");
+  const idxEmailSent = headers.indexOf("email_sent");
+  const idxRem3 = headers.indexOf("reminder_3_sent");
+  const idxRem2 = headers.indexOf("reminder_2_sent");
+  const idxRem1 = headers.indexOf("reminder_1_sent");
+  if (idxSendEmail === -1) return;
+  const allUsers = getData("Users") || [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const isActive = _annBool_(row[idxIsActive]);
+    const sendEmail = _annBool_(row[idxSendEmail]);
+    if (!isActive || !sendEmail) continue;
+    const emailSent =
+      idxEmailSent !== -1 ? _annBool_(row[idxEmailSent]) : false;
+    const startsAt = _annDateOnly_(row[idxStartsAt]);
+    const endsAt = idxEndsAt !== -1 ? _annDateOnly_(row[idxEndsAt]) : "";
+    const rem3Sent = idxRem3 !== -1 ? _annBool_(row[idxRem3]) : false;
+    const rem2Sent = idxRem2 !== -1 ? _annBool_(row[idxRem2]) : false;
+    const rem1Sent = idxRem1 !== -1 ? _annBool_(row[idxRem1]) : false;
+    let emailToSend = null; 
+    let colToUpdate = -1;
+    if (!emailSent && (!startsAt || startsAt <= today)) {
+      emailToSend = "start";
+      colToUpdate = idxEmailSent;
+    } else if (endsAt && (!startsAt || startsAt <= today)) {
+      const endDate = new Date(endsAt);
+      endDate.setHours(0, 0, 0, 0);
+      const diffTime = endDate.getTime() - todayDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays === 3 && !rem3Sent) {
+        emailToSend = "rem3";
+        colToUpdate = idxRem3;
+      } else if (diffDays === 2 && !rem2Sent) {
+        emailToSend = "rem2";
+        colToUpdate = idxRem2;
+      } else if (diffDays === 1 && !rem1Sent) {
+        emailToSend = "rem1";
+        colToUpdate = idxRem1;
+      }
+    }
+    if (emailToSend) {
+      const title = String(row[idxTitle] || "");
+      const body = String(row[idxBody] || "");
+      const targetRole = String(row[idxTargetRole] || "all").toLowerCase();
+      const targetUserIdsStr = String(row[idxTargetUserIds] || "");
+      let targetUserIds = [];
+      try {
+        if (targetUserIdsStr) targetUserIds = JSON.parse(targetUserIdsStr);
+      } catch (e) {}
+      const targetEmails = [];
+      allUsers.forEach((u) => {
+        if (!u.email || !_isValidEmail_(u.email)) return;
+        let include = false;
+        if (targetUserIds.length > 0) {
+          if (targetUserIds.indexOf(String(u.id)) >= 0) include = true;
+        } else {
+          if (targetRole === "all") {
+            include = true;
+          } else {
+            const uRole = String(u.role || "").toLowerCase();
+            if (targetRole === uRole) include = true;
+          }
+        }
+        if (include && targetEmails.indexOf(u.email) === -1) {
+          targetEmails.push(u.email);
+        }
+      });
+      if (targetEmails.length > 0) {
+        // Helper escape HTML khusus untuk email server-side (escapeHtml hanya ada di frontend)
+        function _annEscapeHtml_(str) {
+          return String(str || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        }
+        let subject = "";
+        let prefix = "";
+        if (emailToSend === "start") {
+          subject = "Pengumuman Baru: " + title;
+          const dateStr = startsAt
+            ? formatDateIndo(startsAt)
+            : formatDateIndo(today);
+          prefix = `Berlaku mulai: ${_annEscapeHtml_(dateStr)}`;
+        } else {
+          const daysLeft =
+            emailToSend === "rem3" ? 3 : emailToSend === "rem2" ? 2 : 1;
+          subject = `Peringatan (${daysLeft} hari lagi): ${title}`;
+          const dateStr = formatDateIndo(endsAt);
+          prefix = `Pengingat! Pengumuman ini akan berakhir pada: ${_annEscapeHtml_(dateStr)} (${daysLeft} hari lagi)`;
+        }
+        // Body disanitasi: tag HTML diizinkan (admin yang menulis), tapi
+        // escape karakter berbahaya di luar konteks tag agar aman dikirim via email.
+        // Konversi newline ke <br/> untuk plaintext fallback.
+        const safeBody = String(body).replace(/\r\n/g, "\n").replace(/\n/g, "<br/>");
+        const htmlBody = `
+          <div style="font-family:sans-serif; max-width:600px; margin:0 auto; padding:20px; color:#334155;">
+            <h2 style="color:#1e293b; margin-top:0;">${_annEscapeHtml_(title)}</h2>
+            <p style="font-size:13px; color:#e11d48; margin-bottom:20px; font-weight:bold;">${prefix}</p>
+            <div style="background:#f8fafc; padding:15px; border-radius:8px; line-height:1.6; color:#334155;">
+              ${safeBody}
+            </div>
+            <p style="font-size:12px; color:#94a3b8; margin-top:30px; border-top:1px solid #e2e8f0; padding-top:15px;">
+              Email otomatis dari SiM-Guru. Harap periksa aplikasi untuk detail lebih lanjut. Jangan membalas email ini.
+            </p>
+          </div>
+        `;
+        const chunk = 50;
+        for (let j = 0; j < targetEmails.length; j += chunk) {
+          const bccChunk = targetEmails.slice(j, j + chunk).join(",");
+          try {
+            MailApp.sendEmail({
+              to: Session.getActiveUser().getEmail() || "noreply@simguru.local",
+              bcc: bccChunk,
+              subject: subject,
+              htmlBody: htmlBody,
+              body: "Silakan aktifkan tampilan HTML untuk melihat pengumuman ini.",
+            });
+          } catch (e) {
+            console.error("Gagal mengirim email pengumuman: " + e.message);
+          }
+        }
+      }
+      if (colToUpdate !== -1) {
+        sheet.getRange(i + 1, colToUpdate + 1).setValue(true);
+      }
+    }
+  }
+}
+function installAnnouncementTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "checkAndSendAnnouncementEmails") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("checkAndSendAnnouncementEmails")
+    .timeBased()
+    .atHour(8)
+    .nearMinute(0)
+    .everyDays(1)
+    .inTimezone("Asia/Jakarta")
+    .create();
+  return {
+    status: "success",
+    message: "Trigger berhasil diinstall pada jam 08:00 pagi.",
+  };
 }
 function getDashboardStats(token) {
   const user = verifySession(token);
