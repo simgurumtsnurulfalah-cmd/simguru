@@ -1,0 +1,482 @@
+<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <style>
+      #page-myschedule-root, #page-myschedule-root * { box-sizing: border-box; }
+      .ms-hero {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 55%, #1E3665 100%);
+        padding: 2rem 2rem 2.5rem;
+        position: relative;
+        overflow: hidden;
+        min-width: 0;
+      }
+      @media (max-width: 640px) {
+        .ms-hero { padding: 1.25rem 1rem 1.5rem; }
+      }
+      .ms-hero::before {
+        content: ''; position: absolute;
+        width: 300px; height: 300px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%);
+        top: -80px; right: -60px; pointer-events: none;
+      }
+      .ms-hero::after {
+        content: ''; position: absolute;
+        width: 200px; height: 200px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+        bottom: 10px; left: 25%; pointer-events: none;
+      }
+      .ms-hero-tag {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 999px; padding: 4px 12px;
+        font-size: 0.7rem; font-weight: 700; color: #93C5FD;
+        letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.75rem;
+      }
+      .ms-hero-title {
+        font-size: clamp(1.2rem, 3.5vw, 2rem); font-weight: 800;
+        color: #F1F5F9; letter-spacing: -0.5px; line-height: 1.2;
+        position: relative; z-index: 1;
+        word-break: break-word;
+      }
+      .ms-hero-sub {
+        font-size: 0.825rem; color: #94A3B8; margin-top: 0.35rem;
+        position: relative; z-index: 1;
+        word-break: break-word;
+      }
+      .ms-stat-pills {
+        display: flex; flex-wrap: wrap; gap: 0.625rem; margin-top: 1.5rem;
+        position: relative; z-index: 1;
+      }
+      .ms-stat-pill {
+        display: flex; align-items: center; gap: 8px;
+        background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 12px; padding: 8px 14px;
+        transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        min-width: 0; flex: 0 1 auto;
+      }
+      .ms-stat-pill:hover {
+        background: rgba(255,255,255,0.12);
+        border-color: rgba(255,255,255,0.22);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+      }
+      .ms-stat-pill[data-clickable] { cursor: pointer; }
+      .ms-stat-pill-icon {
+        width: 32px; height: 32px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }
+      .ms-stat-pill > div:last-child { min-width: 0; }
+      .ms-stat-pill-num { font-size: 1.15rem; font-weight: 800; color: #F1F5F9; line-height: 1.1; white-space: nowrap; }
+      .ms-stat-pill-lbl {
+        font-size: 0.65rem; font-weight: 600; color: #94A3B8;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      @media (max-width: 480px) {
+        .ms-stat-pill { flex: 1 1 calc(50% - 0.625rem); padding: 8px 10px; }
+        .ms-stat-pill-num { font-size: 1rem; }
+        .ms-stat-pill-lbl { font-size: 0.6rem; letter-spacing: 0.03em; }
+      }
+      .ms-content {
+        padding: 1.5rem;
+        min-width: 0;
+      }
+      @media (min-width: 640px) { .ms-content { padding: 2rem; } }
+      @media (max-width: 480px) { .ms-content { padding: 1rem; } }
+      .ms-card {
+        background: white; border-radius: 1.25rem;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 2px 8px rgba(15,23,42,0.05), 0 8px 24px rgba(15,23,42,0.03);
+        overflow: hidden;
+        transition: box-shadow 0.2s ease;
+        min-width: 0;
+      }
+      .ms-card:hover {
+        box-shadow: 0 4px 14px rgba(15,23,42,0.08), 0 16px 40px rgba(15,23,42,0.04);
+      }
+      @keyframes ms-card-fade-in {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .ms-card { animation: ms-card-fade-in 0.4s ease both; }
+      .ms-card:nth-of-type(2) { animation-delay: 0.06s; }
+      .ms-card:nth-of-type(3) { animation-delay: 0.12s; }
+      .ms-card:nth-of-type(4) { animation-delay: 0.18s; }
+      @media (prefers-reduced-motion: reduce) {
+        .ms-card { animation: none !important; transition: none !important; }
+      }
+      .ms-card-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #F1F5F9;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 0.75rem; flex-wrap: wrap;
+        background: linear-gradient(to right, #FAFBFD, #F8FAFC);
+      }
+      .ms-card-header-left {
+        display: flex; align-items: center; gap: 0.75rem;
+        min-width: 0; flex: 1 1 auto;
+      }
+      .ms-card-icon {
+        width: 36px; height: 36px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      }
+      .ms-card-header-left > div:last-child { min-width: 0; flex: 1 1 auto; }
+      .ms-card-title {
+        font-size: 0.875rem; font-weight: 700; color: #1E293B;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .ms-card-sub {
+        font-size: 0.7rem; color: #94A3B8; font-weight: 500; margin-top: 1px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .ms-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+      .ms-table thead { position: sticky; top: 0; z-index: 4; }
+      .ms-table th {
+        padding: 0.75rem 1.25rem; text-align: left;
+        font-size: 0.625rem; font-weight: 800; text-transform: uppercase;
+        letter-spacing: 0.08em; color: #94A3B8;
+        background: #FFFFFF;
+        border-bottom: 1px solid #E2E8F0;
+        box-shadow: 0 1px 0 rgba(15,23,42,0.04);
+      }
+      .ms-table th:last-child { text-align: center; }
+      .ms-table td {
+        padding: 1rem 1.25rem; color: #334155;
+        border-bottom: 1px solid #F8FAFC; vertical-align: middle;
+      }
+      .ms-table tbody tr:last-child td { border-bottom: none; }
+      .ms-table tbody tr { transition: background 0.12s ease; }
+      .ms-table tbody tr:hover td { background: #F8FAFC; }
+      @media (max-width: 640px) {
+        .ms-table th { padding: 0.6rem 0.75rem; font-size: 0.6rem; }
+        .ms-table td { padding: 0.75rem 0.75rem; }
+      }
+      .ms-day-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 4px 10px; border-radius: 8px;
+        font-size: 0.75rem; font-weight: 800;
+      }
+      .ms-day-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+      .ms-class-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 4px 10px; border-radius: 7px;
+        font-size: 0.72rem; font-weight: 800;
+        background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;
+      }
+      .ms-jtm-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 32px; height: 28px; border-radius: 7px;
+        font-size: 0.78rem; font-weight: 800;
+        background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;
+      }
+      .ms-allowance-item {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.75rem 0; border-bottom: 1px solid #F8FAFC;
+        flex-wrap: wrap;
+      }
+      .ms-allowance-item:last-child { border-bottom: none; padding-bottom: 0; }
+      .ms-allowance-name {
+        font-size: 0.8125rem; font-weight: 600; color: #1E293B;
+        flex: 1 1 auto; min-width: 0; word-break: break-word;
+      }
+      .ms-allowance-amt {
+        font-size: 0.7rem; font-weight: 700; color: #059669;
+        background: #ECFDF5; border: 1px solid #A7F3D0;
+        padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .ms-piket-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 0.625rem 0; border-bottom: 1px solid #F8FAFC;
+        flex-wrap: wrap;
+      }
+      .ms-piket-item:last-child { border-bottom: none; }
+      .ms-piket-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #F97316; flex-shrink: 0;
+        box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+      }
+      .ms-piket-day {
+        font-size: 0.8125rem; font-weight: 700; color: #1E293B;
+        flex: 1 1 auto; min-width: 0; word-break: break-word;
+      }
+      .ms-piket-lbl {
+        font-size: 0.65rem; font-weight: 700; color: #EA580C;
+        background: #FFF7ED; border: 1px solid #FED7AA;
+        padding: 2px 7px; border-radius: 999px; margin-left: auto;
+        white-space: nowrap; flex-shrink: 0;
+      }
+      .ms-ceremony-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 0.625rem 0.875rem; border-radius: 0.75rem;
+        margin-bottom: 0.5rem; border: 1px solid;
+        transition: background 0.12s ease, border-color 0.12s ease;
+        flex-wrap: wrap;
+      }
+      .ms-ceremony-item:last-child { margin-bottom: 0; }
+      .ms-ceremony-item > p {
+        flex: 1 1 auto; min-width: 0; word-break: break-word;
+      }
+      .ms-ceremony-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+      .ms-empty {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; padding: 2.5rem 1rem; text-align: center;
+        color: #94A3B8;
+      }
+      .ms-empty svg { opacity: 0.35; margin-bottom: 0.75rem; }
+      .ms-empty p { font-size: 0.8125rem; font-weight: 600; }
+      .ms-empty span { font-size: 0.72rem; margin-top: 0.25rem; }
+      .ms-count-badge {
+        display: inline-flex; align-items: center;
+        padding: 3px 10px; border-radius: 999px;
+        font-size: 0.68rem; font-weight: 800;
+        white-space: nowrap; flex-shrink: 0;
+      }
+      .ms-hero-actions {
+        display: flex; align-items: center; gap: 0.5rem;
+        flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;
+      }
+      .ms-hero-actions button { white-space: nowrap; flex-shrink: 0; }
+      .ms-filter-bar {
+        padding: 0.625rem 1.25rem;
+        border-bottom: 1px solid #F1F5F9;
+        background: rgba(248,250,252,0.5);
+        display: flex; align-items: center; gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .ms-filter-bar > * { min-width: 0; }
+      .ms-filter-bar .ms-search-wrap {
+        position: relative; flex: 1 1 180px; min-width: 140px;
+      }
+      .ms-filter-bar select { flex: 0 0 auto; }
+      @media (max-width: 480px) {
+        .ms-filter-bar { padding: 0.625rem 1rem; }
+        .ms-filter-bar .ms-search-wrap { flex-basis: 100%; }
+        .ms-filter-bar select { flex: 1 1 auto; }
+      }
+      .ms-grid {
+        display: grid; gap: 1.25rem;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: start;
+      }
+      @media (min-width: 1024px) {
+        .ms-grid {
+          grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        }
+      }
+      .ms-table td.ms-cell-clip {
+        max-width: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+    </style>
+    <div id="page-myschedule-root">
+    <div class="ms-hero">
+      <div class="relative z-10">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0 flex-1">
+            <div class="ms-hero-tag">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="#93C5FD"><circle cx="4" cy="4" r="4"/></svg>
+              Jadwal &amp; Tugas Saya
+            </div>
+            <h1 class="ms-hero-title">Ringkasan Tugas Mingguan</h1>
+            <p class="ms-hero-sub">Semua jadwal mengajar, piket, dan upacara Anda dalam satu tempat</p>
+          </div>
+          <div class="ms-hero-actions">
+            <button onclick="refreshMySchedule()" id="btnRefreshMySchedule"
+              class="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/15 rounded-xl px-3 py-2 text-xs font-bold text-blue-100 hover:text-white transition" title="Perbarui data">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span class="hidden sm:inline">Refresh</span>
+            </button>
+            <button onclick="printMySchedule()"
+              class="inline-flex items-center gap-1.5 bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700 rounded-xl px-3 py-2 text-xs font-bold transition shadow-sm" title="Cetak / Export jadwal">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+              <span class="hidden sm:inline">Cetak</span>
+            </button>
+          </div>
+        </div>
+        <div class="ms-stat-pills">
+          <div class="ms-stat-pill">
+            <div class="ms-stat-pill-icon" style="background:rgba(59,130,246,0.18);">
+              <svg class="w-4 h-4" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="ms-stat-pill-num" id="statTotalJadwal">—</div>
+              <div class="ms-stat-pill-lbl">Total Sesi</div>
+            </div>
+          </div>
+          <div class="ms-stat-pill" data-clickable onclick="handleNav('Page_Picket')" title="Buka halaman Piket &amp; Upacara">
+            <div class="ms-stat-pill-icon" style="background:rgba(249,115,22,0.18);">
+              <svg class="w-4 h-4" style="color:#FB923C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="ms-stat-pill-num" id="statTotalPiket">—</div>
+              <div class="ms-stat-pill-lbl">Hari Piket</div>
+            </div>
+          </div>
+          <div class="ms-stat-pill">
+            <div class="ms-stat-pill-icon" style="background:rgba(16,185,129,0.18);">
+              <svg class="w-4 h-4" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <div>
+              <div class="ms-stat-pill-num" id="statTotalJtm">—</div>
+              <div class="ms-stat-pill-lbl">JTM / Minggu</div>
+            </div>
+          </div>
+          <div class="ms-stat-pill" data-clickable onclick="handleNav('Page_Picket')" title="Lihat detail jadwal upacara">
+            <div class="ms-stat-pill-icon" style="background:rgba(139,92,246,0.18);">
+              <svg class="w-4 h-4" style="color:#A78BFA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+              </svg>
+            </div>
+            <div>
+              <div class="ms-stat-pill-num" id="statTotalUpacara">—</div>
+              <div class="ms-stat-pill-lbl">Pembina Upacara</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ms-content">
+      <div id="panelExamMySchedule" class="hidden mb-5"></div>
+      <div class="ms-grid">
+        <div class="ms-card">
+          <div class="ms-card-header">
+            <div class="ms-card-header-left">
+              <div class="ms-card-icon" style="background:#EFF6FF;">
+                <svg class="w-4.5 h-4.5" style="color:#3B82F6;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="ms-card-title">Jadwal Mengajar Mingguan</p>
+                <p class="ms-card-sub">Semua sesi mengajar per hari</p>
+              </div>
+            </div>
+            <span class="ms-count-badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" id="badgeJadwalCount">Memuat...</span>
+          </div>
+          <div class="ms-filter-bar">
+            <div class="ms-search-wrap">
+              <svg class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input type="text" id="msSearchInput" oninput="filterMySchedule()" placeholder="Cari mata pelajaran atau kelas..."
+                class="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+            </div>
+            <select id="msDayFilter" onchange="filterMySchedule()"
+              class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer">
+              <option value="">Semua Hari</option>
+              <option value="Senin">Senin</option>
+              <option value="Selasa">Selasa</option>
+              <option value="Rabu">Rabu</option>
+              <option value="Kamis">Kamis</option>
+              <option value="Jumat">Jumat</option>
+              <option value="Sabtu">Sabtu</option>
+              <option value="Minggu">Minggu</option>
+            </select>
+            <button onclick="resetMyScheduleFilter()" class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1.5 hover:bg-slate-100 rounded-lg transition flex-shrink-0" title="Reset filter">
+              <svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="overflow-x-auto" style="max-height: 520px; overflow-y: auto;">
+            <table class="ms-table">
+              <thead>
+                <tr>
+                  <th style="width:110px;">Hari</th>
+                  <th style="width:130px;">Jam</th>
+                  <th>Kelas</th>
+                  <th>Mata Pelajaran</th>
+                  <th style="width:60px; text-align:center;">JTM</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyMyWeeklySchedule">
+                <tr><td colspan="5" class="text-center py-10 text-slate-400 text-sm italic">Memuat jadwal...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="flex flex-col gap-5 min-w-0">
+          <div class="ms-card">
+            <div class="ms-card-header">
+              <div class="ms-card-header-left">
+                <div class="ms-card-icon" style="background:#ECFDF5;">
+                  <svg style="color:#10B981;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="ms-card-title">Tugas Tambahan</p>
+                  <p class="ms-card-sub">Tunjangan &amp; tugas khusus</p>
+                </div>
+              </div>
+            </div>
+            <div class="px-5 py-3">
+              <ul id="listMyAllowances" class="divide-y divide-slate-50">
+                <li class="ms-allowance-item">
+                  <div class="skeleton h-4 w-32 rounded"></div>
+                  <div class="skeleton h-5 w-20 rounded-full"></div>
+                </li>
+                <li class="ms-allowance-item">
+                  <div class="skeleton h-4 w-28 rounded"></div>
+                  <div class="skeleton h-5 w-20 rounded-full"></div>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="ms-card">
+            <div class="ms-card-header">
+              <div class="ms-card-header-left">
+                <div class="ms-card-icon" style="background:#FFF7ED;">
+                  <svg style="color:#F97316;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="ms-card-title">Jadwal Piket</p>
+                  <p class="ms-card-sub">Hari piket sekolah</p>
+                </div>
+              </div>
+            </div>
+            <div class="px-5 py-3">
+              <ul id="listMyPickets" class="space-y-0">
+                <li class="ms-piket-item">
+                  <div class="skeleton h-4 w-20 rounded"></div>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="ms-card">
+            <div class="ms-card-header">
+              <div class="ms-card-header-left">
+                <div class="ms-card-icon" style="background:#F5F3FF;">
+                  <svg style="color:#7C3AED;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="ms-card-title">Pembina Upacara</p>
+                  <p class="ms-card-sub">Jadwal &amp; status konfirmasi</p>
+                </div>
+              </div>
+            </div>
+            <div class="px-4 py-3">
+              <div id="listMyCeremonies">
+                <div class="ms-ceremony-item" style="background:#F5F3FF; border-color:#DDD6FE;">
+                  <div class="skeleton h-4 w-24 rounded"></div>
+                  <div class="skeleton h-4 w-16 rounded-full ml-auto"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

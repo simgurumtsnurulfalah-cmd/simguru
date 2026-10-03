@@ -1,0 +1,534 @@
+<div class="flex h-screen overflow-hidden" style="background:#F5F6FA;">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+      .jrn-root, .jrn-root * { box-sizing: border-box; }
+      .jrn-root { font-family: 'DM Sans', sans-serif; }
+      .jrn-mono { font-family: 'JetBrains Mono', monospace; }
+      .jrn-page-header {
+        background: linear-gradient(135deg, #312e81 0%, #4338ca 50%, #4f46e5 100%);
+        position: relative;
+        overflow: hidden;
+        padding: 1.75rem 1.5rem 1.5rem;
+      }
+      @media (min-width: 640px) {
+        .jrn-page-header { padding: 2rem 2rem 1.75rem; }
+      }
+      .jrn-page-header::before {
+        content: ''; position: absolute;
+        top: -40px; right: -40px;
+        width: 220px; height: 220px;
+        background: radial-gradient(circle, rgba(255,255,255,0.10), transparent 70%);
+        border-radius: 50%; pointer-events: none;
+      }
+      .jrn-page-header::after {
+        content: ''; position: absolute;
+        bottom: -80px; left: 12%;
+        width: 320px; height: 320px;
+        background: radial-gradient(circle, rgba(255,255,255,0.07), transparent 70%);
+        border-radius: 50%; pointer-events: none;
+      }
+      .jrn-stat-chip {
+        background: rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 14px;
+        backdrop-filter: blur(6px);
+        padding: 10px 14px;
+        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        display: flex; align-items: center; gap: 10px;
+        min-width: 0;
+      }
+      .jrn-stat-chip:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.28); }
+      .jrn-stat-chip-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        background: rgba(255,255,255,0.16); flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .jrn-stat-chip-num {
+        color: #fff; font-weight: 800; font-size: 1.15rem; line-height: 1.05;
+        font-family: 'JetBrains Mono', monospace; white-space: nowrap;
+      }
+      .jrn-stat-chip-lbl {
+        color: rgba(199,210,254,0.85); font-size: 0.625rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .jrn-card {
+        background: #fff;
+        border: 1px solid #E8EAF0;
+        border-radius: 18px;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 6px 20px rgba(79,70,229,0.04);
+        overflow: hidden;
+        min-width: 0;
+      }
+      .jrn-toolbar {
+        background: #FAFBFF;
+        border-bottom: 1px solid #ECEEF5;
+        padding: 12px 16px;
+        display: flex; align-items: center; gap: 8px;
+        flex-wrap: wrap;
+      }
+      .jrn-toolbar > * { min-width: 0; }
+      .jrn-input {
+        border: 1.5px solid #DDE1F0;
+        border-radius: 10px;
+        padding: 7px 12px;
+        font-size: 13px;
+        font-family: 'DM Sans', sans-serif;
+        background: #fff; color: #374151;
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .jrn-input:focus {
+        border-color: #4f46e5;
+        box-shadow: 0 0 0 3px rgba(79,70,229,0.10);
+      }
+      .jrn-input::placeholder { color: #9CA3AF; }
+      .jrn-input-group {
+        position: relative;
+      }
+      .jrn-input-group svg.jrn-input-icon {
+        position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+        width: 14px; height: 14px; color: #9CA3AF; pointer-events: none;
+      }
+      .jrn-input-group input.jrn-input { padding-left: 30px; }
+      .jrn-table { width: 100%; border-collapse: collapse; }
+      .jrn-table thead {
+        position: sticky; top: 0; z-index: 4;
+        background: #F7F8FC;
+      }
+      .jrn-table thead tr { border-bottom: 2px solid #ECEEF5; }
+      .jrn-table thead th {
+        padding: 11px 16px;
+        font-size: 11px; font-weight: 700;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: #6B7280; white-space: nowrap;
+        background: #F7F8FC;
+      }
+      .jrn-table tbody tr {
+        border-bottom: 1px solid #F0F1F7;
+        transition: background 0.12s;
+      }
+      .jrn-table tbody tr:hover { background: #FAFBFF; }
+      .jrn-table tbody td { padding: 12px 16px; vertical-align: middle; }
+      .jrn-table tbody tr:last-child { border-bottom: none; }
+      .jrn-table .jrn-cell-clip {
+        max-width: 0; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap;
+      }
+      .jrn-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 11px; font-weight: 700;
+        padding: 3px 9px; border-radius: 999px;
+        white-space: nowrap;
+      }
+      .jrn-badge-indigo  { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
+      .jrn-badge-emerald { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+      .jrn-badge-rose    { background: #FFF1F2; color: #E11D48; border: 1px solid #FECDD3; }
+      .jrn-badge-purple  { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; }
+      .jrn-badge-amber   { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+      .jrn-badge-slate   { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
+      .jrn-badge-sky     { background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
+      .jrn-icon-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px; border-radius: 8px;
+        border: 1px solid transparent;
+        transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+        cursor: pointer;
+      }
+      .jrn-icon-btn svg { width: 15px; height: 15px; }
+      .jrn-icon-btn-view   { background: #EFF6FF; border-color: #BFDBFE; color: #2563EB; }
+      .jrn-icon-btn-view:hover   { background: #DBEAFE; border-color: #93C5FD; transform: scale(1.06); }
+      .jrn-icon-btn-edit   { background: #FFFBEB; border-color: #FDE68A; color: #D97706; }
+      .jrn-icon-btn-edit:hover   { background: #FEF3C7; border-color: #FCD34D; transform: scale(1.06); }
+      .jrn-icon-btn-delete { background: #FFF1F2; border-color: #FECDD3; color: #E11D48; }
+      .jrn-icon-btn-delete:hover { background: #FFE4E6; border-color: #FDA4AF; transform: scale(1.06); }
+      .jrn-pag-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 34px; min-width: 34px; padding: 0 10px;
+        border: 1px solid #DDE1F0; border-radius: 9px;
+        background: #fff; color: #4B5563; font-size: 13px; font-weight: 600;
+        cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+        font-family: 'DM Sans', sans-serif;
+      }
+      .jrn-pag-btn:hover:not(:disabled) { background: #EEF2FF; border-color: #A5B4FC; color: #4338CA; }
+      .jrn-pag-btn.active { background: #4F46E5; border-color: #4F46E5; color: #fff; }
+      .jrn-pag-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+      .jrn-action-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        border-radius: 10px;
+        padding: 8px 14px; font-size: 12.5px; font-weight: 700;
+        font-family: 'DM Sans', sans-serif; cursor: pointer;
+        transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
+        border: 1px solid transparent;
+        white-space: nowrap;
+      }
+      .jrn-action-btn svg { width: 14px; height: 14px; }
+      .jrn-action-btn-primary {
+        background: linear-gradient(135deg, #1e293b, #334155);
+        color: #fff; box-shadow: 0 2px 8px rgba(30,41,59,0.20);
+      }
+      .jrn-action-btn-primary:hover { box-shadow: 0 4px 14px rgba(30,41,59,0.30); }
+      .jrn-action-btn-ghost {
+        background: #fff; color: #4B5563; border-color: #DDE1F0;
+      }
+      .jrn-action-btn-ghost:hover { background: #F1F5F9; color: #1E293B; border-color: #CBD5E1; }
+      .jrn-action-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+      .jrn-personal-bar {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
+        border-radius: 16px;
+        padding: 16px 20px;
+        margin-bottom: 18px;
+        display: flex; align-items: center; gap: 16px;
+        flex-wrap: wrap;
+        position: relative; overflow: hidden;
+      }
+      .jrn-personal-bar::after {
+        content: ''; position: absolute; right: -40px; top: -40px;
+        width: 180px; height: 180px;
+        background: radial-gradient(circle, rgba(99,102,241,0.18), transparent 70%);
+        pointer-events: none;
+      }
+      .jrn-personal-bar > * { position: relative; z-index: 1; }
+      .jrn-row-dot {
+        display: inline-block;
+        width: 8px; height: 8px; border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .jrn-attbar {
+        display: flex; height: 5px; border-radius: 999px; overflow: hidden;
+        background: #E2E8F0;
+        min-width: 56px; max-width: 120px;
+        margin-top: 4px;
+      }
+      .jrn-attbar > span { height: 100%; display: block; }
+      @keyframes jrnFadeUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .jrn-fadein { animation: jrnFadeUp 0.32s ease-out forwards; }
+      @keyframes jrnPulse { 0%,100%{opacity:1} 50%{opacity:.55} }
+      .jrn-auto-badge { animation: jrnPulse 2.5s ease-in-out infinite; }
+      .jrn-select {
+        border: 1.5px solid #DDE1F0; border-radius: 10px;
+        padding: 7px 30px 7px 12px; font-size: 13px;
+        font-family: 'DM Sans', sans-serif; background: #fff;
+        color: #374151; outline: none; cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 10px center;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      .jrn-select:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.10); }
+      .jrn-empty {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; padding: 56px 20px; text-align: center;
+      }
+      .jrn-empty-icon {
+        width: 72px; height: 72px; border-radius: 20px;
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 16px;
+      }
+      .jrn-empty p { font-weight: 700; color: #374151; font-size: 14px; margin-bottom: 4px; }
+      .jrn-empty span { color: #9CA3AF; font-size: 12px; }
+      .jrn-quickrange {
+        display: inline-flex; gap: 4px; padding: 3px;
+        background: #F1F5F9; border-radius: 10px;
+      }
+      .jrn-quickrange button {
+        border: none; background: transparent;
+        padding: 5px 10px; border-radius: 7px;
+        font-size: 11.5px; font-weight: 700; color: #64748B;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        font-family: 'DM Sans', sans-serif;
+      }
+      .jrn-quickrange button:hover { background: #fff; color: #1E293B; }
+      .jrn-quickrange button.active { background: #4F46E5; color: #fff; box-shadow: 0 2px 6px rgba(79,70,229,0.30); }
+      .jrn-filter-summary {
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+        padding: 8px 16px;
+        background: #FFFBEB; border-bottom: 1px solid #FDE68A;
+        font-size: 11.5px; color: #78350F;
+      }
+      .jrn-filter-summary strong { color: #B45309; }
+      .jrn-filter-summary .jrn-chip {
+        background: #fff; border: 1px solid #FDE68A;
+        padding: 2px 9px; border-radius: 999px;
+        font-weight: 700; font-size: 11px;
+      }
+      @media (max-width: 768px) {
+        .jrn-table thead th { padding: 9px 12px; font-size: 10px; }
+        .jrn-table tbody td { padding: 10px 12px; font-size: 12.5px; }
+      }
+      @media (max-width: 640px) {
+        .jrn-personal-bar {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 12px !important;
+          padding: 14px 16px !important;
+        }
+        .jrn-personal-bar > div:first-child { flex: none !important; width: 100% !important; }
+        .jrn-bar-right {
+          width: 100% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 10px !important;
+        }
+        .jrn-bar-stat { flex: 0 0 auto !important; min-width: 78px !important; }
+        .jrn-bar-select { flex: 1 1 auto !important; }
+        .jrn-toolbar { padding: 10px 12px; }
+        .jrn-toolbar > .jrn-input,
+        .jrn-toolbar > .jrn-input-group { flex: 1 1 calc(50% - 4px); min-width: 120px; }
+      }
+    </style>
+    <main class="w-full grow jrn-root" id="page-journal-root">
+      <div class="jrn-page-header">
+        <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.18);">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+              </div>
+              <div class="min-w-0">
+                <h1 class="text-white font-bold text-xl sm:text-2xl tracking-tight" style="line-height:1.15;">Riwayat Jurnal Mengajar</h1>
+                <p class="text-indigo-200 text-xs sm:text-sm mt-0.5" id="jrnHeroSubtitle">Rekam jejak aktivitas pembelajaran</p>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2.5 flex-shrink-0" id="jrnHeaderStats">
+            <div class="jrn-stat-chip">
+              <div class="jrn-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="jrn-stat-chip-num" id="jrnStatTotal">—</p>
+                <p class="jrn-stat-chip-lbl">Total Log</p>
+              </div>
+            </div>
+            <div class="jrn-stat-chip">
+              <div class="jrn-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="jrn-stat-chip-num" id="jrnStatMonth">—</p>
+                <p class="jrn-stat-chip-lbl">Bulan Ini</p>
+              </div>
+            </div>
+            <div class="jrn-stat-chip">
+              <div class="jrn-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="jrn-stat-chip-num" id="jrnStatJtm">—</p>
+                <p class="jrn-stat-chip-lbl">Total JTM</p>
+              </div>
+            </div>
+            <div class="jrn-stat-chip">
+              <div class="jrn-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="jrn-stat-chip-num" id="jrnStatAttRate">—</p>
+                <p class="jrn-stat-chip-lbl">Rerata Hadir</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 sm:p-6">
+        <div id="viewGuruJournal" class="hidden jrn-fadein">
+          <div class="jrn-personal-bar">
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(99,102,241,0.35);">
+                <svg class="w-5 h-5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="text-slate-300 text-xs font-semibold">Log Aktivitas Anda</p>
+                <p class="text-white font-bold text-sm mt-0.5" style="word-break:break-word;">Semua riwayat jurnal yang pernah Anda isi tersimpan di sini.</p>
+              </div>
+            </div>
+            <div class="jrn-bar-right flex items-center gap-3 flex-shrink-0">
+              <div class="jrn-bar-stat text-center px-4 py-2 rounded-xl" style="background:rgba(255,255,255,0.07);">
+                <p class="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Total</p>
+                <p class="text-white font-bold text-xl jrn-mono" id="lblTotalLogs">—</p>
+              </div>
+              <select id="selGuruJournalLimit" onchange="changeGuruJournalLimit()" class="jrn-select jrn-bar-select text-xs">
+                <option value="10">10 / halaman</option>
+                <option value="25">25 / halaman</option>
+                <option value="50">50 / halaman</option>
+                <option value="100">100 / halaman</option>
+              </select>
+            </div>
+          </div>
+          <div class="jrn-card mb-4">
+            <div class="jrn-toolbar">
+              <div class="jrn-input-group" style="flex:1 1 220px; min-width:180px;">
+                <svg class="jrn-input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="jrnGuruSearch" placeholder="Cari materi, kelas, atau mapel..." oninput="onGuruJournalSearchInput()" class="jrn-input w-full">
+              </div>
+              <input type="date" id="jrnGuruFilterDateFrom" onchange="filterGuruJournalTable()" class="jrn-input" title="Tanggal mulai" style="flex:0 1 150px;">
+              <span class="text-slate-400 text-xs font-bold">→</span>
+              <input type="date" id="jrnGuruFilterDateTo" onchange="filterGuruJournalTable()" class="jrn-input" title="Tanggal akhir" style="flex:0 1 150px;">
+              <div class="jrn-quickrange" id="jrnGuruQuickRange">
+                <button type="button" data-range="7"  onclick="setGuruJournalQuickRange(7)">7 Hari</button>
+                <button type="button" data-range="30" onclick="setGuruJournalQuickRange(30)">30 Hari</button>
+                <button type="button" data-range="month" onclick="setGuruJournalQuickRange('month')">Bulan Ini</button>
+              </div>
+              <button onclick="resetGuruJournalFilter()" class="jrn-action-btn jrn-action-btn-ghost" title="Reset Filter">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span class="hidden sm:inline">Reset</span>
+              </button>
+              <div class="flex-1"></div>
+              <button onclick="exportGuruJournalCSV()" class="jrn-action-btn jrn-action-btn-primary" title="Unduh CSV jurnal">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span class="hidden sm:inline">Export CSV</span>
+              </button>
+            </div>
+            <div id="jrnGuruFilterSummary" class="jrn-filter-summary hidden"></div>
+          </div>
+          <div class="jrn-card">
+            <div class="overflow-x-auto" style="max-height: 620px; overflow-y:auto;">
+              <table class="jrn-table">
+                <thead>
+                  <tr>
+                    <th class="text-left pl-5">Tanggal</th>
+                    <th class="text-left">Waktu</th>
+                    <th class="text-left">Kelas &amp; Mapel</th>
+                    <th class="text-left">Materi</th>
+                    <th class="text-center">Hadir</th>
+                    <th class="text-center">Absen</th>
+                    <th class="text-center">Kehadiran</th>
+                    <th class="text-center pr-5">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="journalTableBody">
+                  <tr><td colspan="8" class="py-12 text-center text-slate-400 text-sm">Memuat data...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="px-5 py-3.5 border-t border-slate-100" style="background:#FAFBFF;">
+              <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p class="text-xs text-slate-500">
+                  Menampilkan
+                  <span class="font-bold text-slate-700 jrn-mono" id="txtGuruJournalStart">-</span>–<span class="font-bold text-slate-700 jrn-mono" id="txtGuruJournalEnd">-</span>
+                  dari <span class="font-bold text-indigo-600 jrn-mono" id="txtGuruJournalTotal">-</span> data
+                </p>
+                <div class="flex items-center gap-1.5 flex-wrap justify-center">
+                  <button onclick="changeGuruJournalPage('first')" id="btnFirstGuruJournal" class="jrn-pag-btn" title="Pertama">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+                  </button>
+                  <button onclick="changeGuruJournalPage(-1)" id="btnPrevGuruJournal" class="jrn-pag-btn" title="Sebelumnya">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                  <div id="guruJournalPageNumbers" class="flex items-center gap-1"></div>
+                  <button onclick="changeGuruJournalPage(1)" id="btnNextGuruJournal" class="jrn-pag-btn" title="Selanjutnya">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                  <button onclick="changeGuruJournalPage('last')" id="btnLastGuruJournal" class="jrn-pag-btn" title="Terakhir">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                  </button>
+                  <div class="flex items-center gap-1.5 ml-2">
+                    <input type="number" id="inpGuruJournalJump" min="1" placeholder="Hal." onkeypress="if(event.key==='Enter') jumpToGuruJournalPage()" class="jrn-input w-16 text-center text-xs py-1.5">
+                    <button onclick="jumpToGuruJournalPage()" class="jrn-pag-btn" style="background:#4F46E5;border-color:#4F46E5;color:#fff;padding:0 12px;">Go</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="viewAdminJournal" class="hidden jrn-fadein">
+          <div class="jrn-card mb-4">
+            <div class="jrn-toolbar">
+              <div class="jrn-input-group" style="flex:1 1 200px; min-width:160px;">
+                <svg class="jrn-input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <input type="text" id="jrnFilterGuru" placeholder="Filter nama guru..." oninput="onAdminFilterInput()" class="jrn-input w-full">
+              </div>
+              <input type="date" id="jrnFilterDateFrom" onchange="filterAdminJournalTable()" class="jrn-input" title="Dari tanggal" style="flex:0 1 150px;">
+              <span class="text-slate-400 text-xs font-bold">→</span>
+              <input type="date" id="jrnFilterDateTo" onchange="filterAdminJournalTable()" class="jrn-input" title="Sampai tanggal" style="flex:0 1 150px;">
+              <input type="text" id="jrnFilterClass" placeholder="Kelas..." oninput="onAdminFilterInput()" class="jrn-input" style="flex:0 1 110px;">
+              <div class="jrn-quickrange" id="jrnAdminQuickRange">
+                <button type="button" data-range="today" onclick="setAdminJournalQuickRange('today')">Hari Ini</button>
+                <button type="button" data-range="7"  onclick="setAdminJournalQuickRange(7)">7 Hari</button>
+                <button type="button" data-range="month" onclick="setAdminJournalQuickRange('month')">Bulan Ini</button>
+              </div>
+              <button onclick="resetAdminJournalFilter()" class="jrn-action-btn jrn-action-btn-ghost" title="Reset Filter">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span class="hidden sm:inline">Reset</span>
+              </button>
+              <div class="flex-1"></div>
+              <button onclick="exportAdminJournalCSV()" class="jrn-action-btn jrn-action-btn-ghost" title="Unduh CSV">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span class="hidden sm:inline">Export CSV</span>
+              </button>
+              <button onclick="exportJournalPDF()" class="jrn-action-btn jrn-action-btn-primary">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span class="hidden sm:inline">Export PDF</span>
+              </button>
+            </div>
+            <div id="jrnAdminFilterSummary" class="jrn-filter-summary hidden"></div>
+          </div>
+          <div id="printAreaJournal" class="jrn-card">
+            <div class="mb-4 text-center hidden p-4" id="headerJournalPrint">
+              <h2 class="text-xl font-bold">LAPORAN JURNAL MENGAJAR HARIAN</h2>
+              <p class="text-sm">MTs Nurul Falah</p>
+              <p class="text-xs text-slate-500" id="headerJournalPrintMeta"></p>
+            </div>
+            <div class="overflow-x-auto" style="max-height: 620px; overflow-y:auto;">
+              <table class="jrn-table">
+                <thead>
+                  <tr>
+                    <th class="text-left pl-5">Tanggal &amp; Waktu</th>
+                    <th class="text-left">Guru</th>
+                    <th class="text-left">Kelas &amp; Mapel</th>
+                    <th class="text-left">Materi</th>
+                    <th class="text-center">Hadir</th>
+                    <th class="text-center">Absen</th>
+                    <th class="text-center">Kehadiran</th>
+                    <th class="text-center pr-5" data-html2canvas-ignore="true">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyAdminJournal"></tbody>
+              </table>
+            </div>
+            <div class="px-5 py-3.5 border-t border-slate-100" id="adminJournalFooter" style="background:#FAFBFF;">
+              <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p class="text-xs text-slate-500">
+                  Menampilkan
+                  <span class="font-bold text-slate-700 jrn-mono" id="txtAdminJournalStart">-</span>–<span class="font-bold text-slate-700 jrn-mono" id="txtAdminJournalEnd">-</span>
+                  dari <span class="font-bold text-indigo-600 jrn-mono" id="txtAdminJournalTotal">-</span> data
+                </p>
+                <div class="flex items-center gap-1.5 flex-wrap justify-center">
+                  <button onclick="changeJournalPage('first')" id="btnFirstJournal" class="jrn-pag-btn" title="Pertama">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+                  </button>
+                  <button onclick="changeJournalPage(-1)" id="btnPrevJournal" class="jrn-pag-btn" title="Sebelumnya">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                  <div id="adminJournalPageNumbers" class="flex items-center gap-1"></div>
+                  <button onclick="changeJournalPage(1)" id="btnNextJournal" class="jrn-pag-btn" title="Selanjutnya">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                  <button onclick="changeJournalPage('last')" id="btnLastJournal" class="jrn-pag-btn" title="Terakhir">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                  </button>
+                  <div class="flex items-center gap-1.5 ml-2">
+                    <input type="number" id="inpAdminJournalJump" min="1" placeholder="Hal." onkeypress="if(event.key==='Enter') jumpToAdminJournalPage()" class="jrn-input w-16 text-center text-xs py-1.5">
+                    <button onclick="jumpToAdminJournalPage()" class="jrn-pag-btn" style="background:#4F46E5;border-color:#4F46E5;color:#fff;padding:0 12px;">Go</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

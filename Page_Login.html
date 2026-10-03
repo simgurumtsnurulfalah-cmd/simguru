@@ -1,0 +1,639 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+  #sim-login-root {
+    min-height: 100vh;
+    display: flex;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #0F172A;
+    overflow-x: hidden;
+  }
+  @media (min-width: 1024px) {
+    #sim-login-root { overflow: hidden; height: 100vh; min-height: 100vh; }
+  }
+  #sim-left {
+    display: flex;
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    background: linear-gradient(145deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+    padding: 2.5rem 1.75rem;
+    padding-bottom: max(8.5rem, calc(env(safe-area-inset-bottom, 0px) + 8.5rem));
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.75rem;
+  }
+  @supports (min-height: 100dvh) {
+    #sim-left { min-height: 100dvh; }
+  }
+  @media (min-width: 1024px) {
+    #sim-left {
+      width: 45%;
+      min-height: 100vh;
+      padding: 3rem;
+      padding-bottom: 3rem;
+      overflow: hidden;
+      gap: 0;
+    }
+  }
+  .sim-orb {
+    position: absolute; border-radius: 50%;
+    filter: blur(60px); opacity: 0.18; pointer-events: none;
+    animation: simFloat 8s ease-in-out infinite;
+  }
+  .sim-orb-1 { width: 380px; height: 380px; background: #0EA5E9; top: -100px; right: -80px; animation-delay: 0s; }
+  .sim-orb-2 { width: 280px; height: 280px; background: #6366F1; bottom: 80px; left: -60px; animation-delay: -3s; }
+  .sim-orb-3 { width: 200px; height: 200px; background: #10B981; bottom: -40px; right: 40px; animation-delay: -6s; }
+  @keyframes simFloat {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-20px) scale(1.05); }
+  }
+  .sim-grid-bg {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(148,163,184,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  #sim-brand-logo { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 12px; animation: simFadeUp 0.7s ease both; }
+  .sim-logo-icon {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: linear-gradient(135deg, #0EA5E9, #6366F1);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 24px rgba(14,165,233,0.3);
+  }
+  .sim-logo-text-main { font-size: 22px; font-weight: 800; color: #F1F5F9; letter-spacing: -0.5px; }
+  .sim-logo-text-sub  { font-size: 11px; font-weight: 500; color: #64748B; letter-spacing: 0.5px; text-transform: uppercase; }
+  #sim-left-body { position: relative; z-index: 2; animation: simFadeUp 0.7s ease 0.15s both; }
+  #sim-left-body h2 { font-size: 34px; font-weight: 800; color: #F1F5F9; line-height: 1.18; letter-spacing: -1px; margin: 0 0 14px; }
+  #sim-left-body h2 span { color: #0EA5E9; }
+  #sim-left-body p { font-size: 14.5px; color: #94A3B8; line-height: 1.65; margin: 0 0 24px; }
+  .sim-feature-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 11px; }
+  .sim-feature-item { display: flex; align-items: center; gap: 12px; font-size: 13.5px; font-weight: 500; color: #CBD5E1; line-height: 1.4; }
+  .sim-feature-dot { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .sim-fd-blue    { background: rgba(14,165,233,0.15); }
+  .sim-fd-indigo  { background: rgba(99,102,241,0.15); }
+  .sim-fd-emerald { background: rgba(16,185,129,0.15); }
+  .sim-fd-amber   { background: rgba(245,158,11,0.15); }
+  .sim-fd-violet  { background: rgba(139,92,246,0.15); }
+  .sim-fd-rose    { background: rgba(244,63,94,0.15); }
+  #sim-left-footer { position: relative; z-index: 2; animation: simFadeUp 0.7s ease 0.25s both; }
+  .sim-left-footer-inner {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px; padding: 14px 18px;
+  }
+  .sim-school-badge {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, #1D4ED8, #4F46E5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sim-school-name { font-size: 13px; font-weight: 700; color: #E2E8F0; }
+  .sim-school-sub  { font-size: 11px; color: #64748B; margin-top: 1px; }
+  #sim-right { flex: 1; background: #FFFFFF; display: none; flex-direction: column; overflow-y: auto; }
+  @media (min-width: 1024px) { #sim-right { display: flex; } }
+  #sim-right-inner {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 48px 40px; max-width: 480px; width: 100%; margin: 0 auto;
+    animation: simFadeUp 0.6s ease 0.1s both;
+  }
+  @media (max-width: 1023px) { #sim-right-inner { padding: 36px 24px; } }
+  #sim-mobile-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 36px; }
+  @media (min-width: 1024px) { #sim-mobile-brand { display: none; } }
+  .sim-mobile-logo-icon {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, #0EA5E9, #6366F1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sim-mobile-brand-name { font-size: 18px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; }
+  .sim-mobile-brand-sub  { font-size: 11px; font-weight: 500; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
+  #sim-form-header { margin-bottom: 32px; }
+  #sim-form-header h1 { font-size: 28px; font-weight: 800; color: #0F172A; letter-spacing: -0.75px; margin: 0 0 6px; }
+  #sim-form-header p  { font-size: 14px; color: #64748B; margin: 0; }
+  .sim-welcome-back {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #ECFEFF, #E0F2FE);
+    border: 1px solid #BAE6FD;
+    color: #075985;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 700;
+    margin-bottom: 14px;
+    animation: simFadeUp 0.5s ease 0.2s both;
+  }
+  .sim-welcome-back svg { color: #0EA5E9; flex-shrink: 0; }
+  .sim-welcome-back strong {
+    color: #0C4A6E; font-weight: 800;
+    max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sim-welcome-back.hidden { display: none; }
+  .sim-field { margin-bottom: 20px; }
+  .sim-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 7px; letter-spacing: 0.1px; }
+  .sim-input-wrap { position: relative; }
+  .sim-input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94A3B8; display: flex; align-items: center; }
+  .sim-input {
+    width: 100%; padding: 13px 16px 13px 44px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px; font-weight: 500; color: #0F172A;
+    background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 12px;
+    outline: none; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+  }
+  .sim-input:focus { background: #FFFFFF; border-color: #0EA5E9; box-shadow: 0 0 0 4px rgba(14,165,233,0.1); }
+  .sim-input::placeholder { color: #94A3B8; font-weight: 400; }
+  .sim-eye-btn { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px; color: #94A3B8; display: flex; align-items: center; transition: color 0.2s; }
+  .sim-eye-btn:hover { color: #0EA5E9; }
+  .sim-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .sim-remember { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; color: #475569; }
+  .sim-remember input[type=checkbox] { width: 16px; height: 16px; accent-color: #0EA5E9; cursor: pointer; }
+  .sim-forgot { font-size: 13px; font-weight: 600; color: #0EA5E9; background: none; border: none; cursor: pointer; transition: color 0.2s; font-family: 'Plus Jakarta Sans', sans-serif; }
+  .sim-forgot:hover { color: #0284C7; }
+  #btnLogin, #m_btnLogin {
+    width: 100%; padding: 14px;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; font-weight: 700; color: #FFFFFF;
+    background: linear-gradient(135deg, #0EA5E9 0%, #6366F1 100%);
+    border: none; border-radius: 12px; cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(14,165,233,0.35);
+    position: relative; overflow: hidden;
+  }
+  #btnLogin:hover, #m_btnLogin:hover { opacity: 0.93; box-shadow: 0 6px 28px rgba(14,165,233,0.45); transform: translateY(-1px); }
+  #btnLogin:active, #m_btnLogin:active { transform: scale(0.98); }
+  #btnLogin.is-ready, #m_btnLogin.is-ready {
+    box-shadow: 0 0 0 0 rgba(14,165,233,0.65), 0 4px 20px rgba(14,165,233,0.35);
+    animation: simReadyPulse 2s ease-in-out infinite;
+  }
+  @keyframes simReadyPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(14,165,233,0.5), 0 4px 20px rgba(14,165,233,0.35); }
+    50%      { box-shadow: 0 0 0 6px rgba(14,165,233,0), 0 4px 20px rgba(14,165,233,0.45); }
+  }
+  #btnLogin::after, #m_btnLogin::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: skewX(-20deg); animation: simShimmer 3s ease-in-out infinite 1s;
+  }
+  @keyframes simShimmer { 0% { left: -100%; } 60%, 100% { left: 160%; } }
+  .sim-divider { display: flex; align-items: center; gap: 12px; margin: 28px 0 0; }
+  .sim-divider-line { flex: 1; height: 1px; background: #E2E8F0; }
+  .sim-divider-text { font-size: 12px; color: #94A3B8; font-weight: 500; white-space: nowrap; }
+  #sim-verify-wrap { margin-top: 16px; background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 14px; padding: 16px 18px; }
+  .sim-verify-title { font-size: 12px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
+  .sim-verify-row { display: flex; gap: 8px; }
+  .sim-verify-input {
+    flex: 1; padding: 9px 12px;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 600; color: #0F172A;
+    background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 9px;
+    outline: none; text-transform: uppercase; transition: border-color 0.2s; letter-spacing: 0.5px;
+  }
+  .sim-verify-input:focus { border-color: #0EA5E9; }
+  .sim-verify-input::placeholder { text-transform: none; font-weight: 400; color: #94A3B8; letter-spacing: 0; }
+  .sim-verify-btn {
+    padding: 9px 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 700; color: #FFFFFF;
+    background: #0F172A; border: none; border-radius: 9px; cursor: pointer; transition: background 0.2s; white-space: nowrap;
+  }
+  .sim-verify-btn:hover { background: #1E293B; }
+  #resValidation { margin-top: 10px; font-size: 12px; }
+  #sim-right-footer { padding: 20px 40px; text-align: center; border-top: 1px solid #F1F5F9; }
+  @media (max-width: 1023px) { #sim-right-footer { padding: 16px 24px; } }
+  .sim-footer-text { font-size: 12px; color: #94A3B8; font-family: 'Plus Jakarta Sans', sans-serif; }
+  @keyframes simFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes simFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+  #sim-mobile-cta {
+    display: none;
+  }
+  @media (max-width: 1023px) {
+    #sim-mobile-cta {
+      display: block;
+      position: fixed;
+      bottom: 20px;
+      bottom: max(20px, env(safe-area-inset-bottom, 20px));
+      left: 0;
+      right: 0;
+      width: calc(100% - 48px);
+      margin-left: auto;
+      margin-right: auto;
+      max-width: 400px;
+      z-index: 1000;
+      opacity: 0;
+      animation: simFadeIn 0.5s ease 0.35s forwards;
+    }
+  }
+  #btnOpenLoginModal {
+    width: 100%;
+    padding: 16px 24px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 16px; font-weight: 700; color: #0F172A;
+    background: linear-gradient(135deg, #FFFFFF 0%, #E0F2FE 100%);
+    border: none; border-radius: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 4px 24px rgba(14,165,233,0.25), 0 0 0 1px rgba(255,255,255,0.12);
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    position: relative; overflow: hidden;
+  }
+  #btnOpenLoginModal::before {
+    content: '';
+    position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(14,165,233,0.15), transparent);
+    transform: skewX(-20deg);
+    animation: simShimmer 3.5s ease-in-out infinite 0.5s;
+  }
+  #btnOpenLoginModal:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(14,165,233,0.35); }
+  #btnOpenLoginModal:active { transform: scale(0.98); opacity: 0.9; }
+  .sim-cta-hint {
+    text-align: center; margin-top: 12px;
+    font-size: 12px; color: rgba(148,163,184,0.7); font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .sim-cta-hint::before, .sim-cta-hint::after {
+    content: ''; flex: 1; height: 1px; background: rgba(148,163,184,0.15);
+  }
+  #simLoginModal {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  #simLoginModal.sim-modal-open { display: flex; }
+  .sim-modal-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: simModalBdIn 0.3s ease both;
+  }
+  @keyframes simModalBdIn { from { opacity: 0; } to { opacity: 1; } }
+  .sim-modal-sheet {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 520px;
+    background: #FFFFFF;
+    border-radius: 24px 24px 0 0;
+    padding: 0 0 env(safe-area-inset-bottom, 16px);
+    max-height: 92vh;
+    max-height: 92dvh;
+    overflow-y: auto;
+    animation: simSheetUp 0.38s cubic-bezier(0.32, 0.72, 0, 1) both;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  @keyframes simSheetUp { from { transform: translateY(100%); opacity: 0.7; } to { transform: translateY(0); opacity: 1; } }
+  .sim-modal-sheet.sim-sheet-closing {
+    animation: simSheetDown 0.28s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  @keyframes simSheetDown { from { transform: translateY(0); } to { transform: translateY(110%); } }
+  .sim-sheet-handle-bar {
+    display: flex; justify-content: center; padding: 12px 0 4px;
+  }
+  .sim-sheet-handle {
+    width: 40px; height: 4px; border-radius: 99px;
+    background: #E2E8F0;
+  }
+  .sim-sheet-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 24px 16px;
+    border-bottom: 1px solid #F1F5F9;
+  }
+  .sim-sheet-logo {
+    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(135deg, #0EA5E9, #6366F1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sim-sheet-brand-name { font-size: 16px; font-weight: 800; color: #0F172A; letter-spacing: -0.4px; }
+  .sim-sheet-brand-sub  { font-size: 10px; font-weight: 500; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sim-sheet-close {
+    margin-left: auto; width: 30px; height: 30px;
+    background: #F1F5F9; border: none; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #64748B; transition: background 0.2s, color 0.2s;
+    font-size: 16px; line-height: 1;
+  }
+  .sim-sheet-close:hover { background: #E2E8F0; color: #0F172A; }
+  .sim-sheet-body {
+    padding: 20px 24px 12px;
+  }
+  .sim-sheet-title { font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin: 0 0 4px; }
+  .sim-sheet-subtitle { font-size: 13px; color: #64748B; margin: 0 0 22px; }
+  .sim-sheet-divider {
+    display: flex; align-items: center; gap: 10px; margin: 20px 0 0;
+  }
+  .sim-sheet-divider-line { flex: 1; height: 1px; background: #E2E8F0; }
+  .sim-sheet-divider-text { font-size: 11px; color: #94A3B8; font-weight: 500; white-space: nowrap; }
+  .sim-sheet-verify-wrap {
+    margin-top: 14px; background: #F8FAFC; border: 1.5px solid #E2E8F0;
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .sim-sheet-footer {
+    text-align: center; padding: 14px 24px 20px;
+    border-top: 1px solid #F1F5F9;
+    font-size: 11px; color: #94A3B8;
+  }
+  .sim-caps-hint {
+    align-items: center; gap: 6px;
+    margin-top: 8px;
+    background: #FEF3C7; color: #92400E;
+    border: 1px solid #FCD34D;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 11.5px; font-weight: 700;
+    line-height: 1;
+    animation: simFadeUp 0.18s ease both;
+  }
+  .sim-caps-hint:not(.hidden) { display: inline-flex; }
+  .sim-caps-hint svg { color: #B45309; flex-shrink: 0; }
+  #loginErrorBanner, #m_loginErrorBanner {
+    background: linear-gradient(135deg, #DC2626, #B91C1C);
+    color: #FEF2F2;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(220,38,38,0.28);
+    animation: simShakeIn 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  #loginErrorBanner:not(.hidden), #m_loginErrorBanner:not(.hidden) { display: flex; }
+  #loginErrorBanner svg, #m_loginErrorBanner svg { flex-shrink: 0; opacity: 0.95; }
+  @keyframes simShakeIn {
+    0% { opacity: 0; transform: translateX(-12px); }
+    20% { opacity: 1; transform: translateX(8px); }
+    40% { transform: translateX(-5px); }
+    60% { transform: translateX(3px); }
+    80% { transform: translateX(-2px); }
+    100% { transform: translateX(0); }
+  }
+  #btnLogin:disabled, #m_btnLogin:disabled {
+    cursor: not-allowed; opacity: 0.85;
+    transform: none !important;
+    box-shadow: 0 4px 14px rgba(14,165,233,0.2) !important;
+  }
+  #btnLogin:disabled::after, #m_btnLogin:disabled::after { display: none; }
+  .sim-btn-loader {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: simBtnSpin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes simBtnSpin { to { transform: rotate(360deg); } }
+  .sim-input-wrap.is-error .sim-input { border-color: #FCA5A5; background: #FEF2F2; }
+  .sim-input-wrap.is-error .sim-input:focus { border-color: #EF4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.12); }
+  .sim-verify-btn:disabled {
+    opacity: 0.65; cursor: not-allowed; background: #475569;
+  }
+  .sim-verify-input:disabled { background: #F1F5F9; cursor: not-allowed; }
+  .sim-sheet-body .sim-caps-hint { font-size: 11px; padding: 4px 9px; }
+  .sim-sheet-handle-bar {
+    cursor: grab; touch-action: none;
+    user-select: none; -webkit-user-select: none;
+  }
+  .sim-sheet-handle-bar:active { cursor: grabbing; }
+  #btnLogin:focus-visible, #m_btnLogin:focus-visible,
+  #btnOpenLoginModal:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(14,165,233,0.35), 0 4px 20px rgba(14,165,233,0.35);
+  }
+  .sim-input:focus-visible { outline: none; }
+  .sim-eye-btn:focus-visible { outline: 2px solid #0EA5E9; outline-offset: 2px; border-radius: 4px; }
+  .sim-forgot:focus-visible { outline: 2px solid #0EA5E9; outline-offset: 2px; border-radius: 4px; }
+</style>
+<div id="sim-login-root">
+  <div id="sim-left">
+    <div class="sim-grid-bg"></div>
+    <div class="sim-orb sim-orb-1"></div>
+    <div class="sim-orb sim-orb-2"></div>
+    <div class="sim-orb sim-orb-3"></div>
+    <div id="sim-brand-logo">
+      <div class="sim-logo-icon">
+        <svg width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      </div>
+      <div>
+        <div class="sim-logo-text-main">SiM-Guru</div>
+        <div class="sim-logo-text-sub">v <span id="txtLoginVersionLeft">2.1.1</span></div>
+      </div>
+    </div>
+    <div id="sim-left-body">
+      <h2>Manajemen guru<br>yang <span>cerdas &amp; terhubung</span></h2>
+      <p>Platform terpadu untuk jurnal mengajar, honorarium, kehadiran, ujian, hingga pengumuman — semuanya real-time dan otomatis.</p>
+      <ul class="sim-feature-list">
+        <li class="sim-feature-item">
+          <div class="sim-feature-dot sim-fd-blue">
+            <svg width="15" height="15" fill="none" stroke="#0EA5E9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          </div>
+          Jurnal mengajar harian dengan rekap real-time
+        </li>
+        <li class="sim-feature-item">
+          <div class="sim-feature-dot sim-fd-indigo">
+            <svg width="15" height="15" fill="none" stroke="#818CF8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          Kalkulasi honorarium otomatis &amp; akurat
+        </li>
+        <li class="sim-feature-item">
+          <div class="sim-feature-dot sim-fd-emerald">
+            <svg width="15" height="15" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          Konfirmasi kehadiran, piket &amp; pembina upacara
+        </li>
+        <li class="sim-feature-item">
+          <div class="sim-feature-dot sim-fd-amber">
+            <svg width="15" height="15" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          </div>
+          Manajemen ujian, pengawas &amp; BAP digital
+        </li>
+        <li class="sim-feature-item">
+          <div class="sim-feature-dot sim-fd-violet">
+            <svg width="15" height="15" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          </div>
+          Pengumuman &amp; notifikasi langsung ke guru
+        </li>
+        <li class="sim-feature-item">
+          <div class="sim-feature-dot sim-fd-rose">
+            <svg width="15" height="15" fill="none" stroke="#FB7185" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          Auto-jurnal libur bonus &amp; bonus JTM otomatis
+        </li>
+      </ul>
+    </div>
+    <div id="sim-left-footer">
+      <div class="sim-left-footer-inner">
+        <div class="sim-school-badge">
+          <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"/><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
+        </div>
+        <div>
+          <div class="sim-school-name">MTs Nurul Falah</div>
+          <div class="sim-school-sub">Madrasah Tsanawiyah</div>
+        </div>
+      </div>
+    </div>
+    <div id="sim-mobile-cta">
+      <button id="btnOpenLoginModal" onclick="openLoginModal()">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
+        </svg>
+        Masuk ke Akun Saya
+      </button>
+      <p class="sim-cta-hint">Masuk untuk mengakses semua fitur</p>
+    </div>
+  </div>
+  <div id="sim-right">
+    <div id="sim-right-inner">
+      <div id="sim-mobile-brand">
+        <div class="sim-mobile-logo-icon">
+          <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        </div>
+        <div>
+          <div class="sim-mobile-brand-name">SiM-Guru</div>
+          <div class="sim-mobile-brand-sub">Sistem Manajemen Guru</div>
+        </div>
+      </div>
+      <div id="sim-form-header">
+        <div id="simWelcomeBack" class="sim-welcome-back hidden" aria-hidden="true">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>Selamat datang kembali, <strong id="simWelcomeBackName">—</strong></span>
+        </div>
+        <h1>Selamat datang &#128075;</h1>
+        <p>Masuk ke akun Anda untuk melanjutkan</p>
+      </div>
+      <form id="formLogin" onsubmit="handleLogin(event)" novalidate>
+        <div id="loginErrorBanner" class="hidden" role="alert" aria-live="polite"></div>
+        <div class="sim-field">
+          <label class="sim-label" for="username">Username</label>
+          <div class="sim-input-wrap">
+            <span class="sim-input-icon"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            <input type="text" id="username" class="sim-input" placeholder="Masukkan username Anda" required autocomplete="username" autocapitalize="none" spellcheck="false">
+          </div>
+        </div>
+        <div class="sim-field">
+          <label class="sim-label" for="password">Password</label>
+          <div class="sim-input-wrap">
+            <span class="sim-input-icon"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
+            <input type="password" id="password" class="sim-input" placeholder="Masukkan password Anda" required autocomplete="current-password">
+            <button type="button" class="sim-eye-btn" onclick="togglePassword('password', this)" aria-label="Tampilkan/sembunyikan password" tabindex="-1">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </button>
+          </div>
+          <div id="capsHintDesktop" class="sim-caps-hint hidden" role="status" aria-live="polite">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l7 7h-4v6H9v-6H5z"/></svg>
+            Caps Lock aktif
+          </div>
+        </div>
+        <div class="sim-row">
+          <label class="sim-remember"><input type="checkbox" id="chkRemember"> Ingat saya</label>
+          <button type="button" class="sim-forgot" onclick="handleForgotPassword()">Lupa password?</button>
+        </div>
+        <button type="submit" id="btnLogin">
+          <span class="sim-btn-label">Masuk Aplikasi</span>
+        </button>
+      </form>
+      <div class="sim-divider">
+        <div class="sim-divider-line"></div>
+        <span class="sim-divider-text">Verifikasi Dokumen</span>
+        <div class="sim-divider-line"></div>
+      </div>
+      <div id="sim-verify-wrap">
+        <div class="sim-verify-title">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          Cek Keaslian Dokumen
+        </div>
+        <div class="sim-verify-row">
+          <input type="text" id="inpValTrxId" class="sim-verify-input" placeholder="ID Transaksi (TRX-...)"
+            oninput="this.value = this.value.toUpperCase().replace(/\\s+/g,'');"
+            onkeydown="if(event.key==='Enter'){ event.preventDefault(); checkValidationAction('inpValTrxId'); }"
+            autocapitalize="characters" spellcheck="false" autocomplete="off">
+          <button type="button" class="sim-verify-btn" onclick="checkValidationAction('inpValTrxId')">Verifikasi</button>
+        </div>
+        <div id="resValidation" class="hidden"></div>
+      </div>
+    </div>
+    <div id="sim-right-footer">
+      <p class="sim-footer-text">&copy; 2025&ndash;<span class="sim-footer-year">2026</span> MTs Nurul Falah &mdash; SiM-Guru</p>
+    </div>
+  </div>
+</div>
+<div id="simLoginModal" role="dialog" aria-modal="true" aria-label="Form Login">
+  <div class="sim-modal-backdrop" id="simModalBackdrop" onclick="closeLoginModal()"></div>
+  <div class="sim-modal-sheet" id="simLoginModalSheet">
+    <div class="sim-sheet-handle-bar">
+      <div class="sim-sheet-handle"></div>
+    </div>
+    <div class="sim-sheet-header">
+      <div class="sim-sheet-logo">
+        <svg width="18" height="18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sim-sheet-brand-name">SiM-Guru</div>
+        <div class="sim-sheet-brand-sub">Sistem Manajemen Guru</div>
+      </div>
+      <button class="sim-sheet-close" onclick="closeLoginModal()" aria-label="Tutup" type="button">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sim-sheet-body">
+      <div id="m_simWelcomeBack" class="sim-welcome-back hidden" aria-hidden="true">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Selamat datang kembali, <strong id="m_simWelcomeBackName">—</strong></span>
+      </div>
+      <h2 class="sim-sheet-title">Selamat datang &#128075;</h2>
+      <p class="sim-sheet-subtitle">Masuk ke akun Anda untuk melanjutkan</p>
+      <form id="m_formLogin" onsubmit="handleLogin(event)" novalidate>
+        <div id="m_loginErrorBanner" class="hidden" role="alert" aria-live="polite"></div>
+        <div class="sim-field">
+          <label class="sim-label" for="m_username">Username</label>
+          <div class="sim-input-wrap">
+            <span class="sim-input-icon">
+              <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <input type="text" id="m_username" class="sim-input" placeholder="Masukkan username Anda" required autocomplete="username" autocapitalize="none" spellcheck="false">
+          </div>
+        </div>
+        <div class="sim-field">
+          <label class="sim-label" for="m_password">Password</label>
+          <div class="sim-input-wrap">
+            <span class="sim-input-icon">
+              <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            </span>
+            <input type="password" id="m_password" class="sim-input" placeholder="Masukkan password Anda" required autocomplete="current-password">
+            <button type="button" class="sim-eye-btn" onclick="togglePassword('m_password', this)" aria-label="Tampilkan/sembunyikan password" tabindex="-1">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </button>
+          </div>
+          <div id="capsHintMobile" class="sim-caps-hint hidden" role="status" aria-live="polite">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l7 7h-4v6H9v-6H5z"/></svg>
+            Caps Lock aktif
+          </div>
+        </div>
+        <div class="sim-row">
+          <label class="sim-remember"><input type="checkbox" id="m_chkRemember"> Ingat saya</label>
+          <button type="button" class="sim-forgot" onclick="handleForgotPassword()">Lupa password?</button>
+        </div>
+        <button type="submit" id="m_btnLogin">
+          <span class="sim-btn-label">Masuk Aplikasi</span>
+        </button>
+      </form>
+      <div class="sim-sheet-divider">
+        <div class="sim-sheet-divider-line"></div>
+        <span class="sim-sheet-divider-text">Verifikasi Dokumen</span>
+        <div class="sim-sheet-divider-line"></div>
+      </div>
+      <div class="sim-sheet-verify-wrap">
+        <div class="sim-verify-title">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          Cek Keaslian Dokumen
+        </div>
+        <div class="sim-verify-row">
+          <input type="text" id="m_inpValTrxId" class="sim-verify-input" placeholder="ID Transaksi (TRX-...)"
+            oninput="this.value = this.value.toUpperCase().replace(/\\s+/g,'');"
+            onkeydown="if(event.key==='Enter'){ event.preventDefault(); checkValidationAction('m_inpValTrxId'); }"
+            autocapitalize="characters" spellcheck="false" autocomplete="off">
+          <button type="button" class="sim-verify-btn" onclick="checkValidationAction('m_inpValTrxId')">Verifikasi</button>
+        </div>
+        <div id="m_resValidation" class="hidden"></div>
+      </div>
+    </div>
+    <div class="sim-sheet-footer">
+      &copy; 2025&ndash;<span class="sim-footer-year">2026</span> MTs Nurul Falah &mdash; SiM-Guru
+    </div>
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

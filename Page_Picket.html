@@ -1,0 +1,489 @@
+<div class="flex h-screen overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <style>
+      .pkt-root, .pkt-root * { box-sizing: border-box; }
+      .pkt-hero {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #2563EB 110%);
+        position: relative; overflow: hidden;
+        padding: 1.75rem 1.5rem 1.5rem;
+        border-radius: 0;
+      }
+      @media (min-width: 640px) { .pkt-hero { padding: 2rem 2rem 1.75rem; } }
+      .pkt-hero::before {
+        content: ''; position: absolute;
+        top: -40px; right: -40px;
+        width: 220px; height: 220px;
+        background: radial-gradient(circle, rgba(96,165,250,0.18), transparent 70%);
+        border-radius: 50%; pointer-events: none;
+      }
+      .pkt-hero::after {
+        content: ''; position: absolute;
+        bottom: -80px; left: 12%;
+        width: 320px; height: 320px;
+        background: radial-gradient(circle, rgba(139,92,246,0.10), transparent 70%);
+        border-radius: 50%; pointer-events: none;
+      }
+      .pkt-stat-chip {
+        background: rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 14px;
+        padding: 10px 14px;
+        transition: background 0.2s, border-color 0.2s;
+        display: flex; align-items: center; gap: 10px;
+        min-width: 0;
+      }
+      .pkt-stat-chip:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.28); }
+      .pkt-stat-chip-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        background: rgba(255,255,255,0.16); flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .pkt-stat-chip-num {
+        color: #fff; font-weight: 800; font-size: 1.15rem; line-height: 1.05;
+        font-family: 'JetBrains Mono', monospace; white-space: nowrap;
+      }
+      .pkt-stat-chip-lbl {
+        color: rgba(199,210,254,0.85); font-size: 0.625rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .pkt-tab-btn {
+        flex: 1 1 auto;
+        display: flex; align-items: center; justify-content: center;
+        gap: 6px; padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 0.8rem; font-weight: 700;
+        white-space: nowrap; cursor: pointer;
+        transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+        border: none; outline: none; min-width: 0;
+      }
+      .pkt-tab-btn[data-active="false"] { background: transparent; color: #64748B; }
+      .pkt-tab-btn[data-active="false"]:hover { background: #F1F5F9; color: #1E293B; }
+      .pkt-tab-btn[data-active="true"] {
+        background: linear-gradient(135deg, #2563EB, #4F46E5);
+        color: #fff; box-shadow: 0 4px 10px rgba(79,70,229,0.30);
+      }
+      .pkt-tab-btn svg { flex-shrink: 0; }
+      @keyframes pktFadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      .pkt-fadein { animation: pktFadeUp 0.28s ease-out forwards; }
+      .pkt-card {
+        background: #fff; border: 1px solid #E2E8F0; border-radius: 18px;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 6px 18px rgba(15,23,42,0.04);
+        overflow: hidden; min-width: 0;
+      }
+    </style>
+    <main class="w-full grow p-4 sm:p-6 pkt-root" id="page-picket-root" data-active-tab="1">
+      <div class="pkt-hero rounded-2xl mb-5">
+        <div class="relative z-10 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.18);">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <h1 class="text-white font-bold text-xl sm:text-2xl tracking-tight" style="line-height:1.15;">Piket &amp; Upacara</h1>
+                <p class="text-blue-200 text-xs sm:text-sm mt-0.5" id="pktHeroSubtitle">Pemantauan tugas piket dan upacara bendera</p>
+              </div>
+            </div>
+            <div class="mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-xl px-3.5 py-1.5 text-sm font-semibold text-white">
+              <svg class="w-4 h-4 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <span id="lblPicketTodayDate">—</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:flex sm:flex-row gap-2.5 flex-shrink-0" id="pktHeaderStats">
+            <div class="pkt-stat-chip" title="Petugas piket yang sudah hadir hari ini">
+              <div class="pkt-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="pkt-stat-chip-num" id="pktStatPiketHadir">—</p>
+                <p class="pkt-stat-chip-lbl">Piket Hadir</p>
+              </div>
+            </div>
+            <div class="pkt-stat-chip" title="Guru pengganti aktif (KBM + piket) hari ini">
+              <div class="pkt-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="pkt-stat-chip-num" id="pktStatSubActive">—</p>
+                <p class="pkt-stat-chip-lbl">Pengganti Aktif</p>
+              </div>
+            </div>
+            <div class="pkt-stat-chip" title="Jumlah sesi mengajar hari ini & rate kehadiran guru">
+              <div class="pkt-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="pkt-stat-chip-num" id="pktStatKbm">—</p>
+                <p class="pkt-stat-chip-lbl">KBM Hadir</p>
+              </div>
+            </div>
+            <div class="pkt-stat-chip" title="Status pembina upacara hari ini">
+              <div class="pkt-stat-chip-icon">
+                <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+              </div>
+              <div class="min-w-0">
+                <p class="pkt-stat-chip-num" id="pktStatCeremony">—</p>
+                <p class="pkt-stat-chip-lbl">Upacara</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="viewAdminPicket" class="hidden space-y-5">
+        <div class="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-sm flex gap-1 no-scrollbar overflow-x-auto">
+          <button id="adminPicketTabBtn1" data-active="true"  onclick="switchAdminPicketTab(1)" class="pkt-tab-btn admin-picket-tab-btn">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            <span class="hidden sm:inline">Monitoring Hari Ini</span>
+            <span class="sm:hidden">Monitoring</span>
+          </button>
+          <button id="adminPicketTabBtn2" data-active="false" onclick="switchAdminPicketTab(2)" class="pkt-tab-btn admin-picket-tab-btn">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            <span class="hidden sm:inline">Guru Pengganti</span>
+            <span class="sm:hidden">Pengganti</span>
+            <span id="badgeAdminPicketTab2" class="hidden ml-1 inline-flex items-center justify-center min-w-[20px] h-[20px] px-1.5 bg-amber-500 text-white rounded-full text-[10px] font-bold">0</span>
+          </button>
+          <button id="adminPicketTabBtn3" data-active="false" onclick="switchAdminPicketTab(3)" class="pkt-tab-btn admin-picket-tab-btn">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <span class="hidden sm:inline">Atur Jadwal</span>
+            <span class="sm:hidden">Jadwal</span>
+          </button>
+        </div>
+        <div id="adminPicketPanel1" class="admin-picket-panel space-y-5">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="pkt-card">
+              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-slate-50">
+                <div class="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-slate-700">Petugas Piket</p>
+                  <p class="text-xs text-slate-400">Kehadiran hari ini</p>
+                </div>
+              </div>
+              <div class="p-2">
+                <table class="w-full text-sm text-left">
+                  <thead class="text-[10px] uppercase text-slate-400 font-bold">
+                    <tr>
+                      <th class="px-3 py-2">Guru</th>
+                      <th class="px-3 py-2 text-center">Status</th>
+                      <th class="px-3 py-2 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyTodayPickets"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="cardCeremonyAdmin" class="hidden pkt-card">
+              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-slate-50">
+                <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-slate-700">Pembina Upacara</p>
+                  <p class="text-xs text-slate-400">Senin hari ini</p>
+                </div>
+              </div>
+              <div class="p-4" id="panelCeremonyToday">
+                <div class="text-center text-slate-400 text-sm py-4 italic">Memuat...</div>
+              </div>
+            </div>
+          </div>
+          <div class="pkt-card">
+            <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 gap-2 flex-wrap">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-bold text-slate-700">Status KBM Hari Ini</p>
+                  <p class="text-xs text-slate-400">Seluruh jadwal mengajar</p>
+                </div>
+              </div>
+              <button onclick="refreshPicketPage()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition" title="Refresh data">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+              </button>
+            </div>
+            <div class="overflow-x-auto" style="max-height: 480px; overflow-y:auto;">
+              <table class="w-full text-sm text-left">
+                <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold sticky top-0">
+                  <tr>
+                    <th class="px-4 py-2.5">Jam</th>
+                    <th class="px-4 py-2.5">Kelas / Mapel</th>
+                    <th class="px-4 py-2.5">Guru</th>
+                    <th class="px-4 py-2.5 text-center">Status</th>
+                    <th class="px-4 py-2.5 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyTeacherStatusAdmin"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="adminPicketPanel2" class="admin-picket-panel hidden space-y-5">
+          <div class="flex items-center gap-2 px-1">
+            <div class="w-1 h-5 bg-gradient-to-b from-amber-400 to-orange-500 rounded-full"></div>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Data Guru Pengganti Aktif Hari Ini</p>
+          </div>
+          <div class="pkt-card">
+            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-slate-50">
+              <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-slate-700">Guru Pengganti Mengajar</p>
+                <p class="text-xs text-slate-400">Aktif hari ini</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm text-left">
+                <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold">
+                  <tr>
+                    <th class="px-4 py-2.5">Waktu</th>
+                    <th class="px-4 py-2.5">Jadwal</th>
+                    <th class="px-4 py-2.5">Guru Asli</th>
+                    <th class="px-4 py-2.5">Guru Pengganti</th>
+                    <th class="px-4 py-2.5 text-center">Status</th>
+                    <th class="px-4 py-2.5 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyActiveSubstitutes">
+                  <tr><td colspan="6" class="text-center py-6 text-slate-400 text-sm italic">Memuat...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="pkt-card">
+            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-orange-50 to-slate-50">
+              <div class="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-slate-700">Guru Piket Pengganti</p>
+                <p class="text-xs text-slate-400">Aktif hari ini</p>
+              </div>
+            </div>
+            <div class="p-4" id="panelPicketSubstitutes">
+              <div class="text-center py-4 text-slate-400 text-sm italic">Memuat...</div>
+            </div>
+          </div>
+        </div>
+        <div id="adminPicketPanel3" class="admin-picket-panel hidden space-y-5">
+          <div class="flex items-center gap-2 px-1">
+            <div class="w-1 h-5 bg-gradient-to-b from-blue-500 to-violet-600 rounded-full"></div>
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Manajemen Jadwal Piket &amp; Upacara</p>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div class="pkt-card">
+              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-slate-50">
+                <div class="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-slate-700">Atur Jadwal Piket</p>
+                  <p class="text-xs text-slate-400">Tambah guru piket per hari</p>
+                </div>
+              </div>
+              <div class="p-4 space-y-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Hari</label>
+                  <select id="inpPicketDay" onchange="onPicketDayChange()" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                    <option value="1">Senin</option>
+                    <option value="2">Selasa</option>
+                    <option value="3">Rabu</option>
+                    <option value="4">Kamis</option>
+                    <option value="5">Jumat</option>
+                    <option value="6">Sabtu</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Guru</label>
+                  <select id="inpPicketTeacher" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"></select>
+                  <p id="msgPicketHint" class="text-[11px] text-slate-400 mt-1.5 font-medium">Daftar di-filter otomatis: guru yang sudah ditugaskan pada hari ini akan disembunyikan.</p>
+                </div>
+                <button id="btnSavePicket" onclick="savePicketScheduleAction()"
+                  class="w-full inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                  <span id="lblSavePicket">Tambah Jadwal</span>
+                </button>
+              </div>
+              <div class="border-t border-slate-100">
+                <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Daftar Jadwal Piket</p>
+                </div>
+                <div class="overflow-y-auto max-h-64">
+                  <table class="w-full text-sm">
+                    <thead class="text-[10px] text-slate-400 uppercase bg-white sticky top-0">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Hari</th>
+                        <th class="px-4 py-2 text-left">Guru</th>
+                        <th class="px-4 py-2 text-center">Hapus</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbodyPicketSchedule"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="pkt-card">
+              <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-slate-50">
+                <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-slate-700">Jadwal Upacara</p>
+                  <p class="text-xs text-slate-400">Hanya hari Senin</p>
+                </div>
+              </div>
+              <div class="p-4 space-y-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tanggal Senin</label>
+                  <input type="date" id="inpCeremonyDate"
+                    class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition"
+                    onchange="checkCeremonyDate(this)">
+                  <p class="text-[11px] text-slate-400 mt-1.5 font-medium" id="msgCeremonyDate">Upacara hanya dijadwalkan pada hari Senin.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pembina Upacara</label>
+                  <select id="inpCeremonyTeacher" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition"></select>
+                </div>
+                <button id="btnSaveCeremony" onclick="saveCeremonyAction()"
+                  class="w-full inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white py-2.5 rounded-xl text-sm font-bold transition-all shadow-md shadow-slate-800/20 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  Jadwalkan Upacara
+                </button>
+              </div>
+              <div class="border-t border-slate-100">
+                <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                  <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Jadwal Mendatang</p>
+                </div>
+                <div class="overflow-y-auto max-h-64">
+                  <table class="w-full text-sm">
+                    <thead class="text-[10px] text-slate-400 uppercase bg-white sticky top-0">
+                      <tr>
+                        <th class="px-4 py-2 text-left">Tanggal</th>
+                        <th class="px-4 py-2 text-left">Pembina</th>
+                        <th class="px-4 py-2 text-center">Hapus</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbodyUpcomingCeremonies"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="viewTeacherPicket" class="hidden space-y-5">
+        <div id="panelExamPanitia" class="hidden"></div>
+        <div id="alertPicketUnconfirmed" class="hidden flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
+          <div class="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-5 h-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-bold text-amber-800">Konfirmasi Kehadiran Piket Diperlukan</p>
+            <p class="text-xs text-amber-600 mt-0.5">Aksi pada tabel di bawah terkunci sampai Anda mengonfirmasi kehadiran piket Anda hari ini.</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div id="cardCeremonyPicket" class="pkt-card">
+            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-slate-50">
+              <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-slate-700">Pembina Upacara</p>
+                <p class="text-xs text-slate-400">Senin hari ini</p>
+              </div>
+            </div>
+            <div class="p-4" id="panelCeremonyGuru"></div>
+          </div>
+          <div id="cardGuruSubPicketActive" class="hidden bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-white">
+              <div class="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-amber-800">Piket Pengganti Aktif</p>
+                <p class="text-xs text-amber-500">Guru pengganti hari ini</p>
+              </div>
+            </div>
+            <div class="p-4 space-y-2" id="listGuruSubPicket"></div>
+          </div>
+        </div>
+        <div id="cardActiveSubstitutePicket" class="hidden pkt-card">
+          <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-slate-50">
+            <div class="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-slate-700">Guru Pengganti Mengajar</p>
+              <p class="text-xs text-slate-400">Aktif hari ini</p>
+            </div>
+          </div>
+          <div class="p-4" id="listActiveSubstitutePicket">
+            <div class="text-center text-slate-400 text-sm py-4 italic">Memuat data...</div>
+          </div>
+        </div>
+        <div class="pkt-card">
+          <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100">
+            <div class="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+              </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-bold text-slate-700">Status KBM &amp; Guru</p>
+              <p class="text-xs text-slate-400">Semua jadwal hari ini</p>
+            </div>
+            <button onclick="refreshPicketPage()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-3 py-1.5 rounded-lg transition flex-shrink-0" title="Refresh data">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto" style="max-height: 480px; overflow-y:auto;">
+            <table class="w-full text-sm text-left">
+              <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold sticky top-0">
+                <tr>
+                  <th class="px-4 py-2.5">Jam</th>
+                  <th class="px-4 py-2.5">Kelas / Mapel</th>
+                  <th class="px-4 py-2.5">Guru Pengampu</th>
+                  <th class="px-4 py-2.5 text-center">Status</th>
+                  <th class="px-4 py-2.5 text-center">Aksi Piket</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyTeacherStatusPicket"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

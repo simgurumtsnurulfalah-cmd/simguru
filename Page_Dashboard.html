@@ -1,0 +1,970 @@
+<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <style>
+      .db-main {
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+        position: relative;
+      }
+      .db-main::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 320px;
+        background: radial-gradient(ellipse at top, rgba(99,102,241,0.04), transparent 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .db-main > * { position: relative; z-index: 1; }
+      @media (min-width: 640px) { .db-main { padding: 1.5rem; gap: 1.5rem; } }
+      @media (min-width: 1024px) { .db-main { padding: 2rem; } }
+      .db-welcome {
+        position: relative; overflow: hidden;
+        border-radius: 1.25rem;
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 50%, #1E3665 100%);
+        padding: 1.5rem 2rem;
+        box-shadow: 0 4px 24px rgba(15,23,42,0.18);
+      }
+      .db-welcome::before {
+        content: ''; position: absolute; top: -60px; right: -60px;
+        width: 220px; height: 220px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 70%);
+        pointer-events: none;
+      }
+      .db-welcome::after {
+        content: ''; position: absolute; bottom: -40px; left: 30%;
+        width: 160px; height: 160px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+        pointer-events: none;
+      }
+      .db-welcome-tag {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 999px; padding: 4px 12px;
+        font-size: 0.72rem; font-weight: 600; color: #93C5FD;
+        letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.75rem;
+      }
+      .db-welcome-title {
+        font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 800;
+        color: #F1F5F9; line-height: 1.2; letter-spacing: -0.5px;
+        position: relative; z-index: 1;
+      }
+      .db-welcome-sub {
+        font-size: 0.825rem; color: #94A3B8; margin-top: 0.25rem;
+        position: relative; z-index: 1;
+      }
+      .db-welcome-actions {
+        position: relative; z-index: 1;
+        display: flex; gap: 6px; flex-wrap: wrap;
+        margin-top: 0.875rem;
+      }
+      .db-welcome-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 0.7rem;
+        color: #CBD5E1;
+        font-weight: 500;
+      }
+      .db-welcome-chip svg { width: 12px; height: 12px; opacity: 0.8; }
+      .db-welcome-dots {
+        position: absolute; right: 1.5rem; top: 50%; transform: translateY(-50%);
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+        opacity: 0.12; pointer-events: none;
+      }
+      .db-welcome-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: white;
+      }
+      .db-section-label {
+        font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+        letter-spacing: 0.1em; color: #94A3B8; margin-bottom: 0.625rem;
+        display: flex; align-items: center; gap: 8px;
+      }
+      @media (min-width: 640px) {
+        .db-section-label { font-size: 0.7rem; margin-bottom: 0.75rem; }
+      }
+      .db-section-label::after { content: ''; flex: 1; height: 1px; background: #E2E8F0; }
+      .db-stat-card {
+        background: white; border-radius: 1rem;
+        border: 1px solid #E2E8F0;
+        padding: 1rem 1.125rem;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.03);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+        position: relative; overflow: hidden;
+      }
+      @media (min-width: 640px) {
+        .db-stat-card { padding: 1.25rem 1.5rem; border-radius: 1.125rem; }
+      }
+      .db-stat-card:hover { box-shadow: 0 4px 16px rgba(15,23,42,0.1); transform: translateY(-1px); }
+      .db-stat-card-accent {
+        position: absolute; top: 0; right: 0; bottom: 0;
+        width: 4px; border-radius: 0 1.125rem 1.125rem 0;
+      }
+      .db-stat-icon {
+        width: 36px; height: 36px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      @media (min-width: 640px) {
+        .db-stat-icon { width: 42px; height: 42px; border-radius: 10px; }
+      }
+      .db-stat-label {
+        font-size: 0.63rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: #94A3B8; margin-bottom: 0.2rem;
+      }
+      @media (min-width: 640px) {
+        .db-stat-label { font-size: 0.68rem; margin-bottom: 0.25rem; }
+      }
+      .db-stat-value {
+        font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px;
+        color: #0F172A; line-height: 1;
+        overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      }
+      @media (min-width: 640px) {
+        .db-stat-value { font-size: 1.75rem; }
+      }
+      .db-stat-sub {
+        font-size: 0.65rem; font-weight: 600; margin-top: 0.3rem;
+        border-radius: 999px; display: inline-flex; padding: 2px 7px;
+      }
+      .db-honor-card {
+        border-radius: 1.125rem; overflow: hidden;
+        background: linear-gradient(135deg, #1D4ED8 0%, #4F46E5 60%, #6D28D9 100%);
+        padding: 1.5rem; position: relative;
+        box-shadow: 0 8px 24px rgba(79,70,229,0.28);
+        transition: box-shadow 0.2s ease;
+      }
+      .db-honor-card:hover { box-shadow: 0 12px 32px rgba(79,70,229,0.35); }
+      .db-honor-card::before {
+        content: ''; position: absolute; top: -30px; right: -30px;
+        width: 130px; height: 130px; border-radius: 50%;
+        background: rgba(255,255,255,0.08); pointer-events: none;
+      }
+      .db-panel {
+        background: white; border-radius: 1rem;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+        overflow: hidden;
+      }
+      @media (min-width: 640px) {
+        .db-panel { border-radius: 1.125rem; }
+      }
+      .db-panel-header {
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid #F1F5F9;
+        display: flex; align-items: center; justify-content: space-between;
+        background: linear-gradient(to right, #FAFBFD, #F8FAFC);
+        gap: 0.5rem;
+      }
+      @media (min-width: 640px) {
+        .db-panel-header { padding: 1rem 1.5rem; }
+      }
+      .db-panel-header-left { display: flex; align-items: center; gap: 0.625rem; min-width: 0; flex: 1; }
+      @media (min-width: 640px) {
+        .db-panel-header-left { gap: 0.75rem; }
+      }
+      .db-panel-icon {
+        width: 30px; height: 30px; border-radius: 7px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      @media (min-width: 640px) {
+        .db-panel-icon { width: 34px; height: 34px; border-radius: 8px; }
+      }
+      .db-panel-title {
+        font-size: 0.8125rem; font-weight: 700; color: #1E293B;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      @media (min-width: 480px) {
+        .db-panel-title {
+          white-space: normal;
+          overflow: visible;
+          text-overflow: unset;
+        }
+      }
+      .db-panel-body { padding: 1rem; }
+      @media (min-width: 640px) {
+        .db-panel-body { padding: 1.25rem 1.5rem; }
+      }
+      .db-panel-refresh {
+        transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .db-panel-refresh:hover {
+        transform: translateY(-1px);
+      }
+      .db-panel-refresh:active {
+        transform: translateY(0) scale(0.96);
+      }
+      .db-progress-track {
+        background: #EEF2FF; border-radius: 999px; overflow: hidden;
+        height: 10px;
+      }
+      .db-progress-fill {
+        height: 100%; border-radius: 999px;
+        background: linear-gradient(90deg, #6366F1, #3B82F6);
+        transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+      }
+      .db-journal-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.75rem 1rem; border-radius: 0.75rem;
+        border: 1px solid #F1F5F9; background: #FAFBFD;
+        transition: all 0.15s ease;
+      }
+      .db-journal-item:hover { background: #F5F7FF; border-color: #DDE6FF; }
+      .db-journal-item.done { background: #F0FDF4; border-color: #DCFCE7; }
+      .db-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+      @media (min-width: 640px) { .db-table { font-size: 0.8125rem; } }
+      .db-table thead { background: #FAFBFD; }
+      .db-table th {
+        padding: 0.625rem 0.75rem; text-align: left;
+        font-size: 0.6rem; font-weight: 800; text-transform: uppercase;
+        letter-spacing: 0.06em; color: #94A3B8;
+        border-bottom: 1px solid #F1F5F9;
+        white-space: nowrap;
+      }
+      @media (min-width: 640px) {
+        .db-table th { padding: 0.75rem 1rem; font-size: 0.65rem; }
+      }
+      .db-table td {
+        padding: 0.75rem 0.75rem; color: #334155;
+        border-bottom: 1px solid #F8FAFC;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      @media (min-width: 640px) {
+        .db-table td { padding: 0.875rem 1rem; }
+      }
+      .db-table tbody tr:last-child td { border-bottom: none; }
+      .db-table tbody tr:hover td { background: #F8FAFC; }
+      /* ── Marquee untuk teks overflow di mobile ── */
+      @keyframes db-marquee {
+        0%   { transform: translateX(0); }
+        100% { transform: translateX(-100%); }
+      }
+      /* Kelas wrapper: potong overflow, teks bergerak scroll */
+      .db-marquee-wrap {
+        display: inline-block; /* wajib agar clientWidth terukur, bukan 0 */
+        overflow: hidden;
+        white-space: nowrap;
+        position: relative;
+        max-width: 100%;
+      }
+      /* Teks scroll hanya di layar sempit; di lebar cukup, teks diam */
+      @media (max-width: 479px) {
+        .db-marquee-wrap.is-overflow .db-marquee-inner {
+          display: inline-block;
+          padding-right: 3rem;          /* jarak antar repetisi */
+          animation: db-marquee 8s linear infinite;
+        }
+        /* Pause saat hover / fokus */
+        .db-marquee-wrap:hover .db-marquee-inner,
+        .db-marquee-wrap:focus-within .db-marquee-inner {
+          animation-play-state: paused;
+        }
+      }
+      /* Di layar ≥480px marquee dimatikan, ellipsis yang berlaku */
+      @media (min-width: 480px) {
+        .db-marquee-wrap .db-marquee-inner {
+          animation: none !important;
+          display: inline;
+        }
+      }
+      /* Sembunyikan kolom non-kritis di layar sangat kecil */
+      @media (max-width: 479px) {
+        .db-table .col-hide-xs { display: none; }
+      }
+      .db-autojurnal-banner {
+        border-radius: 1.125rem; overflow: hidden;
+        background: linear-gradient(135deg, #5B21B6 0%, #4338CA 50%, #1D4ED8 100%);
+        box-shadow: 0 4px 20px rgba(91,33,182,0.25);
+      }
+      .db-adm-card-orange { --accent: #F97316; --bg: #FFF7ED; --border: #FED7AA; }
+      .db-adm-card-blue   { --accent: #3B82F6; --bg: #EFF6FF; --border: #BFDBFE; }
+      .db-adm-card-emerald{ --accent: #10B981; --bg: #ECFDF5; --border: #A7F3D0; }
+      .db-adm-card-amber  { --accent: #F59E0B; --bg: #FFFBEB; --border: #FDE68A; }
+      .db-adm-card-teal   { --accent: #14B8A6; --bg: #F0FDFA; --border: #99F6E4; }
+      .db-adm-card-rose   { --accent: #F43F5E; --bg: #FFF1F2; --border: #FECDD3; }
+      .db-adm-card-indigo { --accent: #6366F1; --bg: #EEF2FF; --border: #C7D2FE; }
+      /* === PANEL & KARTU PIKET DASHBOARD ADMIN === */
+      .db-piket-card {
+        background: white;
+        border: 1px solid #E2E8F0;
+        border-radius: 0.875rem;
+        padding: 0.875rem 1rem;
+        transition: box-shadow 0.18s ease, transform 0.18s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      @media (min-width: 640px) {
+        .db-piket-card { border-radius: 1rem; padding: 1rem 1.25rem; }
+      }
+      .db-piket-card:hover {
+        box-shadow: 0 4px 16px rgba(15,23,42,0.08);
+        transform: translateY(-1px);
+      }
+      .db-piket-card.is-confirmed {
+        background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+        border-color: #A7F3D0;
+      }
+      .db-piket-card.is-unconfirmed {
+        background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+        border-color: #FCD34D;
+      }
+      .db-piket-card.has-substitute {
+        background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
+        border-color: #C7D2FE;
+      }
+      .db-piket-card-accent {
+        position: absolute; top: 0; left: 0; bottom: 0;
+        width: 3.5px; border-radius: 1rem 0 0 1rem;
+      }
+      .db-piket-time-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 8px; border-radius: 8px;
+        font-size: 0.72rem; font-weight: 700; font-family: monospace;
+      }
+      .db-piket-action-btn {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 5px 12px; border-radius: 8px;
+        font-size: 0.72rem; font-weight: 700;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .db-piket-action-btn:hover { transform: translateY(-1px); }
+      .db-piket-action-btn:active { transform: scale(0.97); }
+      /* Animasi modal piket */
+      @keyframes apm-pop {
+        from { opacity: 0; transform: scale(0.94) translateY(12px); }
+        to   { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      /* Animasi backdrop */
+      #adminPicketModal:not(.hidden) {
+        animation: apm-backdrop 0.2s ease forwards;
+      }
+      @keyframes apm-backdrop {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      .db-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 999px;
+        font-size: 0.68rem; font-weight: 700;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      .db-badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+      .db-libur-banner {
+        border-radius: 1.125rem; overflow: hidden;
+        background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%);
+        box-shadow: 0 4px 20px rgba(124,58,237,0.3);
+        position: relative;
+      }
+      .db-libur-banner::after {
+        content: ''; position: absolute; right: -20px; top: 50%; transform: translateY(-50%);
+        width: 140px; height: 140px; border-radius: 50%;
+        background: rgba(255,255,255,0.07); pointer-events: none;
+      }
+      .db-quick-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+      }
+      @media (min-width: 480px) {
+        .db-quick-actions { gap: 0.625rem; }
+      }
+      @media (min-width: 768px) {
+        .db-quick-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+      }
+      .db-quick-btn {
+        background: white;
+        border: 1px solid #E2E8F0;
+        border-radius: 0.75rem;
+        padding: 0.75rem 0.875rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        cursor: pointer;
+        font-family: inherit;
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+      }
+      @media (min-width: 640px) {
+        .db-quick-btn { border-radius: 0.875rem; padding: 0.875rem 1rem; gap: 0.625rem; }
+      }
+      .db-quick-btn::after {
+        content: '';
+        position: absolute;
+        right: 10px; top: 50%; transform: translateY(-50%);
+        width: 14px; height: 14px;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8' stroke-width='2.4'><path stroke-linecap='round' stroke-linejoin='round' d='M9 5l7 7-7 7'/></svg>");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 12px 12px;
+        opacity: 0;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+      }
+      .db-quick-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(15,23,42,0.08);
+        border-color: #CBD5E1;
+        background: #FAFBFD;
+      }
+      .db-quick-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(2px); }
+      .db-quick-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+        border-color: #A5B4FC;
+      }
+      .db-quick-btn:active { transform: translateY(0) scale(0.98); }
+      .db-quick-icon {
+        width: 32px; height: 32px;
+        border-radius: 0.5rem;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      @media (min-width: 640px) {
+        .db-quick-icon { width: 38px; height: 38px; border-radius: 0.625rem; }
+      }
+      .db-quick-label {
+        font-size: 0.75rem; font-weight: 700;
+        color: #1E293B; line-height: 1.25;
+        flex: 1; min-width: 0;
+        overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      }
+      @media (min-width: 640px) {
+        .db-quick-label { font-size: 0.8125rem; }
+      }
+    </style>
+    <main class="db-main flex-grow">
+      <div id="viewGuruDashboard" class="hidden space-y-6">
+        <div id="bannerAutoJurnalLibur" class="hidden db-libur-banner p-5 text-white">
+          <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.18); backdrop-filter:blur(4px);">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-extrabold text-base tracking-tight">🎉 Hari Libur Bonus JTM</p>
+                <p class="text-purple-200 text-xs mt-0.5" id="txtLiburInfo">Memuat info...</p>
+              </div>
+            </div>
+            <div class="flex-shrink-0 text-center sm:text-right">
+              <div class="text-xs text-purple-200 mb-0.5">Bonus JTM Anda</div>
+              <div class="text-3xl font-black text-white" id="valBonusJtmLibur">0</div>
+              <div class="text-[10px] text-purple-300 mt-0.5">Otomatis ke honorarium</div>
+            </div>
+          </div>
+        </div>
+        <span id="lblRoleTitle" class="hidden">Guru</span>
+        <div class="db-quick-actions">
+          <button type="button" onclick="scrollToDashboardSchedule()" class="db-quick-btn" data-color="indigo">
+            <span class="db-quick-icon" style="background:#EEF2FF;color:#4F46E5;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Isi Jurnal</span></span></span>
+          </button>
+          <button type="button" onclick="handleNav('Page_MySchedule')" class="db-quick-btn" data-color="blue">
+            <span class="db-quick-icon" style="background:#EFF6FF;color:#3B82F6;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Saya</span></span></span>
+          </button>
+          <button type="button" onclick="handleNav('Page_Picket')" class="db-quick-btn" data-color="emerald">
+            <span class="db-quick-icon" style="background:#ECFDF5;color:#10B981;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Piket &amp; Upacara</span></span></span>
+          </button>
+          <button type="button" onclick="handleNav('Page_Honorarium')" class="db-quick-btn" data-color="amber">
+            <span class="db-quick-icon" style="background:#FFFBEB;color:#F59E0B;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Honorarium</span></span></span>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="db-stat-card" data-tooltip="Akumulasi JTM bulan berjalan: mengajar, piket, upacara, acara/kegiatan, dan bonus hari libur">
+            <div class="db-stat-card-accent" style="background: linear-gradient(180deg, #3B82F6, #6366F1);"></div>
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="db-stat-label">Total JTM Bulan Ini</p>
+                <h3 class="db-stat-value" id="valJtmTotal">0</h3>
+                <span class="db-stat-sub" style="background:#EFF6FF; color:#2563EB;">+<span id="valJtmToday">0</span> hari ini</span>
+                <div id="detailEventJtm" class="hidden mt-2">
+                  <span class="db-stat-sub" style="background:#ECFDF5; color:#065F46;" title="JTM dari kehadiran acara/kegiatan">
+                    <svg style="width:9px;height:9px;display:inline;margin-right:2px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Acara: <span id="valEventJtm">0</span> JTM
+                  </span>
+                </div>
+              </div>
+              <div class="db-stat-icon" style="background:#EFF6FF;">
+                <svg class="w-5 h-5" style="color:#3B82F6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="db-stat-card" data-tooltip="JTM bonus dari hari libur (otomatis dan estimasi)">
+            <div class="db-stat-card-accent" style="background: linear-gradient(180deg, #8B5CF6, #A78BFA);"></div>
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="db-stat-label">Bonus JTM (Libur)</p>
+                <h3 class="db-stat-value" id="valJtmBonus">0</h3>
+                <div id="detailBonusJtm" class="hidden mt-2 space-y-1">
+                  <span class="db-stat-sub" style="background:#F5F3FF; color:#7C3AED;" title="Sudah masuk database">Auto: <span id="valAutoLiburJtm">0</span></span>
+                  <span class="db-stat-sub ml-1" style="background:#FFFBEB; color:#B45309;" title="Estimasi (belum di-generate)">Est: <span id="valEstLiburJtm">0</span></span>
+                </div>
+              </div>
+              <div class="db-stat-icon" style="background:#F5F3FF;">
+                <svg class="w-5 h-5" style="color:#8B5CF6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="db-stat-card" id="guruTransportCard" data-tooltip="Akumulasi tunjangan transportasi harian Anda bulan ini (tgl 1 s/d hari ini)">
+            <div class="db-stat-card-accent" style="background: linear-gradient(180deg, #0EA5E9, #06B6D4);"></div>
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <p class="db-stat-label" style="margin:0;">Transport Bulan Ini</p>
+                  <button type="button" onclick="event.stopPropagation(); toggleTransportVisibility()" id="btnToggleTransport"
+                    class="text-slate-400 hover:text-slate-700 transition p-1 rounded-md hover:bg-slate-100"
+                    title="Tampilkan/Sembunyikan">
+                    <svg id="iconTransportEyeOpen" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    <svg id="iconTransportEyeClosed" class="hidden w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>
+                    </svg>
+                  </button>
+                </div>
+                <h3 class="db-stat-value text-base sm:text-lg font-extrabold cursor-pointer"
+                    id="valGuruTransport" data-value=""
+                    onclick="event.stopPropagation(); toggleTransportVisibility()"
+                    style="color:#0369A1;">
+                  <span class="skeleton inline-block h-6 w-20 rounded"></span>
+                </h3>
+                <span class="db-stat-sub" id="valGuruTransportSub" style="background:#F0F9FF; color:#0369A1;">Tgl 1 s/d hari ini</span>
+              </div>
+              <div class="db-stat-icon" style="background:#F0F9FF;">
+                <svg class="w-5 h-5" style="color:#0EA5E9;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="sm:col-span-2 db-honor-card flex items-center justify-between">
+            <div class="relative z-10 min-w-0 flex-1 overflow-hidden">
+              <div class="flex items-center gap-2 mb-1">
+                <p class="text-xs font-bold text-blue-200 uppercase tracking-wider">Estimasi Honorarium</p>
+                <button type="button" onclick="event.stopPropagation(); toggleHonorVisibility()" id="btnToggleHonor"
+                  class="text-blue-200 hover:text-white transition p-1.5 rounded-lg hover:bg-white/10"
+                  title="Tampilkan/Sembunyikan">
+                  <svg id="iconEyeOpen" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+                  <svg id="iconEyeClosed" class="hidden w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/>
+                  </svg>
+                </button>
+              </div>
+              <h3 class="text-3xl font-black text-white tracking-tight cursor-pointer relative z-20"
+                  id="valEstHonor" data-value="Rp 0"
+                  onclick="event.stopPropagation(); toggleHonorVisibility()">Rp 0</h3>
+              <p class="text-xs text-blue-200 mt-1.5 opacity-80">*Belum termasuk potongan jika ada</p>
+            </div>
+            <div class="relative z-10 w-12 h-12 rounded-xl flex items-center justify-center" style="background:rgba(255,255,255,0.15); backdrop-filter:blur(4px);">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="db-panel" id="panelJurnalHariIni">
+          <div class="db-panel-header">
+            <div class="db-panel-header-left">
+              <div class="db-panel-icon" style="background:#EEF2FF;">
+                <svg class="w-4 h-4" style="color:#6366F1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+              </div>
+              <div>
+                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Status Jurnal Hari Ini</span></span></p>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Progres pengisian jurnal mengajar</p>
+                <span id="guruJurnalBadge" class="db-badge mt-1.5 inline-flex" style="background:#EEF2FF; color:#4F46E5; border:1px solid #C7D2FE;">Memuat...</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="refreshDashboard()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="db-panel-body" id="guruJurnalProgressContainer">
+            <div class="skeleton h-2.5 w-full rounded-full mb-5"></div>
+            <div class="space-y-2.5">
+              <div class="skeleton h-11 rounded-xl w-full"></div>
+              <div class="skeleton h-11 rounded-xl w-4/5"></div>
+            </div>
+          </div>
+        </div>
+        <div id="panelExamDashboard" class="hidden"></div>
+        <div class="db-panel" id="panelJadwalMengajarHariIni">
+          <div class="db-panel-header">
+            <div class="db-panel-header-left">
+              <div class="db-panel-icon" style="background:#EFF6FF;">
+                <svg class="w-4 h-4" style="color:#3B82F6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Mengajar Hari Ini</span></span></p>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Sesi aktif &amp; progres jurnal</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="db-badge" style="background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE;" id="lblMonth">Bulan Ini</span>
+              <button onclick="handleNav('Page_MySchedule')" class="hidden sm:inline-flex db-panel-refresh items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[11px] font-bold text-blue-700 transition" title="Lihat semua jadwal">
+                Lihat Semua
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+            <table class="db-table" style="min-width:420px;">
+              <thead>
+                <tr>
+                  <th style="min-width:90px; max-width:110px;">Jam</th>
+                  <th class="col-hide-xs" style="min-width:70px; max-width:90px;">Kelas</th>
+                  <th style="min-width:110px; max-width:180px;">Mata Pelajaran</th>
+                  <th class="text-center" style="min-width:50px; max-width:70px;">JTM</th>
+                  <th class="text-center" style="min-width:90px; max-width:130px;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="scheduleTableBody">
+                <tr><td colspan="5" class="text-center py-8 text-slate-400 italic text-sm">Memuat jadwal...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div id="viewAdminDashboard" class="hidden space-y-6">
+        <div id="panelAutoJurnalAdmin" class="hidden db-autojurnal-banner">
+          <div class="p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0 flex-1">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style="background:rgba(255,255,255,0.15);">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-white font-extrabold text-base tracking-tight">Auto Jurnal — Hari Libur Bonus</h3>
+                  <span id="badgeAutoJurnalScheduler" class="hidden inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-white">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-300 inline-block"></span>
+                    <span id="badgeAutoJurnalSchedulerLabel">—</span>
+                  </span>
+                </div>
+                <p class="text-purple-200 text-xs mt-0.5" id="txtAdminLiburDate">Memuat...</p>
+                <p class="text-purple-200/80 text-[10px] mt-0.5" id="txtAdminSchedulerInfo">Trigger otomatis ~16.00 WIB di hari libur bonus.</p>
+              </div>
+            </div>
+            <div class="flex gap-2 flex-shrink-0 flex-wrap">
+              <button id="btnToggleAutoJurnalScheduler" onclick="toggleAutoJurnalScheduler()"
+                class="hidden items-center gap-1.5 bg-white/12 hover:bg-white/22 text-white border border-white/20 px-3 py-2 rounded-xl font-semibold text-xs transition active:scale-95">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span id="btnToggleAutoJurnalSchedulerLabel">—</span>
+              </button>
+              <button id="btnCancelAutoJurnal" onclick="cancelAutoJurnalAction()"
+                class="hidden items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-600 transition text-sm shadow-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Batalkan
+              </button>
+              <button id="btnGenerateAutoJurnal" onclick="generateAutoJurnalAction()"
+                class="flex items-center gap-2 bg-white text-indigo-700 px-5 py-2 rounded-xl font-bold hover:bg-indigo-50 transition shadow-lg text-sm">
+                🚀 Generate Jurnal Otomatis
+              </button>
+            </div>
+          </div>
+          <div id="resultAutoJurnal" class="hidden border-t border-white/10 p-5 bg-black/15">
+            <div class="flex justify-between items-center mb-3">
+              <h4 class="font-bold text-white text-sm">Hasil Generate:</h4>
+              <span id="badgeAutoJurnalStatus" class="hidden text-xs font-bold px-2 py-1 rounded-full"></span>
+            </div>
+            <div id="contentResultAutoJurnal" class="space-y-2 text-sm text-purple-100"></div>
+          </div>
+        </div>
+        <div class="db-quick-actions">
+          <button type="button" onclick="handleNav('Page_Users')" class="db-quick-btn" data-color="orange">
+            <span class="db-quick-icon" style="background:#FFF7ED;color:#F97316;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Data Pengguna</span></span></span>
+          </button>
+          <button type="button" onclick="handleNav('Page_ManageSchedule')" class="db-quick-btn" data-color="blue">
+            <span class="db-quick-icon" style="background:#EFF6FF;color:#3B82F6;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Manajemen Jadwal</span></span></span>
+          </button>
+          <button type="button" onclick="handleNav('Page_ExamSchedule')" class="db-quick-btn" data-color="emerald">
+            <span class="db-quick-icon" style="background:#ECFDF5;color:#10B981;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Ujian</span></span></span>
+          </button>
+          <button type="button" onclick="handleNav('Page_Settings_Config')" class="db-quick-btn" data-color="indigo">
+            <span class="db-quick-icon" style="background:#EEF2FF;color:#6366F1;">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </span>
+            <span class="db-quick-label"><span class="db-marquee-wrap"><span class="db-marquee-inner">Pengaturan</span></span></span>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div class="db-stat-card db-adm-card-blue" data-tooltip="Total JTM tercatat dari semua guru bulan ini">
+            <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#3B82F6,#60A5FA);"></div>
+            <div class="flex items-center gap-3">
+              <div class="db-stat-icon" style="background:var(--bg); border:1px solid var(--border);">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="db-stat-label">Total JTM</p>
+                <h3 class="db-stat-value" id="admTotalJTM">0</h3>
+              </div>
+            </div>
+          </div>
+          <div class="db-stat-card db-adm-card-emerald" data-tooltip="Estimasi total honorarium yang akan dibayarkan bulan ini">
+            <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#10B981,#34D399);"></div>
+            <div class="flex items-center gap-3">
+              <div class="db-stat-icon" style="background:var(--bg); border:1px solid var(--border);">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" style="color:var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="db-stat-label">Est. Honor</p>
+                <h3 class="db-stat-value text-base sm:text-xl font-extrabold" id="admTotalHonor">Rp 0</h3>
+              </div>
+            </div>
+          </div>
+          <div class="db-stat-card" id="admTransportCard" data-tooltip="Total tunjangan transportasi semua guru bulan ini">
+            <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#0EA5E9,#06B6D4);"></div>
+            <div class="flex items-center gap-3">
+              <div class="db-stat-icon" style="background:#F0F9FF; border:1px solid #BAE6FD;">
+                <svg class="w-4 h-4 sm:w-5 sm:h-5" style="color:#0EA5E9;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="db-stat-label">Transport</p>
+                <h3 class="db-stat-value text-base sm:text-xl font-extrabold" id="admTotalTransport" style="color:#0369A1;">
+                  <span class="skeleton inline-block h-6 w-20 rounded"></span>
+                </h3>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <p class="db-section-label">Ringkasan Hari Ini</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div class="db-stat-card db-adm-card-amber">
+              <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#F59E0B,#FCD34D);"></div>
+              <p class="db-stat-label">JTM Hari Ini</p>
+              <h3 class="db-stat-value mt-1" id="admTotalJTMToday">
+                <span class="skeleton inline-block h-7 w-12 rounded"></span>
+              </h3>
+              <span class="db-stat-sub mt-2" style="background:#FFFBEB; color:#B45309;">Masuk database hari ini</span>
+            </div>
+            <div class="db-stat-card db-adm-card-teal cursor-pointer" onclick="handleNav('Page_Picket')" title="Lihat detail kehadiran">
+              <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#14B8A6,#2DD4BF);"></div>
+              <p class="db-stat-label" id="admHadirCardTitle">Kehadiran</p>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <h3 class="db-stat-value" id="admHadirCount">
+                  <span class="skeleton inline-block h-7 w-8 rounded"></span>
+                </h3>
+                <span class="text-slate-400 font-bold">/</span>
+                <span class="text-lg font-bold text-slate-600" id="admHadirTotal">
+                  <span class="skeleton inline-block h-5 w-6 rounded"></span>
+                </span>
+              </div>
+              <p class="text-[10px] mt-1.5 font-medium" style="color:#0F766E;" id="admHadirCardSub">Digantikan: <span class="font-extrabold" id="admSubstitutesToday">0</span></p>
+            </div>
+            <div class="db-stat-card db-adm-card-indigo cursor-pointer" onclick="handleNav('Page_Journal')" title="Lihat detail jurnal">
+              <div class="db-stat-card-accent" style="background:linear-gradient(180deg,#6366F1,#818CF8);"></div>
+              <p class="db-stat-label" id="admJurnalCardTitle">Jurnal Hari Ini</p>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <h3 class="db-stat-value" style="color:#4338CA;" id="admJurnalDone">
+                  <span class="skeleton inline-block h-7 w-8 rounded"></span>
+                </h3>
+                <span class="text-slate-400 font-bold">/</span>
+                <span class="text-lg font-bold text-slate-600" id="admJurnalTotal">
+                  <span class="skeleton inline-block h-5 w-6 rounded"></span>
+                </span>
+              </div>
+              <div class="mt-2 db-progress-track" style="height:6px;">
+                <div id="admJurnalProgressBar" class="db-progress-fill" style="width:0%; height:100%;"></div>
+              </div>
+              <p class="text-[10px] mt-1 font-medium text-slate-500" id="admJurnalCardSub">Guru sudah isi jurnal</p>
+            </div>
+          </div>
+        </div>
+        <div class="db-panel transition-all" id="admPanelJurnal">
+          <div class="db-panel-header">
+            <div class="db-panel-header-left">
+              <div class="db-panel-icon" style="background:#EEF2FF;">
+                <svg class="w-4 h-4" style="color:#6366F1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+              </div>
+              <div>
+                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Progress Pengisian Jurnal</span></span></p>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Status real-time per guru</p>
+                <span id="admJurnalProgressBadge" class="db-badge mt-1.5 inline-flex" style="background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE;">Memuat...</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="refreshDashboard()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="db-panel-body">
+            <div class="mb-5">
+              <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
+                <span>Progress Pengisian</span>
+                <span id="admJurnalProgressPct" style="color:#4338CA;" class="font-bold">0%</span>
+              </div>
+              <div class="db-progress-track">
+                <div id="admJurnalProgressBarFull" class="db-progress-fill" style="width:0%;"></div>
+              </div>
+            </div>
+            <div id="admJurnalBelumList" class="space-y-2.5">
+              <div class="skeleton h-11 rounded-xl w-full"></div>
+              <div class="skeleton h-11 rounded-xl w-4/5"></div>
+            </div>
+          </div>
+        </div>
+        <!-- =====================================================
+             PANEL PIKET HARI INI — Admin Dashboard
+             ===================================================== -->
+        <div class="db-panel" id="admPanelPiket">
+          <div class="db-panel-header">
+            <div class="db-panel-header-left">
+              <div class="db-panel-icon" style="background:#FEF3C7;">
+                <svg class="w-4 h-4" style="color:#D97706;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Manajemen Piket Hari Ini</span></span></p>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Konfirmasi kehadiran, penunjukan pengganti &amp; jam piket</p>
+                <span id="admPiketBadge" class="db-badge mt-1.5 inline-flex" style="background:#FEF3C7; color:#92400E; border:1px solid #FCD34D;">Memuat...</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="loadAdminDashboardPicket()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui data piket">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="db-panel-body" id="admPiketPanelBody">
+            <div class="space-y-3">
+              <div class="skeleton h-20 rounded-xl w-full"></div>
+              <div class="skeleton h-20 rounded-xl w-full"></div>
+            </div>
+          </div>
+        </div>
+        <!-- END PANEL PIKET -->
+
+        <div class="grid grid-cols-1 gap-4 transition-all" id="admPanelNormalGrid">
+          <div class="db-panel" id="admPanelJadwal">
+            <div class="db-panel-header">
+              <div class="db-panel-header-left">
+                <div class="db-panel-icon" style="background:#EFF6FF;">
+                  <svg class="w-4 h-4" style="color:#3B82F6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Jadwal Pelajaran Hari Ini</span></span></p>
+                  <p class="hidden sm:block text-xs text-slate-400 font-medium mt-0.5">Semua kelas &amp; guru hari ini</p>
+                </div>
+              </div>
+            </div>
+            <div class="overflow-x-auto" style="max-height:380px; overflow-y:auto; -webkit-overflow-scrolling:touch;">
+              <table class="db-table" style="min-width:480px;">
+                <thead class="sticky top-0" style="background:#FAFBFD;">
+                  <tr>
+                    <th style="min-width:80px; max-width:100px;">Jam</th>
+                    <th style="min-width:120px; max-width:180px;">Guru</th>
+                    <th class="col-hide-xs" style="min-width:70px; max-width:90px;">Kelas</th>
+                    <th style="min-width:100px; max-width:160px;">Mapel</th>
+                    <th class="text-center" style="min-width:90px; max-width:120px;">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admScheduleTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- BAP PENGISIAN PANEL (HIDDEN BY DEFAULT) -->
+      <div class="db-panel transition-all mt-6" id="admPanelExamBap" style="display:none;">
+        <div class="db-panel-header">
+          <div class="db-panel-header-left">
+            <div class="db-panel-icon" style="background:#F0FDF4;">
+              <svg class="w-4 h-4" style="color:#16A34A;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="db-panel-title"><span class="db-marquee-wrap"><span class="db-marquee-inner">Progress Pengisian BAP Pengawas Ujian Hari Ini</span></span></p>
+              <p class="text-xs text-slate-400 font-medium mt-0.5">Status real-time per ruang/sesi ujian</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="admBapProgressBadge" class="db-badge" style="background:#F0FDF4; color:#16A34A; border:1px solid #BBF7D0;">Memuat...</span>
+            <button onclick="refreshDashboard()" class="db-panel-refresh w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition" title="Perbarui">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="db-panel-body">
+          <div class="mb-5">
+            <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
+              <span>Progress BAP</span>
+              <span id="admBapProgressPct" style="color:#16A34A;" class="font-bold">0%</span>
+            </div>
+            <div class="db-progress-track">
+              <div id="admBapProgressBarFull" class="db-progress-fill" style="width:0%; background:#10B981;"></div>
+            </div>
+          </div>
+          <div id="admBapBelumList" class="space-y-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+            <div class="skeleton h-11 rounded-xl w-full"></div>
+            <div class="skeleton h-11 rounded-xl w-4/5"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

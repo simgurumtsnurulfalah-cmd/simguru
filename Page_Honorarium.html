@@ -1,0 +1,248 @@
+<div class="flex h-screen w-full overflow-hidden bg-slate-50">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 w-full max-w-full overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <main class="w-full grow p-4 sm:p-6">
+       <div id="viewGuru" class="hidden max-w-5xl mx-auto w-full">
+          <div class="no-print mb-5">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-md flex-shrink-0">
+                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Slip Honorarium</h1>
+                  <p class="text-sm text-slate-400 mt-0.5">Ringkasan jam mengajar &amp; honor Anda per periode</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="relative flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 shadow-sm hover:border-slate-300 transition flex-1 sm:flex-none min-w-[200px]">
+                  <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                  <select id="selHonorPeriod" onchange="changeHonorPeriod()" aria-label="Pilih periode honorarium"
+                    class="text-sm font-semibold text-slate-700 bg-transparent border-0 outline-none cursor-pointer pr-1 flex-1 min-w-0"></select>
+                </div>
+                <button type="button" onclick="changeHonorPeriod()" title="Muat ulang data" aria-label="Muat ulang"
+                  class="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95 flex items-center justify-center text-slate-500 transition shadow-sm flex-shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                </button>
+                <button id="btnPrintSlipGuru" type="button" onclick="printSlipNative()" title="Cetak slip"
+                  class="hidden items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 px-3 py-2 rounded-xl text-sm font-semibold transition shadow-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                  </svg>
+                  <span class="hidden sm:inline">Cetak</span>
+                </button>
+                <button id="btnDownloadSlipGuru" type="button" onclick="downloadSlipPDF()" title="Unduh sebagai PDF"
+                  class="hidden items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-sm hover:shadow-md">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  Unduh PDF
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="no-print mb-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-blue-100 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap text-xs">
+            <div class="flex items-center gap-2 text-slate-600">
+              <svg class="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span>Slip akan menjadi <strong class="text-slate-700">final</strong> setelah admin melakukan finalisasi periode.</span>
+            </div>
+            <button type="button" onclick="handleNav('Page_HonorariumHistory')"
+              class="inline-flex items-center gap-1.5 text-blue-700 hover:text-blue-800 font-bold whitespace-nowrap">
+              Lihat Arsip Honor
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <div id="printAreaSlip" class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-8 shadow-md relative overflow-hidden w-full">
+             <div id="watermarkEstimasi" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] z-0 transform -rotate-45 hidden">
+                 <span class="text-[60px] sm:text-[150px] font-black text-slate-900 uppercase">ESTIMASI</span>
+             </div>
+             <div class="relative z-10">
+                 <div class="border-b-2 border-slate-800 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                    <div class="w-full">
+                       <h2 class="text-xl sm:text-2xl font-bold text-slate-900 uppercase tracking-wide">SLIP HONORARIUM</h2>
+                       <p class="text-sm font-bold text-slate-600 mt-1 truncate" id="txtSlipSchoolName">...</p>
+                    </div>
+                    <div class="text-left sm:text-right w-full sm:w-auto">
+                       <h3 class="text-lg sm:text-xl font-bold text-slate-800" id="txtSlipPeriod">...</h3>
+                       <p id="txtSlipStatus" class="text-xs font-bold text-slate-400 mt-1 px-2 py-1 rounded inline-block">Loading...</p>
+                    </div>
+                 </div>
+                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-8 text-sm">
+                    <div>
+                       <p class="text-slate-500 mb-1 text-xs uppercase font-bold tracking-wider">Penerima</p>
+                       <p class="font-bold text-lg text-slate-800 break-words" id="txtSlipReceiverName">...</p>
+                       <p class="text-slate-500 mt-2 mb-1 text-xs">NIP / NPK</p>
+                       <p class="font-mono text-slate-700 break-all" id="txtSlipNIP">-</p>
+                    </div>
+                    <div class="text-left sm:text-right">
+                       <p class="text-slate-500 mb-1 text-xs uppercase font-bold tracking-wider">Tanggal Cetak</p>
+                       <p class="font-bold text-slate-800" id="txtPrintDate">...</p>
+                       <p class="text-slate-500 mt-2 mb-1 text-xs">ID Transaksi</p>
+                       <p class="font-mono text-xs text-slate-400 break-all" id="txtSlipTransId">...</p>
+                    </div>
+                 </div>
+                 <div class="overflow-x-auto rounded-lg border border-slate-200 mb-8">
+                     <table class="w-full text-sm min-w-[500px]">
+                        <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
+                           <tr>
+                              <th class="py-3 px-4 text-left">Keterangan</th>
+                              <th class="py-3 px-4 text-center">Qty / JTM</th>
+                              <th class="py-3 px-4 text-right">Tarif</th>
+                              <th class="py-3 px-4 text-right">Jumlah</th>
+                           </tr>
+                        </thead>
+                        <tbody id="honorTableBody" class="text-slate-700 divide-y divide-slate-100"></tbody>
+                     </table>
+                 </div>
+                 <div class="flex justify-end mb-12">
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 rounded-xl border border-blue-200 text-right w-full sm:min-w-[280px] sm:w-auto shadow-sm">
+                       <p class="text-xs text-blue-600 mb-1 font-bold uppercase tracking-wider">Total Diterima</p>
+                       <h3 class="text-2xl sm:text-3xl font-extrabold text-blue-700 tracking-tight" id="txtSlipTotal">Rp 0</h3>
+                    </div>
+                 </div>
+                 <div class="flex flex-col sm:flex-row justify-between items-end text-center mt-8 text-sm text-slate-600 gap-12 sm:gap-0">
+                    <div class="w-full sm:w-48 text-left sm:text-center">
+                       <p class="mb-16 text-xs text-slate-500">Penerima,</p>
+                       <p class="font-bold border-b border-slate-300 pb-1 text-slate-800 block w-full" id="txtSlipSignReceiver">...</p>
+                    </div>
+                    <div class="w-full sm:w-48 text-left sm:text-center">
+                      <p class="mb-1 text-xs text-slate-500">Mengetahui,</p>
+                      <p class="mb-16 text-xs font-bold text-slate-700" id="txtSlipKepsekTitle">...</p>
+                      <p class="font-bold border-b border-slate-300 pb-1 text-slate-800 uppercase block w-full" id="txtSlipKepsekName">...</p>
+                    </div>
+                 </div>
+                 <div class="mt-8 pt-4 border-t border-slate-100 text-[10px] text-slate-400 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                     <span id="txtPrintedBy">Dicetak otomatis dari SiM-Guru</span>
+                     <div id="alertInfoFinal" class="bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded border border-yellow-100 flex items-start sm:items-center gap-2 font-medium w-full sm:w-auto">
+                        <span>⚠️ Total diterima bulan ini akan final dicetak mulai tanggal 02 bulan berikutnya.</span>
+                     </div>
+                 </div>
+             </div>
+          </div>
+       </div>
+       <div id="viewAdmin" class="hidden w-full">
+         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+           <div class="flex items-start gap-3">
+             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-md flex-shrink-0 mt-0.5">
+               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+               </svg>
+             </div>
+             <div>
+               <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Rekapitulasi Honorarium</h1>
+               <p class="text-sm text-slate-400 mt-0.5">Rekap &amp; finalisasi pembayaran honorarium guru per periode</p>
+             </div>
+           </div>
+           <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+             <div class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm hover:border-slate-300 transition flex-1 sm:flex-none">
+               <svg class="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+               </svg>
+               <select id="selAdminHonorMonth" onchange="loadAdminHonorByFilter()" aria-label="Pilih bulan" class="text-sm font-semibold text-slate-700 bg-transparent border-0 outline-none cursor-pointer"></select>
+               <span class="text-slate-300 text-sm font-light select-none">/</span>
+               <select id="selAdminHonorYear" onchange="loadAdminHonorByFilter()" aria-label="Pilih tahun" class="text-sm font-semibold text-slate-700 bg-transparent border-0 outline-none cursor-pointer"></select>
+             </div>
+             <button type="button" onclick="loadAdminHonorByFilter()" title="Muat ulang" aria-label="Muat ulang"
+               class="w-9 h-9 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95 flex items-center justify-center text-slate-500 transition shadow-sm flex-shrink-0">
+               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+               </svg>
+             </button>
+             <button id="btnFinalizeHonor" onclick="finalizeHonorarium()"
+               class="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-sm hover:shadow-md whitespace-nowrap">
+               <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+               </svg>
+               Finalisasi Periode Ini
+             </button>
+           </div>
+         </div>
+         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+             <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+               <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+               </svg>
+             </div>
+             <div class="min-w-0 flex-1">
+               <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Periode Aktif</p>
+               <p id="lblAdminPeriode" class="text-base font-bold text-slate-900 leading-tight">—</p>
+               <p class="text-xs text-slate-400 mt-1">Periode yang ditampilkan</p>
+             </div>
+           </div>
+           <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
+             <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+               <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+               </svg>
+             </div>
+             <div>
+               <p class="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Guru Penerima</p>
+               <p id="lblStatGuruCount" class="text-2xl font-bold text-blue-700">—</p>
+               <p class="text-xs text-slate-400 mt-1">orang menerima honor</p>
+             </div>
+           </div>
+           <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-md p-5 flex items-start gap-4 hover:shadow-lg transition-shadow relative overflow-hidden">
+             <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 pointer-events-none"></div>
+             <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 relative z-10">
+               <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+               </svg>
+             </div>
+             <div class="min-w-0 flex-1 relative z-10">
+               <p class="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">Total Payout</p>
+               <p id="lblGrandTotalPayout" class="text-xl font-bold text-white leading-tight truncate">Rp 0</p>
+               <p class="text-xs text-blue-200 mt-1">total honor periode ini</p>
+             </div>
+           </div>
+         </div>
+         <div id="bannerFinalizedAdmin" class="hidden mb-5 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
+           <div class="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+             <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+             </svg>
+           </div>
+           <div class="flex-1 min-w-0">
+             <p class="text-emerald-800 text-sm font-bold">Periode ini sudah difinalisasi ✅</p>
+             <p class="text-emerald-600 text-xs mt-0.5">Data yang ditampilkan adalah data final yang telah tersimpan secara permanen di database</p>
+           </div>
+         </div>
+         <div id="printAreaRecap" class="bg-white rounded-2xl shadow-sm border border-slate-200 w-full overflow-hidden">
+           <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-4 flex-wrap">
+             <div>
+               <h2 class="font-bold text-slate-800 text-sm">Daftar Penerima Honorarium</h2>
+               <p class="text-xs text-slate-400 mt-0.5">Rincian per guru untuk periode yang dipilih</p>
+             </div>
+             <span id="lblStatEntriCount" class="text-xs font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full border border-slate-200 whitespace-nowrap">0 Guru</span>
+           </div>
+           <div class="overflow-x-auto w-full">
+             <table class="w-full text-sm min-w-[750px]">
+               <thead class="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wide border-b border-slate-200">
+                 <tr>
+                   <th class="px-5 sm:px-6 py-3.5 text-left font-bold">Guru</th>
+                   <th class="px-5 sm:px-6 py-3.5 text-center font-bold">Total JTM</th>
+                   <th class="px-5 sm:px-6 py-3.5 text-right font-bold">Tgs. Tambahan</th>
+                   <th class="px-5 sm:px-6 py-3.5 text-right font-bold">Transportasi</th>
+                   <th class="px-5 sm:px-6 py-3.5 text-right font-bold">Total Diterima</th>
+                   <th class="px-5 sm:px-6 py-3.5 text-center font-bold">Status</th>
+                 </tr>
+               </thead>
+               <tbody id="tbodyAdminRecap" class="divide-y divide-slate-50"></tbody>
+             </table>
+           </div>
+         </div>
+       </div>
+    </main>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__

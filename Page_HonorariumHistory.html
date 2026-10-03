@@ -1,0 +1,657 @@
+<div class="flex h-screen overflow-hidden" style="background:#F0F4FA;">
+  __SIM_GURU_LAYOUT_SIDEBAR__
+  <div class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+    __SIM_GURU_LAYOUT_NAVBAR__
+    <style>
+      .ah-hero {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 55%, #1E3665 100%);
+        padding: 2rem 2rem 2.5rem;
+        position: relative;
+      }
+      .ah-hero::before {
+        content:''; position:absolute; width:280px; height:280px; border-radius:50%;
+        background:radial-gradient(circle,rgba(59,130,246,.18) 0%,transparent 70%);
+        top:-70px; right:-50px; pointer-events:none;
+      }
+      .ah-hero-tag {
+        display:inline-flex; align-items:center; gap:6px;
+        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+        border-radius:999px; padding:4px 12px;
+        font-size:.7rem; font-weight:700; color:#93C5FD;
+        letter-spacing:.06em; text-transform:uppercase; margin-bottom:.75rem;
+      }
+      .ah-hero-title {
+        font-size:clamp(1.35rem,3.5vw,2rem); font-weight:800;
+        color:#F1F5F9; letter-spacing:-.5px; line-height:1.2;
+        position:relative; z-index:1;
+      }
+      .ah-hero-sub { font-size:.825rem; color:#94A3B8; margin-top:.35rem; }
+      .ah-pills { display:flex; flex-wrap:wrap; gap:.625rem; margin-top:1.5rem; }
+      .ah-pill {
+        display:flex; align-items:center; gap:8px;
+        background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+        border-radius:12px; padding:8px 14px;
+      }
+      .ah-pill-icon {
+        width:32px; height:32px; border-radius:8px;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      }
+      .ah-pill-num { font-size:1.15rem; font-weight:800; color:#F1F5F9; line-height:1; }
+      .ah-pill-lbl { font-size:.65rem; font-weight:600; color:#64748B; text-transform:uppercase; letter-spacing:.05em; }
+      .ah-content { padding:1.5rem; display:flex; flex-direction:column; gap:1.25rem; }
+      @media (min-width:640px) { .ah-content { padding:2rem; } }
+      .ah-panel {
+        background:white; border-radius:1.25rem;
+        border:1px solid #E2E8F0;
+        box-shadow:0 2px 8px rgba(15,23,42,.05),0 8px 24px rgba(15,23,42,.03);
+        overflow:hidden;
+      }
+      .ah-panel-header {
+        padding:1rem 1.5rem; border-bottom:1px solid #F1F5F9;
+        display:flex; align-items:center; justify-content:space-between;
+        background:linear-gradient(to right,#FAFBFD,#F8FAFC);
+      }
+      .ah-panel-header-left { display:flex; align-items:center; gap:.75rem; }
+      .ah-panel-icon {
+        width:36px; height:36px; border-radius:9px;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      }
+      .ah-panel-title { font-size:.875rem; font-weight:700; color:#1E293B; }
+      .ah-panel-sub { font-size:.7rem; color:#94A3B8; font-weight:500; margin-top:1px; }
+      .ah-cards-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+        gap:1rem;
+        padding:1.25rem 1.5rem;
+      }
+      .ah-honor-card {
+        border-radius:1rem; border:1px solid #E2E8F0;
+        background:#FAFBFD; overflow:hidden;
+        transition:box-shadow .2s ease, transform .2s ease;
+        display:flex; flex-direction:column;
+      }
+      .ah-honor-card:hover {
+        box-shadow:0 6px 20px rgba(15,23,42,.1);
+        transform:translateY(-2px);
+      }
+      .ah-honor-card-top {
+        padding:.875rem 1.125rem .75rem;
+        border-bottom:1px solid #F1F5F9;
+        display:flex; align-items:center; justify-content:space-between;
+      }
+      .ah-honor-card-periode {
+        font-size:.875rem; font-weight:800; color:#1E293B;
+        letter-spacing:-.2px;
+      }
+      .ah-honor-card-body { padding:.875rem 1.125rem; flex:1; }
+      .ah-honor-card-row {
+        display:flex; align-items:center; justify-content:space-between;
+        margin-bottom:.5rem;
+      }
+      .ah-honor-card-row:last-of-type { margin-bottom:0; }
+      .ah-honor-card-lbl { font-size:.7rem; font-weight:600; color:#94A3B8; text-transform:uppercase; letter-spacing:.04em; }
+      .ah-honor-card-val { font-size:.8125rem; font-weight:700; color:#334155; }
+      .ah-honor-card-foot {
+        padding:.75rem 1.125rem;
+        border-top:1px solid #F1F5F9;
+        background:white;
+      }
+      .ah-slip-btn {
+        width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
+        padding:.5rem 1rem; border-radius:.625rem;
+        background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;
+        font-size:.78rem; font-weight:700; cursor:pointer;
+        transition:all .15s ease;
+      }
+      .ah-slip-btn:hover { background:#DBEAFE; border-color:#93C5FD; }
+      .ah-filter-bar {
+        display:flex; flex-wrap:wrap; align-items:center; gap:.75rem;
+        padding:1rem 1.5rem;
+        background:white; border-radius:1.25rem;
+        border:1px solid #E2E8F0;
+        box-shadow:0 2px 8px rgba(15,23,42,.04);
+      }
+      .ah-filter-label {
+        font-size:.7rem; font-weight:800; color:#94A3B8;
+        text-transform:uppercase; letter-spacing:.06em; flex-shrink:0;
+        display:flex; align-items:center; gap:6px;
+      }
+      .ah-filter-sep { width:1px; height:20px; background:#E2E8F0; flex-shrink:0; }
+      .ah-filter-select {
+        padding:.45rem .875rem; border-radius:.625rem;
+        border:1px solid #E2E8F0; font-size:.8125rem; font-weight:600;
+        color:#334155; background:white; outline:none; cursor:pointer;
+        transition:border-color .15s ease, box-shadow .15s ease;
+        min-width:180px;
+      }
+      .ah-filter-select:focus { border-color:#93C5FD; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
+      .ah-admin-stats {
+        display:grid; grid-template-columns:repeat(3,1fr); gap:1rem;
+      }
+      @media (max-width:640px) { .ah-admin-stats { grid-template-columns:1fr; } }
+      .ah-admin-stat {
+        background:white; border-radius:1rem;
+        border:1px solid #E2E8F0; padding:1rem 1.25rem;
+        box-shadow:0 1px 4px rgba(15,23,42,.04);
+        display:flex; align-items:center; gap:.875rem;
+        position:relative; overflow:hidden;
+      }
+      .ah-admin-stat-accent {
+        position:absolute; top:0; left:0; bottom:0;
+        width:4px; border-radius:1rem 0 0 1rem;
+      }
+      .ah-admin-stat-icon {
+        width:40px; height:40px; border-radius:10px;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      }
+      .ah-admin-stat-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#94A3B8; }
+      .ah-admin-stat-val { font-size:1.5rem; font-weight:800; color:#0F172A; letter-spacing:-.5px; line-height:1.1; margin-top:.15rem; }
+      .ah-table { width:100%; border-collapse:collapse; font-size:.8125rem; }
+      .ah-table thead { position:sticky; top:0; z-index:4; }
+      .ah-table th {
+        padding:.75rem 1.25rem; text-align:left;
+        font-size:.625rem; font-weight:800; text-transform:uppercase;
+        letter-spacing:.08em; color:#94A3B8; background:#FAFBFD;
+        border-bottom:1px solid #F1F5F9;
+      }
+      .ah-table td {
+        padding:.9375rem 1.25rem; color:#334155;
+        border-bottom:1px solid #F8FAFC; vertical-align:middle;
+      }
+      .ah-table tbody tr:last-child td { border-bottom:none; }
+      .ah-table tbody tr { transition:background .12s ease; }
+      .ah-table tbody tr:hover td { background:#F8FAFC; }
+      .ah-periode-badge {
+        display:inline-flex; align-items:center; gap:5px;
+        padding:3px 10px; border-radius:7px;
+        font-size:.75rem; font-weight:800;
+        background:#F8FAFC; color:#1E293B; border:1px solid #E2E8F0;
+      }
+      .ah-jtm-badge {
+        display:inline-flex; align-items:center; gap:4px;
+        padding:3px 10px; border-radius:999px;
+        font-size:.72rem; font-weight:800;
+        background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;
+      }
+      .ah-nominal { font-weight:800; color:#059669; font-size:.875rem; }
+      .ah-btn-slip {
+        display:inline-flex; align-items:center; gap:5px;
+        padding:5px 12px; border-radius:8px;
+        font-size:.72rem; font-weight:700; cursor:pointer;
+        background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE;
+        transition:all .15s ease;
+      }
+      .ah-btn-slip:hover { background:#E0E7FF; border-color:#A5B4FC; }
+      .ah-empty {
+        display:flex; flex-direction:column; align-items:center;
+        justify-content:center; padding:3.5rem 1rem; text-align:center; color:#94A3B8;
+      }
+      .ah-empty-icon {
+        width:56px; height:56px; border-radius:14px; margin-bottom:1rem;
+        background:#F1F5F9; border:1px solid #E2E8F0;
+        display:flex; align-items:center; justify-content:center;
+      }
+      .ah-pagination-wrap {
+        display:flex; flex-wrap:wrap; align-items:center;
+        justify-content:space-between; gap:.875rem;
+        padding:1rem 1.5rem; border-top:1px solid #F1F5F9;
+        background:linear-gradient(to right,#FAFBFD,#F8FAFC);
+        border-radius:0 0 1.25rem 1.25rem;
+      }
+      .ah-pagination-info {
+        font-size:.75rem; font-weight:600; color:#64748B; white-space:nowrap;
+      }
+      .ah-pagination-info strong { color:#334155; font-weight:800; }
+      .ah-pagination-controls {
+        display:flex; align-items:center; gap:.3rem; flex-wrap:wrap;
+      }
+      .ah-pg-btn {
+        display:inline-flex; align-items:center; justify-content:center;
+        min-width:34px; height:34px; padding:0 .5rem;
+        border-radius:9px; font-size:.8rem; font-weight:700; letter-spacing:-.2px;
+        border:1px solid #E2E8F0; background:white; color:#475569;
+        cursor:pointer; transition:all .18s cubic-bezier(.4,0,.2,1);
+        box-shadow:0 1px 2px rgba(15,23,42,.04);
+      }
+      .ah-pg-btn:hover:not(:disabled):not(.ah-pg-active) {
+        background:#F1F5F9; border-color:#CBD5E1; color:#1E293B;
+        transform:translateY(-1px); box-shadow:0 2px 6px rgba(15,23,42,.08);
+      }
+      .ah-pg-btn:active:not(:disabled) { transform:scale(.93); }
+      .ah-pg-btn:disabled { opacity:.35; cursor:not-allowed; box-shadow:none; }
+      .ah-pg-active {
+        background:linear-gradient(135deg,#3B82F6 0%,#6366F1 100%);
+        color:white; border-color:transparent;
+        box-shadow:0 3px 10px rgba(99,102,241,.38);
+        transform:translateY(-1px);
+      }
+      .ah-pg-nav {
+        background:white; color:#64748B;
+      }
+      .ah-pg-dots {
+        color:#CBD5E1; font-size:.95rem; padding:0 .25rem; line-height:34px;
+        user-select:none; letter-spacing:.1em;
+      }
+      .ah-pagination-perpage {
+        display:flex; align-items:center; gap:.5rem;
+      }
+      .ah-pagination-perpage-lbl {
+        font-size:.72rem; font-weight:600; color:#94A3B8; white-space:nowrap;
+      }
+      .ah-pagination-perpage-select {
+        padding:.3rem .65rem; border-radius:8px;
+        border:1px solid #E2E8F0; font-size:.78rem; font-weight:700;
+        color:#334155; background:white; outline:none; cursor:pointer;
+        transition:border-color .15s, box-shadow .15s;
+      }
+      .ah-pagination-perpage-select:focus {
+        border-color:#93C5FD; box-shadow:0 0 0 3px rgba(59,130,246,.1);
+      }
+      .ah-search-wrap { position:relative; flex:1; min-width:180px; }
+      .ah-search-input {
+        width:100%; padding:.45rem .875rem .45rem 2.2rem;
+        border-radius:.625rem; border:1px solid #E2E8F0;
+        font-size:.8125rem; font-weight:500; color:#334155; background:white;
+        outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+      }
+      .ah-search-input:focus {
+        border-color:#93C5FD; box-shadow:0 0 0 3px rgba(59,130,246,.1);
+      }
+      .ah-search-input::placeholder { color:#CBD5E1; }
+      .ah-search-icon {
+        position:absolute; left:.65rem; top:50%; transform:translateY(-50%);
+        pointer-events:none; color:#CBD5E1;
+      }
+      @media (max-width:640px) {
+        .ah-pagination-wrap { flex-direction:column; align-items:stretch; gap:.625rem; }
+        .ah-pagination-info { text-align:center; }
+        .ah-pagination-controls { justify-content:center; }
+        .ah-pagination-perpage { justify-content:center; }
+      }
+      .ah-guru-filter-bar {
+        border-bottom: 1px solid #F1F5F9;
+        background: linear-gradient(to bottom, #FAFBFD, #FFFFFF);
+        padding: 1rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: .875rem;
+      }
+      .ah-guru-filter-row {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        flex-wrap: nowrap;
+      }
+      .ah-guru-filter-lbl {
+        font-size: .65rem; font-weight: 800; color: #94A3B8;
+        text-transform: uppercase; letter-spacing: .07em;
+        white-space: nowrap; display: flex; align-items: center;
+        gap: 5px; flex-shrink: 0; min-width: 48px;
+      }
+      .ah-guru-filter-divider {
+        width: 1px; height: 18px; background: #E2E8F0; flex-shrink: 0;
+      }
+      .ah-guru-chips-scroll {
+        display: flex; align-items: center; gap: .4rem;
+        overflow-x: auto; padding-bottom: 2px;
+        scrollbar-width: none; -ms-overflow-style: none; flex: 1;
+      }
+      .ah-guru-chips-scroll::-webkit-scrollbar { display: none; }
+      .ah-guru-year-chip {
+        display: inline-flex; align-items: center;
+        padding: .35rem .9rem; border-radius: 999px;
+        font-size: .78rem; font-weight: 700; cursor: pointer;
+        border: 1.5px solid #E2E8F0; background: white; color: #64748B;
+        white-space: nowrap; transition: all .18s cubic-bezier(.4,0,.2,1);
+        flex-shrink: 0;
+      }
+      .ah-guru-year-chip:hover:not(.ah-guru-year-active) {
+        border-color: #CBD5E1; background: #F8FAFC; color: #334155;
+        transform: translateY(-1px);
+      }
+      .ah-guru-year-active {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
+        color: white !important; border-color: transparent !important;
+        box-shadow: 0 3px 10px rgba(15,23,42,.28); transform: translateY(-1px);
+      }
+      .ah-guru-month-chip {
+        display: inline-flex; align-items: center;
+        padding: .28rem .75rem; border-radius: 8px;
+        font-size: .75rem; font-weight: 700; cursor: pointer;
+        border: 1.5px solid #E2E8F0; background: white; color: #64748B;
+        white-space: nowrap; transition: all .16s ease;
+        flex-shrink: 0; letter-spacing: -.1px;
+      }
+      .ah-guru-month-chip:hover:not(.ah-guru-month-active) {
+        border-color: #BFDBFE; background: #EFF6FF; color: #1D4ED8;
+        transform: translateY(-1px);
+      }
+      .ah-guru-month-active {
+        background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
+        color: white !important; border-color: transparent !important;
+        box-shadow: 0 3px 8px rgba(99,102,241,.32); transform: translateY(-1px);
+      }
+      .ah-guru-month-row { display: none; }
+      .ah-guru-month-row.visible { display: flex; }
+      .ah-guru-filter-result {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: .5rem .875rem; border-radius: .625rem;
+        background: #F8FAFC; border: 1px solid #F1F5F9;
+      }
+      .ah-guru-result-info {
+        display: flex; align-items: center; gap: .5rem;
+        font-size: .75rem; font-weight: 600; color: #64748B;
+      }
+      .ah-guru-result-dot {
+        width: 6px; height: 6px; border-radius: 50%; background: #10B981;
+        flex-shrink: 0; box-shadow: 0 0 0 3px rgba(16,185,129,.18);
+      }
+      .ah-guru-result-dot.filtered {
+        background: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+      }
+      .ah-guru-reset-btn {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: .28rem .75rem; border-radius: 7px;
+        font-size: .72rem; font-weight: 700; color: #EF4444;
+        background: #FEF2F2; border: 1px solid #FCA5A5;
+        cursor: pointer; transition: all .15s ease;
+      }
+      .ah-guru-reset-btn:hover { background: #FEE2E2; border-color: #F87171; }
+      @keyframes cardReveal {
+        from { opacity:0; transform:translateY(8px) scale(.97); }
+        to   { opacity:1; transform:translateY(0) scale(1); }
+      }
+      .ah-card-reveal { animation: cardReveal .2s ease-out both; }
+      @media (max-width:640px) {
+        .ah-guru-filter-bar { padding: .875rem 1rem; }
+        .ah-guru-filter-lbl { display: none; }
+        .ah-guru-filter-divider { display: none; }
+      }
+    </style>
+    <div id="viewGuruHistory" class="hidden">
+      <div class="ah-hero">
+        <div class="relative z-10">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div class="ah-hero-tag">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="#93C5FD"><circle cx="4" cy="4" r="4"/></svg>
+                Arsip Honorarium
+              </div>
+              <h1 class="ah-hero-title">Riwayat Honor Saya</h1>
+              <p class="ah-hero-sub">Rekap honorarium bulanan yang telah difinalisasi</p>
+            </div>
+            <button type="button" onclick="handleNav('Page_Honorarium')"
+              style="display:inline-flex;align-items:center;gap:6px;padding:.5rem 1rem;border-radius:.625rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#F1F5F9;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s ease;backdrop-filter:blur(8px);"
+              onmouseover="this.style.background='rgba(255,255,255,.18)'"
+              onmouseout="this.style.background='rgba(255,255,255,.1)'">
+              <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Lihat Slip Bulan Ini
+            </button>
+          </div>
+          <div class="ah-pills">
+            <div class="ah-pill">
+              <div class="ah-pill-icon" style="background:rgba(59,130,246,.18);">
+                <svg class="w-4 h-4" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ah-pill-num" id="guruStatPeriods">—</div>
+                <div class="ah-pill-lbl" id="guruStatPeriodsLbl">Total Periode</div>
+              </div>
+            </div>
+            <div class="ah-pill">
+              <div class="ah-pill-icon" style="background:rgba(16,185,129,.18);">
+                <svg class="w-4 h-4" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ah-pill-num" id="guruStatJtm">—</div>
+                <div class="ah-pill-lbl">Akumulasi JTM</div>
+              </div>
+            </div>
+            <div class="ah-pill">
+              <div class="ah-pill-icon" style="background:rgba(245,158,11,.18);">
+                <svg class="w-4 h-4" style="color:#FCD34D;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ah-pill-num" id="guruStatTotal" style="font-size:.85rem;">—</div>
+                <div class="ah-pill-lbl">Total Diterima</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ah-content">
+        <div class="ah-panel">
+          <div class="ah-panel-header">
+            <div class="ah-panel-header-left">
+              <div class="ah-panel-icon" style="background:#EFF6FF;">
+                <svg style="color:#3B82F6;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="ah-panel-title">Daftar Slip Honorarium</p>
+                <p class="ah-panel-sub">Klik "Lihat Slip" untuk melihat detail rincian</p>
+              </div>
+            </div>
+            <span id="guruHistoryBadge" style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:800;background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;">Memuat...</span>
+          </div>
+          <div id="guruHonorFilterBar" class="ah-guru-filter-bar" style="display:none;">
+            <div class="ah-guru-filter-row">
+              <span class="ah-guru-filter-lbl">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Tahun
+              </span>
+              <div class="ah-guru-filter-divider"></div>
+              <div id="guruYearChips" class="ah-guru-chips-scroll">
+              </div>
+            </div>
+            <div id="guruMonthRow" class="ah-guru-filter-row ah-guru-month-row">
+              <span class="ah-guru-filter-lbl">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Bulan
+              </span>
+              <div class="ah-guru-filter-divider"></div>
+              <div id="guruMonthChips" class="ah-guru-chips-scroll">
+              </div>
+            </div>
+            <div class="ah-guru-filter-result">
+              <div class="ah-guru-result-info">
+                <span id="guruFilterDot" class="ah-guru-result-dot"></span>
+                <span id="guruFilterResultText">— periode tersedia</span>
+              </div>
+              <button id="guruFilterResetBtn" onclick="resetGuruHonorFilter()"
+                class="ah-guru-reset-btn" style="display:none;">
+                <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Reset Filter
+              </button>
+            </div>
+          </div>
+          <div id="tbodyHonorHistory" class="ah-cards-grid">
+            <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+              <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+            </div>
+            <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+              <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+            </div>
+            <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+              <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+              <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="viewAdminHistory" class="hidden">
+      <div class="ah-hero">
+        <div class="relative z-10">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div class="ah-hero-tag" style="color:#FCD34D;">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="#FCD34D"><circle cx="4" cy="4" r="4"/></svg>
+                Administrator
+              </div>
+              <h1 class="ah-hero-title">Arsip Honorarium Semua Guru</h1>
+              <p class="ah-hero-sub">Data honorarium final semua periode yang telah difinalisasi</p>
+            </div>
+            <button type="button" onclick="handleNav('Page_Honorarium')"
+              style="display:inline-flex;align-items:center;gap:6px;padding:.5rem 1rem;border-radius:.625rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#F1F5F9;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s ease;backdrop-filter:blur(8px);"
+              onmouseover="this.style.background='rgba(255,255,255,.18)'"
+              onmouseout="this.style.background='rgba(255,255,255,.1)'">
+              <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              Rekap Periode Aktif
+            </button>
+          </div>
+          <div class="ah-pills">
+            <div class="ah-pill">
+              <div class="ah-pill-icon" style="background:rgba(249,115,22,.18);">
+                <svg class="w-4 h-4" style="color:#FB923C;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ah-pill-num" id="admStatPeriods">—</div>
+                <div class="ah-pill-lbl">Periode</div>
+              </div>
+            </div>
+            <div class="ah-pill">
+              <div class="ah-pill-icon" style="background:rgba(59,130,246,.18);">
+                <svg class="w-4 h-4" style="color:#60A5FA;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ah-pill-num" id="admStatGuru">—</div>
+                <div class="ah-pill-lbl">Guru Tercatat</div>
+              </div>
+            </div>
+            <div class="ah-pill">
+              <div class="ah-pill-icon" style="background:rgba(16,185,129,.18);">
+                <svg class="w-4 h-4" style="color:#34D399;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <div class="ah-pill-num" id="admStatTotal" style="font-size:.85rem;">—</div>
+                <div class="ah-pill-lbl">Total Entri</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ah-content">
+        <div class="ah-filter-bar">
+          <span class="ah-filter-label">
+            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+            </svg>
+            Filter Periode
+          </span>
+          <div class="ah-filter-sep"></div>
+          <select id="selAdminHistoryFilter" onchange="filterAdminHistoryByPeriod()" class="ah-filter-select" aria-label="Filter berdasarkan periode">
+            <option value="">Semua Periode</option>
+          </select>
+          <div class="ah-filter-sep"></div>
+          <div class="ah-search-wrap">
+            <svg class="ah-search-icon" style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input type="text" id="admHistorySearch" oninput="filterAdminHistorySearchDebounced()" placeholder="Cari nama guru..." class="ah-search-input" autocomplete="off" aria-label="Cari guru">
+            <button type="button" id="admSearchClearBtn" onclick="clearAdminHistorySearch()" aria-label="Bersihkan pencarian"
+              style="position:absolute;right:.45rem;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;background:#E2E8F0;color:#64748B;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;">
+              <svg style="width:10px;height:10px;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <button type="button" id="admFilterResetBtn" onclick="clearAdminHistoryFilter()" class="ah-guru-reset-btn" style="display:none;" title="Reset semua filter">
+            <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Reset
+          </button>
+          <button type="button" onclick="exportAdminHonorHistoryExcel()" title="Unduh Excel"
+            style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:.4rem .85rem;border-radius:8px;font-size:.72rem;font-weight:700;color:#0F766E;background:#ECFDF5;border:1px solid #A7F3D0;cursor:pointer;transition:all .15s ease;">
+            <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Unduh Excel
+          </button>
+          <span id="admFilterCount" style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:.68rem;font-weight:800;background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;">Memuat...</span>
+        </div>
+        <div class="ah-panel">
+          <div class="ah-panel-header">
+            <div class="ah-panel-header-left">
+              <div class="ah-panel-icon" style="background:#ECFDF5;">
+                <svg style="color:#10B981;width:18px;height:18px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="ah-panel-title">Rekap Honorarium Per Guru</p>
+                <p class="ah-panel-sub">Data final setelah finalisasi per periode</p>
+              </div>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="ah-table">
+              <thead>
+                <tr>
+                  <th>Periode</th>
+                  <th>Nama Guru</th>
+                  <th style="text-align:center;">Total JTM</th>
+                  <th style="text-align:right;">Tgs. Tambahan</th>
+                  <th style="text-align:right;">Transportasi</th>
+                  <th style="text-align:right;">Nominal Diterima</th>
+                  <th style="text-align:center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyAdminHonorHistory">
+              </tbody>
+            </table>
+          </div>
+          <div id="adminHonorPaginationWrap" class="ah-pagination-wrap">
+            <div class="ah-pagination-info">
+              <span id="admPaginationInfo">—</span>
+            </div>
+            <div id="admPaginationControls" class="ah-pagination-controls">
+            </div>
+            <div class="ah-pagination-perpage">
+              <span class="ah-pagination-perpage-lbl">Tampilkan</span>
+              <select id="admItemsPerPage" onchange="changeAdminHonorItemsPerPage()" class="ah-pagination-perpage-select">
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              <span class="ah-pagination-perpage-lbl">per halaman</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    __SIM_GURU_LAYOUT_FOOTER__
+  </div>
+</div>
+__SIM_GURU_LAYOUT_MODAL__
