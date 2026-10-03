@@ -1,0 +1,713 @@
+<script>
+            finalizeBtn.disabled = !!data.is_finalized;
+            finalizeBtn.innerHTML = data.is_finalized
+              ? '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sudah Difinalisasi'
+              : '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Finalisasi Periode Ini';
+            finalizeBtn.className = data.is_finalized
+              ? 'flex items-center gap-2 bg-slate-200 text-slate-500 px-4 py-2 rounded-xl text-sm font-bold cursor-not-allowed transition-all border border-slate-200'
+              : 'flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-sm hover:shadow-md whitespace-nowrap';
+          }
+          if (bannerFinalized) {
+            if (data.is_finalized) bannerFinalized.classList.remove('hidden');
+            else bannerFinalized.classList.add('hidden');
+          }
+          const tbody2 = document.getElementById('tbodyAdminRecap');
+          if (!tbody2) return;
+          if (!data.data || data.data.length === 0) {
+            var gcEl = document.getElementById('lblStatGuruCount');
+            var ecEl = document.getElementById('lblStatEntriCount');
+            if (gcEl) gcEl.innerText = '0';
+            if (ecEl) ecEl.innerText = '0 Guru';
+            tbody2.innerHTML = '<tr><td colspan="6" class="py-2">' + errorStateHTML('Belum ada data honorarium untuk periode ini.') + '</td></tr>';
+            return;
+          }
+          var guruCount = data.data.length;
+          var gcEl2 = document.getElementById('lblStatGuruCount');
+          var ecEl2 = document.getElementById('lblStatEntriCount');
+          if (gcEl2) gcEl2.innerText = guruCount;
+          if (ecEl2) ecEl2.innerText = guruCount + ' Guru';
+          var html = '';
+          data.data.forEach(function (item, idx) {
+            var nameParts = (item.nama || 'G').trim().split(/\s+/);
+            var initials = nameParts.slice(0, 2).map(function (n) { return n[0] || ''; }).join('').toUpperCase();
+            var gradients = [
+              'from-blue-500 to-indigo-600',
+              'from-violet-500 to-purple-600',
+              'from-emerald-500 to-teal-600',
+              'from-orange-500 to-amber-600',
+              'from-rose-500 to-pink-600',
+              'from-cyan-500 to-blue-600'
+            ];
+            var grad = gradients[idx % gradients.length];
+            var statusCell;
+            if (data.is_finalized && item.trx_id) {
+              statusCell = '<div class="flex flex-col items-center gap-1">'
+                + '<span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-[11px] font-bold">'
+                + '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Final</span>'
+                + '<span class="font-mono text-[9px] text-slate-400 max-w-[100px] truncate" title="' + escapeHtml(item.trx_id || '') + '">' + escapeHtml((item.trx_id || '').substring(0, 12)) + '…</span>'
+                + '</div>';
+            } else {
+              statusCell = '<span class="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-lg text-[11px] font-bold">'
+                + '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>Estimasi</span>';
+            }
+            html += '<tr class="hover:bg-blue-50/30 transition-colors group">';
+            html += '<td class="px-5 sm:px-6 py-4">'
+              + '<div class="flex items-center gap-3">'
+              + '<div class="w-9 h-9 rounded-xl bg-gradient-to-br ' + grad + ' flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-sm">' + initials + '</div>'
+              + '<div class="min-w-0">'
+              + '<p class="font-semibold text-slate-800 truncate">' + escapeHtml(item.nama || '-') + '</p>'
+              + '<p class="text-xs text-slate-400 mt-0.5 truncate">' + escapeHtml(item.nip || 'NIP tidak tersedia') + '</p>'
+              + '</div></div></td>';
+            html += '<td class="px-5 sm:px-6 py-4 text-center">'
+              + '<span class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-full text-xs font-bold">'
+              + '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+              + (item.total_jtm || 0) + ' JTM</span></td>';
+            html += '<td class="px-5 sm:px-6 py-4 text-right">'
+              + '<span class="font-semibold text-slate-700 text-sm">' + escapeHtml(item.nominal_tugas_tambahan || 'Rp 0') + '</span>'
+              + '</td>';
+            html += '<td class="px-5 sm:px-6 py-4 text-right">'
+              + '<span class="font-semibold text-slate-700 text-sm">' + escapeHtml(item.nominal_transport || 'Rp 0') + '</span>'
+              + '</td>';
+            html += '<td class="px-5 sm:px-6 py-4 text-right">'
+              + '<span class="font-bold text-slate-800 text-base">' + escapeHtml(item.nominal || 'Rp 0') + '</span>'
+              + '</td>';
+            html += '<td class="px-5 sm:px-6 py-4 text-center">' + statusCell + '</td>';
+            html += '</tr>';
+          });
+          tbody2.innerHTML = html;
+        } else {
+          var msg = (data && data.message) ? data.message : 'Gagal memuat rekapitulasi.';
+          if (tbody) tbody.innerHTML = errorTableRows(6, msg, 'loadAdminHonorByFilter()');
+          if (lbl) lbl.innerText = 'Gagal Memuat';
+          if (finalizeBtn) finalizeBtn.disabled = true;
+          showToast(msg, 'error');
+        }
+      }).withFailureHandler(function (err) {
+        if (myReq !== _adminHonorReqToken) return;
+        var tEl = document.getElementById('tbodyAdminRecap');
+        if (tEl) tEl.innerHTML = errorTableRows(6, 'Koneksi ke server gagal: ' + String(err), 'loadAdminHonorByFilter()');
+        var lblEl = document.getElementById('lblAdminPeriode');
+        if (lblEl) lblEl.innerText = 'Gagal Memuat';
+        if (finalizeBtn) finalizeBtn.disabled = true;
+        showToast('Gagal memuat data honorarium: ' + String(err), 'error');
+      }).getAdminHonorRecap(token, month, year);
+    }
+    function continueInitHonorarium(token, role) {
+      if (String(role).toLowerCase() === 'admin') {
+        document.getElementById('viewAdmin').classList.remove('hidden');
+        const monthSel = document.getElementById('selAdminHonorMonth');
+        const yearSel = document.getElementById('selAdminHonorYear');
+        if (monthSel) {
+          const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+          const nowM = new Date().getMonth();
+          monthSel.innerHTML = months.map((m, i) => `<option value="${i}" ${i === nowM ? 'selected' : ''}>${m}</option>`).join('');
+        }
+        if (yearSel) {
+          const nowY = new Date().getFullYear();
+          let yOpts = '';
+          for (let y = nowY - 2; y <= nowY + 1; y++) {
+            yOpts += `<option value="${y}" ${y === nowY ? 'selected' : ''}>${y}</option>`;
+          }
+          yearSel.innerHTML = yOpts;
+        }
+        loadAdminHonorByFilter();
+      } else {
+        document.getElementById('viewGuru').classList.remove('hidden');
+        const sel = document.getElementById('selHonorPeriod');
+        const targetPeriode = window._pendingHonorPeriode || null;
+        window._pendingHonorPeriode = null;
+        if (sel) {
+          const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+          const now = new Date();
+          const baseOptions = [{ value: 'current', label: 'Bulan Ini (Estimasi)', finalized: false }];
+          for (let i = 1; i <= 12; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const label = monthNames[d.getMonth()] + ' ' + d.getFullYear();
+            baseOptions.push({ value: label, label: label, finalized: false });
+          }
+          function _renderPeriodOptions(finalizedSet) {
+            const seen = {};
+            let html = '';
+            baseOptions.forEach(function (opt) {
+              if (seen[opt.value]) return;
+              seen[opt.value] = true;
+              const isFinal = finalizedSet && finalizedSet[opt.value];
+              const display = isFinal ? (opt.label + ' ✓') : opt.label;
+              html += '<option value="' + opt.value.replace(/"/g, '&quot;') + '">' + display + '</option>';
+            });
+            if (finalizedSet) {
+              Object.keys(finalizedSet).forEach(function (p) {
+                if (!seen[p] && p !== 'current') {
+                  seen[p] = true;
+                  html += '<option value="' + p.replace(/"/g, '&quot;') + '">' + p + ' ✓</option>';
+                }
+              });
+            }
+            sel.innerHTML = html;
+          }
+          _renderPeriodOptions(null);
+          function _applyTargetPeriode(p) {
+            const vals = Array.from(sel.options).map(o => o.value);
+            if (!vals.includes(p)) {
+              const opt = document.createElement('option');
+              opt.value = p;
+              opt.innerText = p + ' ✓';
+              sel.appendChild(opt);
+            }
+            sel.value = p;
+            loadGuruSlip(token, p);
+          }
+          google.script.run
+            .withSuccessHandler(function (res) {
+              if (res && res.status === 'success' && res.periods && res.periods.length > 0) {
+                const finalizedSet = {};
+                res.periods.forEach(function (p) { if (p) finalizedSet[p] = true; });
+                _renderPeriodOptions(finalizedSet);
+              }
+              if (targetPeriode) {
+                _applyTargetPeriode(targetPeriode);
+              } else {
+                sel.value = 'current';
+                loadGuruSlip(token, 'current');
+              }
+            })
+            .withFailureHandler(function (err) {
+              console.warn('getAvailableHonorPeriods error:', err);
+              if (targetPeriode) {
+                _applyTargetPeriode(targetPeriode);
+              } else {
+                sel.value = 'current';
+                loadGuruSlip(token, 'current');
+              }
+            })
+            .getAvailableHonorPeriods(token);
+        } else {
+          if (targetPeriode) {
+            loadGuruSlip(token, targetPeriode);
+          } else {
+            loadGuruSlip(token, 'current');
+          }
+        }
+      }
+    }
+    function changeHonorPeriod() {
+      const token = localStorage.getItem('auth_token');
+      const period = document.getElementById('selHonorPeriod').value;
+      loadGuruSlip(token, period);
+    }
+    function downloadSlipPDF() {
+      const period = document.getElementById('selHonorPeriod') ? document.getElementById('selHonorPeriod').value : 'current';
+      const periodLabel = (period === 'current') ? 'Bulan_Ini' : String(period).replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+      const userName = (localStorage.getItem('user_name') || 'Guru').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+      const filename = 'Slip_Honor_' + userName + '_' + periodLabel + '.pdf';
+      const slipEl = document.getElementById('printAreaSlip');
+      if (!slipEl) {
+        showToast('Elemen slip belum termuat.', 'error');
+        return;
+      }
+      exportElementToPDF('printAreaSlip', filename, 'portrait');
+    }
+    function printSlipNative() {
+      const slipEl = document.getElementById('printAreaSlip');
+      if (!slipEl) {
+        showToast('Slip belum termuat.', 'error');
+        return;
+      }
+      document.body.classList.add('printing-slip');
+      const cleanup = function () {
+        document.body.classList.remove('printing-slip');
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+      setTimeout(function () { window.print(); }, 50);
+    }
+    var _guruSlipReqToken = 0;
+    function loadGuruSlip(token, period) {
+      const statusEl = document.getElementById('txtSlipStatus');
+      const honorTbody = document.getElementById('honorTableBody');
+      const alertEl = document.getElementById('alertInfoFinal');
+      const watermark = document.getElementById('watermarkEstimasi');
+      const transIdEl = document.getElementById('txtSlipTransId');
+      const downloadBtn = document.getElementById('btnDownloadSlipGuru');
+      const printBtn = document.getElementById('btnPrintSlipGuru');
+      const myReq = ++_guruSlipReqToken;
+      if (statusEl) {
+        statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span>Memuat data...</span>';
+        statusEl.className = 'text-xs font-bold text-slate-500 mt-1 bg-slate-100 px-2 py-1 rounded inline-block';
+      }
+      if (honorTbody) honorTbody.innerHTML = skeletonTableRows(4, 4);
+      if (downloadBtn) {
+        downloadBtn.classList.add('hidden');
+        downloadBtn.classList.remove('inline-flex');
+      }
+      if (printBtn) {
+        printBtn.classList.add('hidden');
+        printBtn.classList.remove('inline-flex');
+      }
+      const periodParam = (period === 'current' || !period) ? null : period;
+      google.script.run
+        .withSuccessHandler(function (data) {
+          if (myReq !== _guruSlipReqToken) return;
+          if (!data || data.status !== 'success') {
+            const msg = (data && data.message) ? data.message : 'Gagal memuat data honorarium.';
+            if (statusEl) {
+              statusEl.innerText = 'Gagal Memuat';
+              statusEl.className = 'text-xs font-bold text-red-600 mt-1 bg-red-100 px-2 py-1 rounded inline-block';
+            }
+            if (honorTbody) honorTbody.innerHTML = errorTableRows(4, msg, 'changeHonorPeriod()');
+            showToast(msg, 'error');
+            return;
+          }
+          const today = new Date();
+          const currentMonth = today.getMonth();
+          const currentYear = today.getFullYear();
+          const viewedMonth = (data.month !== undefined && data.month !== null) ? data.month : currentMonth;
+          const viewedYear = data.year || currentYear;
+          const schoolName = (globalConfig && globalConfig.app_school_name) ? globalConfig.app_school_name : (data.school_name || 'MTs Nurul Falah');
+          const userName = localStorage.getItem('user_name') || 'Guru';
+          const kepalaSekolahName = (data.kepala_sekolah) ? data.kepala_sekolah : ((globalConfig && globalConfig.kepala_sekolah) ? globalConfig.kepala_sekolah : 'Kepala Sekolah');
+          setText('txtSlipSchoolName', schoolName);
+          setText('txtSlipReceiverName', userName);
+          setText('txtSlipSignReceiver', userName);
+          setText('txtSlipKepsekTitle', 'Kepala ' + schoolName);
+          setText('txtSlipKepsekName', kepalaSekolahName);
+          setText('txtSlipNIP', data.nip || '-');
+          setText('txtSlipPeriod', getMonthName(viewedMonth) + ' ' + viewedYear);
+          setText('txtPrintDate', formatDateID(new Date()));
+          const totalEl = document.getElementById('txtSlipTotal');
+          if (totalEl && data.formatted_total) {
+            if (typeof animateRupiah === 'function') animateRupiah(totalEl, data.formatted_total, 700);
+            else totalEl.innerText = data.formatted_total;
+          } else if (totalEl) {
+            totalEl.innerText = 'Rp 0';
+          }
+          const isCurrentPeriod = (viewedMonth === currentMonth && viewedYear === currentYear);
+          const realTrxId = data.trx_id || null;
+          const isFinalized = !!(realTrxId && String(realTrxId).indexOf('ESTIMASI') === -1 && String(realTrxId).indexOf('null') === -1);
+          if (isCurrentPeriod || !isFinalized) {
+            if (statusEl) {
+              statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>Menunggu Finalisasi</span>';
+              statusEl.className = 'text-xs font-bold text-amber-700 mt-1 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full inline-block';
+            }
+            if (alertEl) alertEl.classList.remove('hidden');
+            if (watermark) watermark.classList.remove('hidden');
+            if (transIdEl) transIdEl.innerText = 'ID: ESTIMASI';
+            if (downloadBtn) {
+              downloadBtn.classList.add('hidden');
+              downloadBtn.classList.remove('inline-flex');
+            }
+            if (printBtn) {
+              printBtn.classList.add('hidden');
+              printBtn.classList.remove('inline-flex');
+            }
+          } else {
+            if (statusEl) {
+              statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Siap Dibayarkan</span>';
+              statusEl.className = 'text-xs font-bold text-emerald-700 mt-1 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full inline-block';
+            }
+            if (alertEl) alertEl.classList.add('hidden');
+            if (watermark) watermark.classList.add('hidden');
+            if (transIdEl) transIdEl.innerText = 'ID: ' + realTrxId;
+            if (downloadBtn) {
+              downloadBtn.classList.remove('hidden');
+              downloadBtn.classList.add('inline-flex');
+            }
+            if (printBtn) {
+              printBtn.classList.remove('hidden');
+              printBtn.classList.add('inline-flex');
+            }
+          }
+          renderHonorariumTable(data.details || [], data.total || 0);
+        })
+        .withFailureHandler(function (err) {
+          if (myReq !== _guruSlipReqToken) return;
+          const errMsg = 'Koneksi ke server gagal: ' + String(err);
+          if (statusEl) {
+            statusEl.innerText = 'Koneksi Gagal';
+            statusEl.className = 'text-xs font-bold text-red-600 mt-1 bg-red-100 px-2 py-1 rounded inline-block';
+          }
+          if (honorTbody) honorTbody.innerHTML = errorTableRows(4, errMsg, 'changeHonorPeriod()');
+          showToast(errMsg, 'error');
+        })
+        .getMyHonorariumData(token, periodParam);
+    }
+    function renderHonorariumTable(details, total) {
+      const tbody = document.getElementById('honorTableBody');
+      if (!tbody) return;
+      if (!details || details.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-400 italic text-sm">Belum ada data honorarium pada periode ini.</td></tr>';
+        return;
+      }
+      let html = '';
+      details.forEach(function (item) {
+        const safeDesc = escapeHtml(item.desc || '-');
+        const safeNote = item.note ? ('<div class="text-[10px] text-slate-400 mt-0.5 italic">' + escapeHtml(item.note) + '</div>') : '';
+        const qty = (item.qty !== undefined && item.qty !== null) ? item.qty : '-';
+        const rate = escapeHtml(item.rate || '-');
+        const amount = escapeHtml(item.amount || 'Rp 0');
+        html += '<tr class="border-b border-slate-50 hover:bg-blue-50/30 transition-colors">';
+        html += '<td class="py-3 px-4 text-left font-medium text-slate-700">' + safeDesc + safeNote + '</td>';
+        html += '<td class="py-3 px-4 text-center text-slate-500">' + qty + '</td>';
+        html += '<td class="py-3 px-4 text-right text-slate-500">' + rate + '</td>';
+        html += '<td class="py-3 px-4 text-right font-bold text-slate-800">' + amount + '</td>';
+        html += '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+    function getMonthName(monthIndex) {
+      const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      return months[monthIndex] || "";
+    }
+    function checkValidationAction(inputId) {
+      const id = inputId || 'inpValTrxId';
+      const inp = document.getElementById(id);
+      if (!inp) return;
+      const rawVal = String(inp.value || '').trim();
+      if (!rawVal) {
+        try {
+          var wrap = inp.closest && (inp.closest('.sim-input-wrap') || inp.parentElement);
+          inp.style.borderColor = '#EF4444';
+          inp.style.boxShadow = '0 0 0 4px rgba(239,68,68,0.12)';
+          inp.focus();
+        } catch (_) { }
+        showToast('ID Transaksi wajib diisi.', 'error');
+        setTimeout(() => {
+          inp.style.borderColor = '';
+          inp.style.boxShadow = '';
+        }, 1800);
+        return;
+      }
+      var wrap = inp.closest && (inp.closest('.sim-verify-row') || inp.parentElement);
+      var btn = wrap ? wrap.querySelector('.sim-verify-btn') : null;
+      var origBtnHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        if (btn.dataset.busy === 'true') return;
+        btn.dataset.busy = 'true';
+        btn.disabled = true;
+        btn.innerHTML = '<span class="sim-btn-loader" aria-hidden="true" style="border-color:rgba(255,255,255,0.4); border-top-color:#fff; width:12px; height:12px; margin-right:6px;"></span>Mengecek...';
+      }
+      if (inp) inp.disabled = true;
+      function _restore() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origBtnHtml || 'Verifikasi';
+          delete btn.dataset.busy;
+        }
+        if (inp) inp.disabled = false;
+      }
+      showDocVerifyModal('loading', null);
+      google.script.run
+        .withSuccessHandler(function (res) {
+          _restore();
+          if (res && res.status === 'valid') {
+            showDocVerifyModal('valid', res.data);
+          } else {
+            showDocVerifyModal('invalid', { message: (res && res.message) || 'Dokumen tidak ditemukan.' });
+          }
+        })
+        .withFailureHandler(function (err) {
+          _restore();
+          showDocVerifyModal('error', { message: 'Gagal terhubung ke server. Coba lagi.' });
+        })
+        .validateDocument(rawVal);
+    }
+    function showDocVerifyModal(state, data) {
+      const existing = document.getElementById('docVerifyModal');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'docVerifyModal';
+      overlay.style.cssText = `
+      position:fixed;inset:0;z-index:9999;
+      background:rgba(2,6,23,0.72);
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      display:flex;align-items:center;justify-content:center;
+      padding:16px;
+      animation:dvFadeIn 0.25s ease both;
+    `;
+      if (!document.getElementById('dvStyles')) {
+        const st = document.createElement('style');
+        st.id = 'dvStyles';
+        st.innerHTML = `
+        @keyframes dvFadeIn { from{opacity:0} to{opacity:1} }
+        @keyframes dvSlideUp { from{opacity:0;transform:translateY(28px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+        @keyframes dvPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+        @keyframes dvSpin { to{transform:rotate(360deg)} }
+        @keyframes dvCheckDraw {
+          from{stroke-dashoffset:100}
+          to{stroke-dashoffset:0}
+        }
+        @keyframes dvShimmer {
+          0%{background-position:-400px 0}
+          100%{background-position:400px 0}
+        }
+        .dv-card {
+          background:#fff;border-radius:24px;
+          width:100%;max-width:460px;
+          box-shadow:0 32px 80px rgba(2,6,23,0.35),0 0 0 1px rgba(255,255,255,0.06);
+          overflow:hidden;
+          animation:dvSlideUp 0.35s cubic-bezier(0.34,1.56,0.64,1) both;
+        }
+        .dv-header-valid {
+          background:linear-gradient(135deg,#064E3B 0%,#065F46 60%,#047857 100%);
+          padding:28px 28px 24px;position:relative;overflow:hidden;
+        }
+        .dv-header-invalid {
+          background:linear-gradient(135deg,#450A0A 0%,#7F1D1D 60%,#991B1B 100%);
+          padding:28px 28px 24px;position:relative;overflow:hidden;
+        }
+        .dv-header-loading {
+          background:linear-gradient(135deg,#0F172A 0%,#1E293B 60%,#0F172A 100%);
+          padding:28px 28px 24px;position:relative;overflow:hidden;
+        }
+        .dv-header-orb {
+          position:absolute;border-radius:50%;pointer-events:none;
+        }
+        .dv-icon-ring {
+          width:64px;height:64px;border-radius:50%;
+          display:flex;align-items:center;justify-content:center;
+          margin-bottom:16px;position:relative;z-index:1;
+        }
+        .dv-ring-valid   { background:rgba(52,211,153,0.2);box-shadow:0 0 0 12px rgba(52,211,153,0.1); }
+        .dv-ring-invalid { background:rgba(252,165,165,0.2);box-shadow:0 0 0 12px rgba(252,165,165,0.1); }
+        .dv-ring-loading { background:rgba(148,163,184,0.15);box-shadow:0 0 0 12px rgba(148,163,184,0.08); }
+        .dv-badge {
+          display:inline-flex;align-items:center;gap:6px;
+          padding:5px 14px;border-radius:999px;
+          font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;
+          margin-bottom:10px;
+        }
+        .dv-badge-valid   { background:rgba(52,211,153,0.18);color:#6EE7B7;border:1px solid rgba(52,211,153,0.3); }
+        .dv-badge-invalid { background:rgba(252,165,165,0.15);color:#FCA5A5;border:1px solid rgba(252,165,165,0.25); }
+        .dv-body { padding:24px 28px 28px; }
+        .dv-row {
+          display:flex;align-items:flex-start;gap:12px;
+          padding:11px 0;border-bottom:1px solid #F1F5F9;
+        }
+        .dv-row:last-child { border-bottom:none; }
+        .dv-row-icon {
+          width:32px;height:32px;border-radius:9px;flex-shrink:0;
+          display:flex;align-items:center;justify-content:center;margin-top:1px;
+        }
+        .dv-row-label { font-size:11px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px; }
+        .dv-row-value { font-size:14px;font-weight:700;color:#0F172A;word-break:break-all; }
+        .dv-row-value-mono { font-family:'Courier New',monospace;font-size:12px;font-weight:700;color:#1D4ED8;letter-spacing:0.5px; }
+        .dv-honor-box {
+          margin-top:18px;border-radius:14px;overflow:hidden;
+          background:linear-gradient(135deg,#EFF6FF,#F0FDF4);
+          border:1.5px solid #BFDBFE;padding:16px 18px;
+          display:flex;align-items:center;justify-content:space-between;
+        }
+        .dv-honor-label { font-size:11px;font-weight:600;color:#3B82F6;text-transform:uppercase;letter-spacing:0.05em; }
+        .dv-honor-value { font-size:22px;font-weight:900;color:#1D4ED8;letter-spacing:-0.5px; }
+        .dv-watermark {
+          position:absolute;right:-10px;bottom:-10px;
+          font-size:90px;font-weight:900;color:rgba(255,255,255,0.04);
+          line-height:1;pointer-events:none;letter-spacing:-4px;
+          font-family:'Courier New',monospace;
+        }
+        .dv-close-btn {
+          width:100%;padding:13px;
+          font-size:14px;font-weight:700;color:#475569;
+          background:#F1F5F9;border:none;border-radius:12px;cursor:pointer;
+          transition:all 0.2s;margin-top:20px;
+          display:flex;align-items:center;justify-content:center;gap:8px;
+        }
+        .dv-close-btn:hover { background:#E2E8F0;color:#0F172A; }
+        .dv-spinner {
+          width:40px;height:40px;border-radius:50%;
+          border:3px solid rgba(148,163,184,0.2);border-top-color:#60A5FA;
+          animation:dvSpin 0.8s linear infinite;
+        }
+        .dv-check-svg circle {
+          fill:none;stroke:#34D399;stroke-width:2.5;
+          stroke-dasharray:100;stroke-dashoffset:100;
+          animation:dvCheckDraw 0.5s ease 0.1s forwards;
+        }
+        .dv-check-svg polyline {
+          fill:none;stroke:#34D399;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;
+          stroke-dasharray:100;stroke-dashoffset:100;
+          animation:dvCheckDraw 0.4s ease 0.4s forwards;
+        }
+        .dv-skel {
+          background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%);
+          background-size:400px 100%;
+          animation:dvShimmer 1.4s ease-in-out infinite;
+          border-radius:6px;height:14px;
+        }
+        .dv-verified-stamp {
+          display:inline-flex;align-items:center;gap:6px;
+          background:linear-gradient(135deg,#D1FAE5,#A7F3D0);
+          border:1.5px solid #6EE7B7;color:#065F46;
+          padding:6px 14px;border-radius:10px;
+          font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;
+          box-shadow:0 2px 8px rgba(16,185,129,0.2);
+        }
+      `;
+        document.head.appendChild(st);
+      }
+      let inner = '';
+      if (state === 'loading') {
+        inner = `
+        <div class="dv-card">
+          <div class="dv-header-loading" style="text-align:center;">
+            <div class="dv-header-orb" style="width:200px;height:200px;background:radial-gradient(circle,rgba(99,102,241,0.2) 0%,transparent 70%);top:-60px;right:-60px;"></div>
+            <div class="dv-icon-ring dv-ring-loading" style="margin:0 auto 16px;">
+              <div class="dv-spinner"></div>
+            </div>
+            <p style="color:#CBD5E1;font-size:15px;font-weight:700;margin:0 0 4px;">Memverifikasi Dokumen</p>
+            <p style="color:#64748B;font-size:12px;margin:0;">Mohon tunggu sebentar...</p>
+          </div>
+          <div class="dv-body">
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;gap:10px;align-items:center;">
+                <div style="width:32px;height:32px;border-radius:9px;background:#F1F5F9;flex-shrink:0;"></div>
+                <div style="flex:1;"><div class="dv-skel" style="width:40%;margin-bottom:6px;height:10px;"></div><div class="dv-skel" style="width:70%;"></div></div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <div style="width:32px;height:32px;border-radius:9px;background:#F1F5F9;flex-shrink:0;"></div>
+                <div style="flex:1;"><div class="dv-skel" style="width:35%;margin-bottom:6px;height:10px;"></div><div class="dv-skel" style="width:55%;"></div></div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <div style="width:32px;height:32px;border-radius:9px;background:#F1F5F9;flex-shrink:0;"></div>
+                <div style="flex:1;"><div class="dv-skel" style="width:45%;margin-bottom:6px;height:10px;"></div><div class="dv-skel" style="width:60%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      } else if (state === 'valid') {
+        const d = data || {};
+        inner = `
+        <div class="dv-card">
+          <div class="dv-header-valid">
+            <div class="dv-header-orb" style="width:220px;height:220px;background:radial-gradient(circle,rgba(52,211,153,0.15) 0%,transparent 70%);top:-80px;right:-60px;"></div>
+            <div class="dv-header-orb" style="width:140px;height:140px;background:radial-gradient(circle,rgba(16,185,129,0.1) 0%,transparent 70%);bottom:-40px;left:20px;"></div>
+            <div class="dv-watermark">✓</div>
+            <div class="dv-icon-ring dv-ring-valid" style="margin:0 0 14px;">
+              <svg class="dv-check-svg" width="34" height="34" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="7,12 10,15 17,9"/>
+              </svg>
+            </div>
+            <div class="dv-badge dv-badge-valid">
+              <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              Dokumen Terverifikasi
+            </div>
+            <h3 style="color:#F1F5F9;font-size:20px;font-weight:800;margin:0 0 4px;letter-spacing:-0.5px;position:relative;z-index:1;">Dokumen Asli & Valid</h3>
+            <p style="color:#6EE7B7;font-size:12px;font-weight:500;margin:0;position:relative;z-index:1;">${d.school_name || 'SiM-Guru'} &mdash; Sistem Manajemen Guru</p>
+          </div>
+          <div class="dv-body">
+            <div class="dv-row">
+              <div class="dv-row-icon" style="background:#EFF6FF;">
+                <svg width="16" height="16" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div class="dv-row-label">ID Transaksi</div>
+                <div class="dv-row-value-mono">${escapeHtml(d.trx_id || '-')}</div>
+              </div>
+            </div>
+            <div class="dv-row">
+              <div class="dv-row-icon" style="background:#F0FDF4;">
+                <svg width="16" height="16" fill="none" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div class="dv-row-label">Nama Guru</div>
+                <div class="dv-row-value">${escapeHtml(d.nama_guru || '-')}</div>
+                ${d.nip && d.nip !== '-' ? `<div style="font-size:11px;color:#94A3B8;margin-top:1px;">NIP: ${escapeHtml(d.nip)}</div>` : ''}
+              </div>
+            </div>
+            <div class="dv-row">
+              <div class="dv-row-icon" style="background:#FFF7ED;">
+                <svg width="16" height="16" fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div class="dv-row-label">Periode Honorarium</div>
+                <div class="dv-row-value">${escapeHtml(d.periode || '-')}</div>
+              </div>
+            </div>
+            <div class="dv-row">
+              <div class="dv-row-icon" style="background:#F5F3FF;">
+                <svg width="16" height="16" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <div style="flex:1;">
+                <div class="dv-row-label">Tanggal Penerbitan</div>
+                <div class="dv-row-value">${escapeHtml(d.tgl_simpan || '-')}</div>
+              </div>
+            </div>
+            <div class="dv-honor-box">
+              <div>
+                <div class="dv-honor-label">Total Honorarium</div>
+                <div class="dv-honor-value">${escapeHtml(d.total_honor || '-')}</div>
+              </div>
+              <svg width="36" height="36" fill="none" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" fill="#DBEAFE"/>
+                <path stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+              </svg>
+            </div>
+            <div style="margin-top:16px;padding:12px 14px;background:#F8FAFC;border-radius:10px;border:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;flex-wrap:gap 8px;">
+              <div>
+                <div style="font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Diverifikasi Pada</div>
+                <div style="font-size:12px;font-weight:700;color:#475569;">${escapeHtml(d.tgl_verifikasi || '-')}</div>
+              </div>
+              <div class="dv-verified-stamp">
+                <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                Verified
+              </div>
+            </div>
+            <button class="dv-close-btn" onclick="document.getElementById('docVerifyModal').remove()">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              Tutup
+            </button>
+          </div>
+        </div>`;
+      } else {
+        const msg = (data && data.message) ? data.message : 'Dokumen tidak ditemukan.';
+        inner = `
+        <div class="dv-card">
+          <div class="dv-header-invalid">
+            <div class="dv-header-orb" style="width:200px;height:200px;background:radial-gradient(circle,rgba(252,165,165,0.12) 0%,transparent 70%);top:-60px;right:-40px;"></div>
+            <div class="dv-watermark">✗</div>
+            <div class="dv-icon-ring dv-ring-invalid" style="margin:0 0 14px;">
+              <svg width="34" height="34" fill="none" stroke="#FCA5A5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M15 9l-6 6M9 9l6 6"/>
+              </svg>
+            </div>
+            <div class="dv-badge dv-badge-invalid">
+              <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z"/></svg>
+              Tidak Terverifikasi
+            </div>
+            <h3 style="color:#F1F5F9;font-size:20px;font-weight:800;margin:0 0 4px;letter-spacing:-0.5px;position:relative;z-index:1;">Dokumen Tidak Valid</h3>
+            <p style="color:#FCA5A5;font-size:12px;font-weight:500;margin:0;position:relative;z-index:1;">Verifikasi gagal — dokumen tidak ditemukan</p>
+          </div>
+          <div class="dv-body">
+            <div style="text-align:center;padding:8px 0 16px;">
+              <div style="width:56px;height:56px;border-radius:16px;background:#FEF2F2;border:2px solid #FECACA;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                <svg width="28" height="28" fill="none" stroke="#EF4444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+              </div>
+              <p style="font-size:14px;font-weight:700;color:#1E293B;margin:0 0 8px;">${escapeHtml(msg)}</p>
+              <p style="font-size:12px;color:#94A3B8;line-height:1.6;margin:0;">Kemungkinan penyebab: ID Transaksi salah ketik, dokumen belum diterbitkan secara resmi, atau dokumen tidak terdaftar dalam sistem.</p>
+            </div>
+            <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;padding:14px 16px;margin-top:4px;">
+              <p style="font-size:12px;font-weight:700;color:#C2410C;margin:0 0 6px;display:flex;align-items:center;gap:6px;">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Pastikan hal berikut:
+              </p>
+              <ul style="font-size:12px;color:#92400E;margin:0;padding-left:16px;line-height:1.8;">
+                <li>ID dimulai dengan awalan <strong>TRX-</strong></li>
+                <li>Tidak ada spasi di awal atau akhir</li>
+                <li>Dokumen telah diterbitkan secara resmi oleh admin</li>
+              </ul>
+            </div>
+            <button class="dv-close-btn" onclick="document.getElementById('docVerifyModal').remove()">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              Tutup & Coba Lagi
+            </button>
+          </div>
+        </div>`;
+      }
+      overlay.innerHTML = inner;
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) overlay.remove();
+      });
+      document.body.appendChild(overlay);
+</script>

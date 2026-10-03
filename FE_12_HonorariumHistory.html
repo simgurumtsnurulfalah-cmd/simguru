@@ -1,0 +1,369 @@
+<script>
+    function forgotBackToStep1() {
+      _showForgotStep(1);
+      setTimeout(() => {
+        const inp = document.getElementById('inpForgotUsername');
+        if (inp) inp.focus();
+      }, 100);
+    }
+    function forgotBackToMethod() {
+      if (window._forgotState && window._forgotState.otpCooldownTimer) {
+        clearInterval(window._forgotState.otpCooldownTimer);
+        window._forgotState.otpCooldownTimer = null;
+      }
+      _renderForgotMethodStep();
+      _showForgotStep('method');
+    }
+    function forgotChooseMethod(method) {
+      const st = window._forgotState || {};
+      st.method = method;
+      window._forgotState = st;
+      if (method === 'secq') {
+        _forgotStartSecurityQuestion();
+      } else if (method === 'otp') {
+        _forgotStartOtp();
+      }
+    }
+    function _forgotStartSecurityQuestion() {
+      const st = window._forgotState || {};
+      const username = st.username;
+      const btn = document.getElementById('btnMethodSecQ');
+      if (btn) btn.disabled = true;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (btn) btn.disabled = false;
+          if (res && res.status === 'success') {
+            document.getElementById('txtForgotUsername').innerText = username;
+            document.getElementById('txtSecurityQuestion').innerText = res.question;
+            document.getElementById('inpSecurityAnswerForgot').value = '';
+            _showForgotStep('secq');
+            _checkForgotLockout(username);
+            setTimeout(() => document.getElementById('inpSecurityAnswerForgot').focus(), 100);
+          } else {
+            showToast((res && res.message) || 'Gagal memuat pertanyaan keamanan.', 'error');
+          }
+        })
+        .withFailureHandler(() => {
+          if (btn) btn.disabled = false;
+          showToast('Gagal terhubung ke server.', 'error');
+        })
+        .getSecurityQuestion(username);
+    }
+    function _forgotStartOtp() {
+      const st = window._forgotState || {};
+      const m = st.methods || {};
+      document.getElementById('txtForgotOtpEmail').innerText = m.masked_email || 'email terverifikasi';
+      document.getElementById('inpForgotOtp').value = '';
+      _showForgotStep('otp');
+      forgotRequestOtp(false);
+      setTimeout(() => {
+        const inp = document.getElementById('inpForgotOtp');
+        if (inp) inp.focus();
+      }, 150);
+    }
+    function forgotRequestOtp(isResend) {
+      const st = window._forgotState || {};
+      const username = st.username;
+      if (!username) return;
+      const resendBtn = document.getElementById('btnForgotResendOtp');
+      if (resendBtn) {
+        resendBtn.disabled = true;
+        resendBtn.innerText = 'Mengirim...';
+      }
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res && res.status === 'success') {
+            showToast(isResend ? 'Kode OTP baru terkirim.' : ('OTP dikirim ke ' + (res.masked_email || 'email terverifikasi') + '.'), 'success');
+            if (res.masked_email) {
+              const t = document.getElementById('txtForgotOtpEmail');
+              if (t) t.innerText = res.masked_email;
+            }
+            _startForgotOtpCooldown(Number(res.cooldown || 60));
+          } else {
+            if (resendBtn) {
+              resendBtn.disabled = false;
+              resendBtn.innerText = 'Kirim ulang';
+            }
+            showToast((res && res.message) || 'Gagal mengirim OTP.', 'error');
+            if (!isResend) {
+              forgotBackToMethod();
+            }
+          }
+        })
+        .withFailureHandler(() => {
+          if (resendBtn) {
+            resendBtn.disabled = false;
+            resendBtn.innerText = 'Kirim ulang';
+          }
+          showToast('Gagal terhubung ke server.', 'error');
+        })
+        .requestForgotPasswordOTP(username);
+    }
+    function _startForgotOtpCooldown(secs) {
+      const st = window._forgotState || {};
+      if (st.otpCooldownTimer) {
+        clearInterval(st.otpCooldownTimer);
+        st.otpCooldownTimer = null;
+      }
+      let remaining = Math.max(0, Number(secs) || 60);
+      const btn = document.getElementById('btnForgotResendOtp');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.innerText = 'Tunggu ' + remaining + 'd';
+      st.otpCooldownTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(st.otpCooldownTimer);
+          st.otpCooldownTimer = null;
+          btn.disabled = false;
+          btn.innerText = 'Kirim ulang';
+          return;
+        }
+        btn.innerText = 'Tunggu ' + remaining + 'd';
+      }, 1000);
+      window._forgotState = st;
+    }
+    function submitForgotAction() {
+      const username = (document.getElementById('inpForgotUsername').value || '').trim();
+      const answer = (document.getElementById('inpSecurityAnswerForgot').value || '').trim();
+      if (!username) return showToast('Username tidak ditemukan.', 'error');
+      if (!answer) return showToast('Silakan isi jawaban keamanan Anda.', 'error');
+      const rlKey = 'reset_rl_' + username;
+      const rlRaw = localStorage.getItem(rlKey);
+      let rlData = rlRaw ? JSON.parse(rlRaw) : { count: 0, lockedUntil: 0 };
+      const now = Date.now();
+      if (rlData.lockedUntil && now < rlData.lockedUntil) {
+        const secsLeft = Math.ceil((rlData.lockedUntil - now) / 1000);
+        const minsLeft = Math.ceil(secsLeft / 60);
+        showToast('Terlalu banyak percobaan gagal. Coba lagi dalam ' + (secsLeft > 60 ? minsLeft + ' menit' : secsLeft + ' detik') + '.', 'error');
+        _startForgotCountdown(username, rlData.lockedUntil);
+        return;
+      }
+      if (rlData.lockedUntil && now >= rlData.lockedUntil) {
+        rlData = { count: 0, lockedUntil: 0 };
+        localStorage.setItem(rlKey, JSON.stringify(rlData));
+      }
+      const btn = document.getElementById('btnSubmitForgot');
+      btn.disabled = true;
+      btn.innerText = 'Memverifikasi...';
+      google.script.run
+        .withSuccessHandler((res) => {
+          btn.disabled = false;
+          btn.innerText = 'Verifikasi';
+          if (res && res.status === 'success') {
+            localStorage.removeItem(rlKey);
+            window._forgotState = window._forgotState || {};
+            window._forgotState.resetToken = res.reset_token;
+            _enterForgotFinalStep();
+          } else {
+            rlData.count += 1;
+            const remaining = 3 - rlData.count;
+            if (rlData.count >= 3) {
+              rlData.lockedUntil = Date.now() + (2 * 60 * 1000);
+              localStorage.setItem(rlKey, JSON.stringify(rlData));
+              btn.disabled = true;
+              btn.innerText = 'Terkunci';
+              _startForgotCountdown(username, rlData.lockedUntil);
+              showToast('Anda telah mencapai batas 3 percobaan. Permintaan diblokir selama 2 menit.', 'error');
+            } else {
+              localStorage.setItem(rlKey, JSON.stringify(rlData));
+              showToast(((res && res.message) || 'Verifikasi gagal.') + ' (Sisa percobaan: ' + remaining + ')', 'error');
+            }
+          }
+        })
+        .withFailureHandler(() => {
+          btn.disabled = false;
+          btn.innerText = 'Verifikasi';
+          showToast('Gagal terhubung ke server.', 'error');
+        })
+        .verifyForgotSecurityAnswer(username, answer);
+    }
+    function submitForgotOtpAction() {
+      const st = window._forgotState || {};
+      const username = st.username || (document.getElementById('inpForgotUsername').value || '').trim();
+      const code = (document.getElementById('inpForgotOtp').value || '').trim();
+      if (!username) return showToast('Username tidak ditemukan.', 'error');
+      if (!/^\d{6}$/.test(code)) return showToast('Kode OTP harus 6 digit angka.', 'error');
+      const btn = document.getElementById('btnSubmitForgotOtp');
+      btn.disabled = true;
+      btn.innerText = 'Memverifikasi...';
+      google.script.run
+        .withSuccessHandler((res) => {
+          btn.disabled = false;
+          btn.innerText = 'Verifikasi';
+          if (res && res.status === 'success') {
+            window._forgotState = window._forgotState || {};
+            window._forgotState.resetToken = res.reset_token;
+            if (st.otpCooldownTimer) {
+              clearInterval(st.otpCooldownTimer);
+              st.otpCooldownTimer = null;
+            }
+            _enterForgotFinalStep();
+          } else {
+            showToast((res && res.message) || 'Verifikasi OTP gagal.', 'error');
+          }
+        })
+        .withFailureHandler(() => {
+          btn.disabled = false;
+          btn.innerText = 'Verifikasi';
+          showToast('Gagal terhubung ke server.', 'error');
+        })
+        .requestPasswordResetByOTP(username, code);
+    }
+    function _enterForgotFinalStep() {
+      const st = window._forgotState || {};
+      const u = st.username || '';
+      const txt = document.getElementById('txtForgotUsernameFinal');
+      if (txt) txt.innerText = u;
+      const np = document.getElementById('inpForgotNewPass');
+      const cp = document.getElementById('inpForgotConfirmPass');
+      if (np) { np.value = ''; np.type = 'password'; }
+      if (cp) { cp.value = ''; cp.type = 'password'; }
+      const submit = document.getElementById('btnSubmitNewPass');
+      if (submit) submit.disabled = true;
+      forgotEvalPassword();
+      _showForgotStep('final');
+      setTimeout(() => { if (np) try { np.focus(); } catch (_) { } }, 100);
+    }
+    function forgotTogglePassVis(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      if (btn) btn.classList.toggle('text-emerald-500', inp.type === 'text');
+    }
+    function _forgotCheckPassRules(pass, username) {
+      const u = String(username || '').toLowerCase();
+      const p = String(pass || '');
+      return {
+        length: p.length >= 8,
+        upper: /[A-Z]/.test(p),
+        lower: /[a-z]/.test(p),
+        digit: /[0-9]/.test(p),
+        symbol: /[!@#$%^&*(),.?":{}|<>]/.test(p),
+        noident: !!p && (!u || !p.toLowerCase().includes(u))
+      };
+    }
+    function forgotEvalPassword() {
+      const st = window._forgotState || {};
+      const username = st.username || '';
+      const np = document.getElementById('inpForgotNewPass');
+      const cp = document.getElementById('inpForgotConfirmPass');
+      const bar = document.getElementById('forgotPassStrengthBar');
+      const lbl = document.getElementById('forgotPassStrengthLabel');
+      const checklist = document.getElementById('forgotPassChecklist');
+      const hint = document.getElementById('forgotConfirmHint');
+      const submit = document.getElementById('btnSubmitNewPass');
+      const pass = np ? np.value : '';
+      const confirm = cp ? cp.value : '';
+      const rules = _forgotCheckPassRules(pass, username);
+      const passed = Object.values(rules).filter(Boolean).length;
+      const allOk = passed === 6;
+      if (checklist) {
+        checklist.querySelectorAll('li[data-rule]').forEach(li => {
+          const k = li.getAttribute('data-rule');
+          const dot = li.querySelector('.rule-dot');
+          if (rules[k]) {
+            li.classList.remove('text-slate-400');
+            li.classList.add('text-emerald-600', 'font-semibold');
+            if (dot) {
+              dot.classList.remove('bg-slate-300');
+              dot.classList.add('bg-emerald-500');
+            }
+          } else {
+            li.classList.add('text-slate-400');
+            li.classList.remove('text-emerald-600', 'font-semibold');
+            if (dot) {
+              dot.classList.add('bg-slate-300');
+              dot.classList.remove('bg-emerald-500');
+            }
+          }
+        });
+      }
+      let pct = (passed / 6) * 100;
+      let color = '#E2E8F0';
+      let labelTxt = '—';
+      if (passed === 0) { color = '#E2E8F0'; labelTxt = '—'; }
+      else if (passed <= 2) { color = '#EF4444'; labelTxt = 'Lemah'; }
+      else if (passed <= 4) { color = '#F59E0B'; labelTxt = 'Sedang'; }
+      else if (passed === 5) { color = '#3B82F6'; labelTxt = 'Kuat'; }
+      else { color = '#10B981'; labelTxt = 'Sangat Kuat'; }
+      if (bar) { bar.style.width = pct + '%'; bar.style.background = color; }
+      if (lbl) {
+        lbl.innerText = 'Kekuatan: ' + labelTxt;
+        lbl.style.color = color === '#E2E8F0' ? '#94A3B8' : color;
+      }
+      let confirmOk = false;
+      if (hint) {
+        if (!confirm) {
+          hint.innerText = 'Masukkan password yang sama persis.';
+          hint.className = 'text-[11px] text-slate-400 mb-4';
+        } else if (confirm !== pass) {
+          hint.innerText = '⚠️ Password konfirmasi tidak cocok.';
+          hint.className = 'text-[11px] text-red-500 font-semibold mb-4';
+        } else {
+          hint.innerText = '✓ Password cocok.';
+          hint.className = 'text-[11px] text-emerald-600 font-semibold mb-4';
+          confirmOk = true;
+        }
+      }
+      if (submit) submit.disabled = !(allOk && confirmOk);
+    }
+    function submitForgotNewPassword() {
+      const st = window._forgotState || {};
+      const token = st.resetToken || '';
+      const np = document.getElementById('inpForgotNewPass');
+      const cp = document.getElementById('inpForgotConfirmPass');
+      const pass = np ? np.value : '';
+      const confirm = cp ? cp.value : '';
+      if (!token) return showToast('Sesi verifikasi tidak ditemukan. Ulangi proses.', 'error');
+      if (!pass) return showToast('Password baru wajib diisi.', 'error');
+      if (pass !== confirm) return showToast('Password konfirmasi tidak cocok.', 'error');
+      const rules = _forgotCheckPassRules(pass, st.username || '');
+      if (!rules.length || !rules.upper || !rules.lower || !rules.digit || !rules.symbol || !rules.noident) {
+        return showToast('Password belum memenuhi semua syarat keamanan.', 'error');
+      }
+      const btn = document.getElementById('btnSubmitNewPass');
+      if (btn) { btn.disabled = true; btn.innerText = 'Menyimpan...'; }
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (btn) { btn.disabled = false; btn.innerText = 'Simpan Password'; }
+          if (res && res.status === 'success') {
+            showToast(res.message || 'Password berhasil diubah.', 'success');
+            try { localStorage.removeItem('reset_rl_' + (st.username || '')); } catch (_) { }
+            closeForgotModal();
+          } else {
+            showToast((res && res.message) || 'Gagal menyimpan password.', 'error');
+            if (res && res.message && /token/i.test(res.message)) {
+              window._forgotState = window._forgotState || {};
+              window._forgotState.resetToken = '';
+            }
+          }
+        })
+        .withFailureHandler(() => {
+          if (btn) { btn.disabled = false; btn.innerText = 'Simpan Password'; }
+          showToast('Gagal terhubung ke server.', 'error');
+        })
+        .resetPasswordWithToken(token, pass);
+    }
+    function _startForgotCountdown(username, lockedUntil) {
+      const btn = document.getElementById('btnSubmitForgot');
+      if (!btn) return;
+      btn.disabled = true;
+      const tick = () => {
+        const secsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
+        if (secsLeft <= 0) {
+          const rlKey = 'reset_rl_' + username;
+          localStorage.removeItem(rlKey);
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Kirim Permintaan';
+          }
+          return;
+        }
+        if (btn) btn.innerText = `Tunggu ${secsLeft}d...`;
+        setTimeout(tick, 1000);
+      };
+      tick();
+    }
+    function handleForgotPassword() {
+</script>

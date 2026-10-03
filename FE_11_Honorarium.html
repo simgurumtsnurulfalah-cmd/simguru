@@ -1,0 +1,1378 @@
+<script>
+          '<span class="text-slate-400 text-xs">Menyiapkan data dari arsip</span>' +
+          '</div>';
+      }
+      if (exportBtn) {
+        exportBtn.classList.add('hidden');
+        exportBtn.classList.remove('inline-flex');
+      }
+      const token = localStorage.getItem('auth_token');
+      google.script.run
+        .withSuccessHandler((data) => {
+          if (data && data.status === 'success') {
+            currentSlipData = data;
+            if (modalTitle) modalTitle.textContent = 'Slip Honorarium — ' + (data.guru_nama || '');
+            if (modalSubtitle) modalSubtitle.textContent = 'Periode: ' + (data.periode || '-');
+            renderSlipContent(data);
+            if (exportBtn) {
+              exportBtn.classList.remove('hidden');
+              exportBtn.classList.add('inline-flex');
+            }
+          } else {
+            if (modalTitle) modalTitle.textContent = 'Slip Honorarium';
+            if (modalSubtitle) modalSubtitle.textContent = '';
+            const msg = (data && data.message) ? data.message : 'Gagal memuat slip.';
+            slipContent.innerHTML = `<div class="text-center py-12 px-4">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+              <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M5 19h14a2 2 0 001.84-2.75L13.74 4a2 2 0 00-3.48 0L3.16 16.25A2 2 0 005 19z"/></svg>
+            </div>
+            <p class="font-bold text-slate-800 text-lg mb-1">Data Tidak Ditemukan</p>
+            <p class="text-sm text-slate-500 max-w-sm mx-auto">${escapeHtml(msg)}</p>
+            <p class="text-xs text-slate-400 mt-3">Periode: <strong>${escapeHtml(periode)}</strong></p>
+          </div>`;
+          }
+        })
+        .withFailureHandler((err) => {
+          if (modalTitle) modalTitle.textContent = 'Slip Honorarium';
+          if (modalSubtitle) modalSubtitle.textContent = '';
+          slipContent.innerHTML = `<div class="text-center py-12 px-4">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636l-12.728 12.728M5.636 5.636l12.728 12.728"/></svg>
+          </div>
+          <p class="font-bold text-slate-800 text-lg mb-1">Koneksi Gagal</p>
+          <p class="text-sm text-slate-500 break-words max-w-sm mx-auto">${escapeHtml(String(err))}</p>
+        </div>`;
+        })
+        .getHonorariumSlipByHistory(token, periode, userId);
+    }
+    function renderSlipContent(data) {
+      const slipContent = document.getElementById('slipContent');
+      if (!slipContent) return;
+      data = data || {};
+      const allowanceRows = (data.allowance_list || []).map(a => `
+      <tr class="hover:bg-blue-50/30 transition-colors">
+        <td class="py-3 px-4 text-left font-medium text-slate-700">${escapeHtml(a.desc || '-')}</td>
+        <td class="py-3 px-4 text-center text-slate-500">${escapeHtml(String(a.qty || ''))}</td>
+        <td class="py-3 px-4 text-right text-slate-500">${escapeHtml(a.rate || '-')}</td>
+        <td class="py-3 px-4 text-right font-bold text-slate-800">${escapeHtml(a.amount || 'Rp 0')}</td>
+      </tr>
+    `).join('');
+      const trxId = String(data.trx_id || '-');
+      const isFinal = trxId && trxId.indexOf('ESTIMASI') === -1 && trxId !== '-';
+      slipContent.innerHTML = `
+      <div id="printAreaSlipModal"
+           class="bg-white border border-slate-200 rounded-xl p-4 sm:p-8 shadow-sm relative overflow-hidden w-full">
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] z-0 transform -rotate-45 ${isFinal ? 'hidden' : ''}">
+          <span class="text-[60px] sm:text-[150px] font-black text-slate-900 uppercase">ESTIMASI</span>
+        </div>
+        <div class="relative z-10">
+          <div class="border-b-2 border-slate-800 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+            <div class="w-full">
+              <h2 class="text-xl sm:text-2xl font-bold text-slate-900 uppercase tracking-wide">SLIP HONORARIUM</h2>
+              <p class="text-sm font-bold text-slate-600 mt-1 truncate">${escapeHtml(data.school_name || '-')}</p>
+            </div>
+            <div class="text-left sm:text-right w-full sm:w-auto flex-shrink-0">
+              <h3 class="text-lg sm:text-xl font-bold text-slate-800">${escapeHtml(data.periode || '-')}</h3>
+              ${isFinal
+          ? '<p class="text-xs font-bold text-emerald-700 mt-1 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Siap Dibayarkan</p>'
+          : '<p class="text-xs font-bold text-amber-700 mt-1 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Estimasi</p>'}
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-8 text-sm">
+            <div>
+              <p class="text-slate-500 mb-1 text-xs uppercase font-bold tracking-wider">Penerima</p>
+              <p class="font-bold text-lg text-slate-800 break-words">${escapeHtml(data.guru_nama || '-')}</p>
+              <p class="text-slate-500 mt-2 mb-1 text-xs">NIP / NPK</p>
+              <p class="font-mono text-slate-700 break-all">${escapeHtml(data.guru_nip || '-')}</p>
+            </div>
+            <div class="text-left sm:text-right">
+              <p class="text-slate-500 mb-1 text-xs uppercase font-bold tracking-wider">Tanggal Cetak</p>
+              <p class="font-bold text-slate-800">${escapeHtml(data.tgl_cetak || '-')}</p>
+              <p class="text-slate-500 mt-2 mb-1 text-xs">ID Transaksi</p>
+              <p class="font-mono text-xs text-slate-400 break-all">${escapeHtml(trxId)}</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto rounded-lg border border-slate-200 mb-8">
+            <table class="w-full text-sm min-w-[500px]">
+              <thead class="bg-slate-50 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4 text-left">Keterangan</th>
+                  <th class="py-3 px-4 text-center">Qty / JTM</th>
+                  <th class="py-3 px-4 text-right">Tarif</th>
+                  <th class="py-3 px-4 text-right">Jumlah</th>
+                </tr>
+              </thead>
+              <tbody class="text-slate-700 divide-y divide-slate-100">
+                <tr class="hover:bg-blue-50/30 transition-colors">
+                  <td class="py-3 px-4 text-left font-medium text-slate-700">JTM Mengajar &amp; Tugas</td>
+                  <td class="py-3 px-4 text-center text-slate-500">${escapeHtml(String(data.qty_real || 0))}</td>
+                  <td class="py-3 px-4 text-right text-slate-500">${escapeHtml(data.tarif || '-')}</td>
+                  <td class="py-3 px-4 text-right font-bold text-slate-800">${escapeHtml(data.total_real || 'Rp 0')}</td>
+                </tr>
+                <tr class="hover:bg-emerald-50/30 transition-colors">
+                  <td class="py-3 px-4 text-left font-medium text-slate-700">JTM Kehadiran Acara</td>
+                  <td class="py-3 px-4 text-center text-slate-500">${Number(data.jtm_event || 0)}</td>
+                  <td class="py-3 px-4 text-right text-slate-500">${escapeHtml(data.tarif || '-')}</td>
+                  <td class="py-3 px-4 text-right font-bold text-slate-800">${escapeHtml(data.jtm_event_amount || 'Rp 0')}</td>
+                </tr>
+                ${allowanceRows}
+              </tbody>
+            </table>
+          </div>
+          <div class="flex justify-end mb-12">
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 px-4 sm:px-6 py-4 rounded-xl border border-blue-200 text-right w-full sm:min-w-[280px] sm:w-auto shadow-sm">
+              <p class="text-xs text-blue-600 mb-1 font-bold uppercase tracking-wider">Total Diterima</p>
+              <h3 class="text-2xl sm:text-3xl font-extrabold text-blue-700 tracking-tight">${escapeHtml(data.grand_total || 'Rp 0')}</h3>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row justify-between items-end text-center mt-8 text-sm text-slate-600 gap-12 sm:gap-0">
+            <div class="w-full sm:w-48 text-left sm:text-center">
+              <p class="mb-16 text-xs text-slate-500">Penerima,</p>
+              <p class="font-bold border-b border-slate-300 pb-1 text-slate-800 block w-full">${escapeHtml(data.guru_nama || '-')}</p>
+            </div>
+            <div class="w-full sm:w-48 text-left sm:text-center">
+              <p class="mb-1 text-xs text-slate-500">Mengetahui,</p>
+              <p class="mb-16 text-xs font-bold text-slate-700">Kepala ${escapeHtml(data.school_name || '-')}</p>
+              <p class="font-bold border-b border-slate-300 pb-1 text-slate-800 uppercase block w-full">${escapeHtml(data.kepala_sekolah || '-')}</p>
+            </div>
+          </div>
+          <div class="mt-8 pt-4 border-t border-slate-100 text-[10px] text-slate-400 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <span>Dicetak dari SiM-Guru oleh ${escapeHtml(data.printed_by || '-')}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    }
+    function closeSlipModal() {
+      const modal = document.getElementById('slipModal');
+      if (modal) modal.classList.add('hidden');
+      if (typeof _maybeReleaseBodyLock === 'function') {
+        _maybeReleaseBodyLock();
+      } else {
+        document.body.classList.remove('overflow-hidden');
+      }
+      const exportBtn = document.getElementById('btnExportSlipPDF');
+      if (exportBtn) {
+        exportBtn.classList.add('hidden');
+        exportBtn.classList.remove('inline-flex');
+        exportBtn.disabled = false;
+      }
+      const modalSubtitle = document.getElementById('slipModalSubtitle');
+      if (modalSubtitle) modalSubtitle.textContent = '';
+      const slipContent = document.getElementById('slipContent');
+      if (slipContent) {
+        slipContent.innerHTML =
+          '<div class="flex items-center justify-center gap-3 py-12">' +
+          '<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>' +
+          '<span class="text-slate-500 font-medium">Memuat slip honorarium...</span>' +
+          '</div>';
+      }
+      currentSlipData = null;
+    }
+    function exportSlipToPDF() {
+      if (!currentSlipData) return showToast('Data slip tidak tersedia.', 'error');
+      const element = document.getElementById('printAreaSlipModal');
+      if (!element) return showToast('Elemen slip tidak ditemukan. Pastikan slip sudah dimuat.', 'error');
+      const rawName = (currentSlipData.guru_nama || 'Guru').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+      const rawPeriode = (currentSlipData.periode || 'Periode').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+      const filename = 'Slip_Honor_' + rawName + '_' + rawPeriode + '.pdf';
+      const btn = document.getElementById('btnExportSlipPDF');
+      const originalHTML = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg class=\"w-4 h-4 animate-spin\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" stroke-width=\"4\" class=\"opacity-25\"/><path d=\"M4 12a8 8 0 018-8\" stroke-width=\"4\" class=\"opacity-75\"/></svg> Memproses...';
+      }
+      showToast('Menyiapkan PDF berkualitas tinggi...', 'info');
+      var savedStyles = [];
+      var el = element.parentElement;
+      while (el && el !== document.body) {
+        var cs = window.getComputedStyle(el);
+        var ovf = cs.overflow + cs.overflowY + cs.overflowX;
+        var hasClip = ovf.indexOf('hidden') !== -1 || ovf.indexOf('auto') !== -1 || ovf.indexOf('scroll') !== -1;
+        var hasMaxH = el.style.maxHeight && el.style.maxHeight !== 'none' && el.style.maxHeight !== '';
+        if (hasClip || hasMaxH) {
+          savedStyles.push({
+            el: el,
+            overflow: el.style.overflow,
+            overflowY: el.style.overflowY,
+            overflowX: el.style.overflowX,
+            maxHeight: el.style.maxHeight
+          });
+          el.style.overflow = 'visible';
+          el.style.overflowY = 'visible';
+          el.style.overflowX = 'visible';
+          el.style.maxHeight = 'none';
+        }
+        el = el.parentElement;
+      }
+      function restoreStyles() {
+        savedStyles.forEach(function (s) {
+          s.el.style.overflow = s.overflow;
+          s.el.style.overflowY = s.overflowY;
+          s.el.style.overflowX = s.overflowX;
+          s.el.style.maxHeight = s.maxHeight;
+        });
+      }
+      var opt = {
+        margin: [12, 10, 12, 10],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2.5,
+          useCORS: true,
+          logging: false,
+          scrollY: -window.scrollY,
+          scrollX: -window.scrollX,
+          windowWidth: document.documentElement.scrollWidth,
+          windowHeight: document.documentElement.scrollHeight
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait'
+        }
+      };
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(function () {
+          restoreStyles();
+          showToast('PDF berhasil diunduh!', 'success');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+          }
+        })
+        .catch(function (err) {
+          restoreStyles();
+          showToast('Gagal membuat PDF: ' + String(err), 'error');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
+          }
+        });
+    }
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/[&<>"']/g, function (m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        if (m === '"') return '&quot;';
+        if (m === "'") return '&#39;';
+        return m;
+      }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function (c) {
+        return c;
+      });
+    }
+    function formatHHmm(val) {
+      if (val === null || val === undefined || val === '') return '';
+      const s = String(val).trim();
+      if (!s) return '';
+      if (/^\d{2}:\d{2}/.test(s)) return s.substring(0, 5);
+      if (s.includes('T') || (s.includes('-') && s.length > 10)) {
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+      }
+      return s;
+    }
+    function initHonorariumHistory() {
+      const token = localStorage.getItem('auth_token');
+      const role = localStorage.getItem('user_role');
+      const isAdmin = String(role).toLowerCase() === 'admin';
+      const viewGuru = document.getElementById('viewGuruHistory');
+      const viewAdmin = document.getElementById('viewAdminHistory');
+      if (isAdmin) {
+        if (viewGuru) viewGuru.classList.add('hidden');
+        if (viewAdmin) viewAdmin.classList.remove('hidden');
+        const tbody = document.getElementById('tbodyAdminHonorHistory');
+        if (tbody) tbody.innerHTML = skeletonTableRows(7, 5);
+        const countBadge = document.getElementById('admFilterCount');
+        if (countBadge) countBadge.textContent = 'Memuat...';
+        ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+          var el = document.getElementById(id);
+          if (el) el.innerHTML = '<div class="skeleton" style="height:18px;width:36px;border-radius:6px;display:inline-block;"></div>';
+        });
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (!res) {
+              console.error('Response null dari server');
+              if (tbody) tbody.innerHTML = errorTableRows(7, 'Server mengembalikan response kosong.', 'initHonorariumHistory()');
+              if (countBadge) countBadge.textContent = '0 Data';
+              ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+                var el = document.getElementById(id); if (el) el.textContent = '—';
+              });
+              showToast('Gagal memuat data arsip: response kosong', 'error');
+              return;
+            }
+            if (res.status === 'success') {
+              allAdminHistoryData = res.data || [];
+              adminHonorCurrentPage = 1;
+              adminHonorFilteredData = allAdminHistoryData;
+              const selFilter = document.getElementById('selAdminHistoryFilter');
+              if (selFilter && res.periods && Array.isArray(res.periods)) {
+                let opts = '<option value="">Semua Periode</option>';
+                res.periods.forEach(function (p) {
+                  opts += '<option value="' + String(p).replace(/"/g, '&quot;') + '">' + escapeHtml(String(p)) + '</option>';
+                });
+                selFilter.innerHTML = opts;
+              }
+              const admData = allAdminHistoryData;
+              const admPeriods = [...new Set(admData.map(d => d.periode))].length;
+              const admGurus = [...new Set(admData.map(d => d.user_id))].length;
+              const elAP = document.getElementById('admStatPeriods');
+              const elAG = document.getElementById('admStatGuru');
+              const elAT = document.getElementById('admStatTotal');
+              if (elAP) elAP.textContent = admPeriods;
+              if (elAG) elAG.textContent = admGurus;
+              if (elAT) elAT.textContent = admData.length + ' Entri';
+              renderAdminHonorHistoryTable(allAdminHistoryData);
+            } else {
+              const errMsg = res.message || 'Gagal memuat data arsip honorarium.';
+              if (tbody) tbody.innerHTML = errorTableRows(7, errMsg, 'initHonorariumHistory()');
+              if (countBadge) countBadge.textContent = '0 Data';
+              ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+                var el = document.getElementById(id); if (el) el.textContent = '—';
+              });
+              showToast(errMsg, 'error');
+            }
+          })
+          .withFailureHandler(function (err) {
+            console.error('getHonorariumHistoryAdmin error:', err);
+            if (tbody) tbody.innerHTML = errorTableRows(7, 'Koneksi ke server gagal: ' + String(err), 'initHonorariumHistory()');
+            if (countBadge) countBadge.textContent = '0 Data';
+            ['admStatPeriods', 'admStatGuru', 'admStatTotal'].forEach(id => {
+              var el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            showToast('Gagal memuat arsip honorarium: ' + String(err), 'error');
+          })
+          .getHonorariumHistoryAdmin(token);
+        return;
+      }
+      if (viewGuru) viewGuru.classList.remove('hidden');
+      if (viewAdmin) viewAdmin.classList.add('hidden');
+      const tbodyGuru = document.getElementById('tbodyHonorHistory');
+      if (!tbodyGuru) return;
+      var badge = document.getElementById('guruHistoryBadge');
+      if (badge) badge.textContent = 'Memuat...';
+      ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = '<div class="skeleton" style="height:18px;width:36px;border-radius:6px;display:inline-block;"></div>';
+      });
+      tbodyGuru.innerHTML = `
+      <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+        <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+      </div>
+      <div style="border-radius:1rem;border:1px solid #E2E8F0;background:#FAFBFD;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+        <div class="skeleton" style="height:18px;width:60%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:90%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:14px;width:75%;border-radius:6px;"></div>
+        <div class="skeleton" style="height:32px;width:100%;border-radius:8px;margin-top:.25rem;"></div>
+      </div>`;
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (!res) {
+            tbodyGuru.innerHTML = `<div style="grid-column:1/-1;">${errorStateHTML('Server mengembalikan response kosong.', 'initHonorariumHistory()')}</div>`;
+            if (badge) badge.textContent = '0 Periode';
+            ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+              var el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            showToast('Gagal memuat riwayat honorarium: response kosong', 'error');
+            return;
+          }
+          if (res.status === 'success') {
+            const historyData = res.data || [];
+            allGuruHistoryData = historyData;
+            guruHonorSelectedYear = 'all';
+            guruHonorSelectedMonth = 'all';
+            const totalPeriods = historyData.length;
+            const totalJtm = historyData.reduce(function (s, x) { return s + Number(x.total_jtm || 0); }, 0);
+            var sumHonor = 0;
+            historyData.forEach(function (x) {
+              var n = String(x.nominal || '').replace(/[^0-9]/g, '');
+              if (n) sumHonor += Number(n) || 0;
+            });
+            const elPeriods = document.getElementById('guruStatPeriods');
+            const elJtm = document.getElementById('guruStatJtm');
+            const elTotalEl = document.getElementById('guruStatTotal');
+            if (elPeriods) elPeriods.textContent = totalPeriods;
+            if (elJtm) elJtm.textContent = totalJtm;
+            if (badge) badge.textContent = totalPeriods + ' Periode';
+            if (elTotalEl) {
+              if (totalPeriods === 0) {
+                elTotalEl.textContent = '—';
+              } else {
+                elTotalEl.textContent = 'Rp ' + sumHonor.toLocaleString('id-ID');
+              }
+            }
+            if (historyData.length === 0) {
+              tbodyGuru.innerHTML = `<div class="ah-empty" style="grid-column:1/-1;">
+              <div class="ah-empty-icon">
+                <svg style="width:24px;height:24px;color:#CBD5E1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586"/>
+                </svg>
+              </div>
+              <p style="font-size:.875rem;font-weight:700;color:#475569;">Belum ada riwayat honorarium</p>
+              <span style="font-size:.75rem;color:#94A3B8;margin-top:.25rem;">Riwayat akan muncul setelah finalisasi bulanan</span>
+            </div>`;
+              var fb = document.getElementById('guruHonorFilterBar');
+              if (fb) fb.style.display = 'none';
+              return;
+            }
+            _buildGuruHonorFilter(historyData);
+            _applyGuruHonorFilter();
+          } else {
+            var errMsg = res.message || 'Gagal memuat riwayat honorarium.';
+            tbodyGuru.innerHTML = `<div style="grid-column:1/-1;">${errorStateHTML(errMsg, 'initHonorariumHistory()')}</div>`;
+            if (badge) badge.textContent = '0 Periode';
+            ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+              var el = document.getElementById(id); if (el) el.textContent = '—';
+            });
+            showToast(errMsg, 'error');
+          }
+        })
+        .withFailureHandler(function (err) {
+          console.error('getHonorariumHistoryGuru error:', err);
+          tbodyGuru.innerHTML = `<div style="grid-column:1/-1;">${errorStateHTML('Koneksi ke server gagal: ' + String(err), 'initHonorariumHistory()')}</div>`;
+          if (badge) badge.textContent = '0 Periode';
+          ['guruStatPeriods', 'guruStatJtm', 'guruStatTotal'].forEach(id => {
+            var el = document.getElementById(id); if (el) el.textContent = '—';
+          });
+          showToast('Gagal memuat riwayat honorarium: ' + String(err), 'error');
+        })
+        .getHonorariumHistoryGuru(token);
+    }
+    function viewSlipFromHistory(periode) {
+      window._pendingHonorPeriode = periode;
+      handleNav('Page_Honorarium');
+    }
+    function _buildGuruHonorFilter(data) {
+      _guruHonorYearMap = {};
+      data.forEach(function (h) {
+        var parts = String(h.periode || '').trim().split(' ');
+        if (parts.length === 2) {
+          var month = parts[0], year = parts[1];
+          if (!_guruHonorYearMap[year]) _guruHonorYearMap[year] = [];
+          if (_guruHonorYearMap[year].indexOf(month) === -1) {
+            _guruHonorYearMap[year].push(month);
+          }
+        }
+      });
+      var years = Object.keys(_guruHonorYearMap)
+        .sort(function (a, b) { return Number(b) - Number(a); });
+      var yearEl = document.getElementById('guruYearChips');
+      if (yearEl) {
+        var html = '<button class="ah-guru-year-chip ah-guru-year-active" data-year="all" onclick="selectGuruHonorYear(\'all\')">Semua Tahun</button>';
+        years.forEach(function (y) {
+          html += '<button class="ah-guru-year-chip" data-year="' + y + '" onclick="selectGuruHonorYear(\'' + y + '\')">' + y + '</button>';
+        });
+        yearEl.innerHTML = html;
+      }
+      var bar = document.getElementById('guruHonorFilterBar');
+      if (bar) bar.style.display = '';
+    }
+    function selectGuruHonorYear(year) {
+      guruHonorSelectedYear = year;
+      guruHonorSelectedMonth = 'all';
+      document.querySelectorAll('.ah-guru-year-chip').forEach(function (btn) {
+        btn.classList.toggle('ah-guru-year-active', btn.getAttribute('data-year') === String(year));
+      });
+      var monthRow = document.getElementById('guruMonthRow');
+      var monthChips = document.getElementById('guruMonthChips');
+      if (year === 'all' || !_guruHonorYearMap[year]) {
+        if (monthRow) { monthRow.classList.remove('visible'); }
+      } else {
+        var months = (_guruHonorYearMap[year] || []).slice().sort(function (a, b) {
+          return _MONTH_NAMES_ID.indexOf(a) - _MONTH_NAMES_ID.indexOf(b);
+        });
+        if (monthChips) {
+          var html = '<button class="ah-guru-month-chip ah-guru-month-active" data-month="all" onclick="selectGuruHonorMonth(\'all\')">Semua Bulan</button>';
+          months.forEach(function (m) {
+            var idx = _MONTH_NAMES_ID.indexOf(m);
+            var label = idx >= 0 ? _MONTH_SHORT_ID[idx] : m;
+            html += '<button class="ah-guru-month-chip" data-month="' + m + '" onclick="selectGuruHonorMonth(\'' + m + '\')">' + label + '</button>';
+          });
+          monthChips.innerHTML = html;
+        }
+        if (monthRow) { monthRow.classList.add('visible'); }
+      }
+      _applyGuruHonorFilter();
+    }
+    function selectGuruHonorMonth(month) {
+      guruHonorSelectedMonth = month;
+      document.querySelectorAll('.ah-guru-month-chip').forEach(function (btn) {
+        btn.classList.toggle('ah-guru-month-active', btn.getAttribute('data-month') === String(month));
+      });
+      _applyGuruHonorFilter();
+    }
+    function resetGuruHonorFilter() {
+      selectGuruHonorYear('all');
+    }
+    function _applyGuruHonorFilter() {
+      var isYearFiltered = guruHonorSelectedYear !== 'all';
+      var isMonthFiltered = guruHonorSelectedMonth !== 'all';
+      var isFiltered = isYearFiltered || isMonthFiltered;
+      var filtered = allGuruHistoryData;
+      if (isYearFiltered) {
+        filtered = filtered.filter(function (h) {
+          var parts = String(h.periode || '').split(' ');
+          return parts.length === 2 && parts[1] === guruHonorSelectedYear;
+        });
+      }
+      if (isMonthFiltered) {
+        filtered = filtered.filter(function (h) {
+          var parts = String(h.periode || '').split(' ');
+          return parts.length === 2 && parts[0] === guruHonorSelectedMonth;
+        });
+      }
+      var resultText = document.getElementById('guruFilterResultText');
+      var resultDot = document.getElementById('guruFilterDot');
+      var resetBtn = document.getElementById('guruFilterResetBtn');
+      var badge = document.getElementById('guruHistoryBadge');
+      var label = isFiltered
+        ? filtered.length + ' periode ditemukan'
+        : allGuruHistoryData.length + ' periode tersedia';
+      if (resultText) resultText.textContent = label;
+      if (resultDot) resultDot.classList.toggle('filtered', isFiltered);
+      if (resetBtn) resetBtn.style.display = isFiltered ? '' : 'none';
+      if (badge) badge.textContent = filtered.length + ' Periode' + (isFiltered ? ' ↑ difilter' : '');
+      // Update hero stat cards sesuai data yang sedang difilter
+      var filteredJtm = filtered.reduce(function (s, x) { return s + Number(x.total_jtm || 0); }, 0);
+      var filteredHonor = 0;
+      filtered.forEach(function (x) {
+        var n = String(x.nominal || '').replace(/[^0-9]/g, '');
+        if (n) filteredHonor += Number(n) || 0;
+      });
+      var elSP = document.getElementById('guruStatPeriods');
+      var elSJ = document.getElementById('guruStatJtm');
+      var elST = document.getElementById('guruStatTotal');
+      var elLbl = document.getElementById('guruStatPeriodsLbl');
+      if (elSP) elSP.textContent = filtered.length;
+      if (elSJ) elSJ.textContent = filteredJtm;
+      if (elST) elST.textContent = filtered.length === 0 ? '—' : 'Rp ' + filteredHonor.toLocaleString('id-ID');
+      if (elLbl) elLbl.textContent = isFiltered ? 'Periode Difilter' : 'Total Periode';
+      _renderGuruHonorCards(filtered);
+    }
+    function _renderGuruHonorCards(data) {
+      var tbodyGuru = document.getElementById('tbodyHonorHistory');
+      if (!tbodyGuru) return;
+      if (data.length === 0) {
+        tbodyGuru.innerHTML = `
+        <div class="ah-empty" style="grid-column:1/-1;">
+          <div class="ah-empty-icon">
+            <svg style="width:24px;height:24px;color:#CBD5E1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+          <p style="font-size:.875rem;font-weight:700;color:#475569;">Tidak ada data untuk filter ini</p>
+          <span style="font-size:.75rem;color:#94A3B8;margin-top:.25rem;">
+            Coba pilih tahun atau bulan yang berbeda
+          </span>
+          <button onclick="resetGuruHonorFilter()"
+            style="margin-top:.875rem;display:inline-flex;align-items:center;gap:6px;
+                   padding:.4rem 1rem;border-radius:8px;font-size:.78rem;font-weight:700;
+                   background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;cursor:pointer;">
+            <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Tampilkan Semua
+          </button>
+        </div>`;
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.length; i++) {
+        var h = data[i];
+        var safePeriode = escapeHtml(h.periode || '-');
+        var safePeriodeJs = String(h.periode || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var safeJtm = Number(h.total_jtm || 0);
+        var safeJtmAcara = Number(h.jtm_acara || 0);
+        var safeTugasTambahan = escapeHtml(h.nominal_tugas_tambahan || 'Rp 0');
+        var safeTransport = escapeHtml(h.nominal_transport || 'Rp 0');
+        var safeNominal = escapeHtml(h.nominal || 'Rp 0');
+        var safeTrx = escapeHtml(h.trx_id || '-');
+        var delay = Math.min(i, 8) * 35;
+        var tanggal = h.tanggal_simpan
+          ? '<span style="font-size:.68rem;color:#94A3B8;display:inline-flex;align-items:center;gap:4px;">' +
+          '<svg style="width:10px;height:10px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+          'Final: ' + escapeHtml(_formatTanggalFinal(h.tanggal_simpan)) + '</span>'
+          : '';
+        html += `<div class="ah-honor-card ah-card-reveal" style="animation-delay:${delay}ms;">
+        <div class="ah-honor-card-top">
+          <span class="ah-honor-card-periode">${safePeriode}</span>
+          <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.65rem;font-weight:800;background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;">
+            <svg style="width:9px;height:9px;" fill="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Final
+          </span>
+        </div>
+        <div class="ah-honor-card-body">
+          <div class="ah-honor-card-row">
+            <span class="ah-honor-card-lbl">Total JTM</span>
+            <span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;font-size:.72rem;font-weight:800;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;">${safeJtm} JTM</span>
+          </div>
+          ${safeJtmAcara > 0 ? `<div class="ah-honor-card-row" style="margin-top:.375rem;">
+            <span class="ah-honor-card-lbl">JTM Acara</span>
+            <span style="display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:999px;font-size:.72rem;font-weight:800;background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;"><svg style="width:9px;height:9px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>${safeJtmAcara} JTM</span>
+          </div>` : ''}
+          <div class="ah-honor-card-row" style="margin-top:.625rem;">
+            <span class="ah-honor-card-lbl">Tgs. Tambahan</span>
+            <span style="font-size:.875rem;font-weight:700;color:#475569;">${safeTugasTambahan}</span>
+          </div>
+          <div class="ah-honor-card-row" style="margin-top:.375rem;">
+            <span class="ah-honor-card-lbl">Transportasi</span>
+            <span style="font-size:.875rem;font-weight:700;color:#475569;">${safeTransport}</span>
+          </div>
+          <div class="ah-honor-card-row" style="margin-top:.625rem;border-top:1px dashed #E2E8F0;padding-top:.5rem;">
+            <span class="ah-honor-card-lbl">Nominal Diterima</span>
+            <span style="font-size:1rem;font-weight:800;color:#059669;">${safeNominal}</span>
+          </div>
+          ${tanggal ? '<div style="margin-top:.5rem;">' + tanggal + '</div>' : ''}
+        </div>
+        <div class="ah-honor-card-foot">
+          <button type="button" onclick="viewSlipFromHistory('${safePeriodeJs}')" class="ah-slip-btn" aria-label="Lihat slip ${safePeriode}">
+            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Lihat Detail Slip
+          </button>
+        </div>
+      </div>`;
+      }
+      tbodyGuru.innerHTML = html;
+    }
+    function initManageSchedule() {
+      populateGlobalClassSelects();
+      if (globalConfig) {
+        const tf = document.getElementById('filterTahunPelajaran');
+        if (tf && !tf.value) tf.value = globalConfig.tahun_pelajaran || '';
+        const sf = document.getElementById('filterSemester');
+        if (sf && !sf.value) sf.value = globalConfig.semester || '';
+      }
+      const token = localStorage.getItem('auth_token');
+      const tbody = document.getElementById('tbodyManageSchedule');
+      if (tbody) tbody.innerHTML = skeletonTableRows(7, 5);
+      cachedSchedules = cachedSchedules || [];
+      _updateFilterIndicators();
+      google.script.run.withSuccessHandler((data) => {
+        cachedSchedules = data || [];
+        applyScheduleFilters();
+      }).withFailureHandler((err) => {
+        if (tbody) tbody.innerHTML = errorTableRows(7, 'Gagal memuat jadwal: ' + (err && err.message ? err.message : err), 'initManageSchedule()');
+      }).getAllSchedulesAdmin(token);
+      if (Array.isArray(window._allUsersCache) && window._allUsersCache.length) {
+        _populateScheduleTeacherSelect(window._allUsersCache);
+      } else {
+        google.script.run.withSuccessHandler((users) => {
+          if (Array.isArray(users)) window._allUsersCache = users;
+          _populateScheduleTeacherSelect(users || []);
+        }).getAllUsers(token);
+      }
+      if (Array.isArray(window._subjectsCache) && window._subjectsCache.length) {
+        _populateScheduleSubjectSelect(window._subjectsCache);
+      } else {
+        google.script.run.withSuccessHandler((res) => {
+          if (res && res.status === 'success' && res.subjects) {
+            window._subjectsCache = res.subjects;
+            _populateScheduleSubjectSelect(res.subjects);
+          } else if (res && res.message) {
+            console.error("Gagal memuat mata pelajaran:", res.message);
+          }
+        }).getSettingsMasterData(token);
+      }
+    }
+    function _populateScheduleTeacherSelect(users) {
+      const sel = document.getElementById('inpSchedTeacher');
+      if (!sel) return;
+      let html = '<option value="">Pilih Guru...</option>';
+      (users || []).filter(u => u.role === 'guru').forEach(u => {
+        html += '<option value="' + escapeHtml(String(u.id)) + '">' + escapeHtml(u.full_name || '') + '</option>';
+      });
+      sel.innerHTML = html;
+    }
+    function _populateScheduleSubjectSelect(subjects) {
+      const sel = document.getElementById('inpSchedSubject');
+      if (!sel) return;
+      let html = '<option value="">Pilih Mapel...</option>';
+      (subjects || []).forEach(s => {
+        const v = escapeHtml(s.name || '');
+        html += '<option value="' + v + '">' + v + '</option>';
+      });
+      sel.innerHTML = html;
+    }
+    function _updateFilterIndicators() {
+      const search = (document.getElementById('filterSearch') || {}).value || '';
+      const day = (document.getElementById('filterDay') || {}).value || '';
+      const cls = (document.getElementById('filterClass') || {}).value || '';
+      const tp = ((document.getElementById('filterTahunPelajaran') || {}).value || '').trim().toLowerCase();
+      const sem = (document.getElementById('filterSemester') || {}).value || '';
+      const activeTP = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.tahun_pelajaran) ? globalConfig.tahun_pelajaran.toLowerCase() : '';
+      const activeSem = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.semester) ? globalConfig.semester : '';
+      let activeCount = 0;
+      if (search.trim()) activeCount++;
+      if (day) activeCount++;
+      if (cls) activeCount++;
+      if (tp && tp !== activeTP) activeCount++;
+      if (sem && sem !== activeSem) activeCount++;
+      const badge = document.getElementById('badgeFilterActive');
+      const badgeCount = document.getElementById('badgeFilterActiveCount');
+      const btnClearAll = document.getElementById('btnClearFilters');
+      const btnClearSearch = document.getElementById('btnClearSearch');
+      if (badge && badgeCount) {
+        if (activeCount > 0) {
+          badge.classList.remove('hidden');
+          badge.classList.add('inline-flex');
+          badgeCount.textContent = String(activeCount);
+        } else {
+          badge.classList.add('hidden');
+          badge.classList.remove('inline-flex');
+        }
+      }
+      if (btnClearAll) btnClearAll.classList.toggle('hidden', activeCount === 0);
+      if (btnClearSearch) btnClearSearch.classList.toggle('hidden', !search);
+    }
+    function clearScheduleSearch() {
+      var s = document.getElementById('filterSearch');
+      if (s) { s.value = ''; s.focus(); }
+      applyScheduleFilters();
+    }
+    function clearScheduleFilters() {
+      var s = document.getElementById('filterSearch'); if (s) s.value = '';
+      var d = document.getElementById('filterDay'); if (d) d.value = '';
+      var c = document.getElementById('filterClass'); if (c) c.value = '';
+      var t = document.getElementById('filterTahunPelajaran'); 
+      if (t) t.value = (typeof globalConfig !== 'undefined' && globalConfig) ? globalConfig.tahun_pelajaran || '' : '';
+      var m = document.getElementById('filterSemester'); 
+      if (m) m.value = (typeof globalConfig !== 'undefined' && globalConfig) ? globalConfig.semester || '' : '';
+      applyScheduleFilters();
+    }
+    function applyScheduleFilters() {
+      if (!Array.isArray(cachedSchedules)) cachedSchedules = [];
+      const search = ((document.getElementById('filterSearch') || {}).value || '').toLowerCase();
+      const day = (document.getElementById('filterDay') || {}).value || '';
+      const cls = (document.getElementById('filterClass') || {}).value || '';
+      const tp = ((document.getElementById('filterTahunPelajaran') || {}).value || '').trim().toLowerCase();
+      const sem = (document.getElementById('filterSemester') || {}).value || '';
+      const activeTP = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.tahun_pelajaran) ? globalConfig.tahun_pelajaran.toLowerCase() : '';
+      const activeSem = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.semester) ? globalConfig.semester : '';
+      let filtered = cachedSchedules.filter(s => {
+        const matchSearch = !search ||
+          ((s.guru_name || '').toLowerCase().includes(search) ||
+            (s.subject || '').toLowerCase().includes(search));
+        const matchDay = day === "" || String(s.day_index) === String(day);
+        const matchClass = cls === "" || String(s.class_name) === String(cls);
+        const sTP = s.tahun_pelajaran ? String(s.tahun_pelajaran).toLowerCase() : activeTP;
+        const sSem = s.semester ? String(s.semester) : activeSem;
+        const matchTP = tp === "" || sTP.includes(tp);
+        const matchSem = sem === "" || sSem === sem;
+        return matchSearch && matchDay && matchClass && matchTP && matchSem;
+      });
+      filtered.sort((a, b) => {
+        if (Number(a.day_index) !== Number(b.day_index)) {
+          return Number(a.day_index) - Number(b.day_index);
+        }
+        return (a.time_start || '').localeCompare(b.time_start || '');
+      });
+      filteredSchedules = filtered;
+      renderManageScheduleTable(filtered);
+      _updateFilterIndicators();
+    }
+    function renderManageScheduleTable(schedules) {
+      const tbody = document.getElementById('tbodyManageSchedule');
+      if (!tbody) return;
+      schedules = Array.isArray(schedules) ? schedules : [];
+      const totalAll = (cachedSchedules || []).length;
+      const totalJadwal = schedules.length;
+      const uniqueDays = [...new Set(schedules.map(s => s.day_index))].length;
+      const uniqueGuru = [...new Set(schedules.map(s => String(s.user_id)))].length;
+      const totalJTM = schedules.reduce((acc, s) => acc + Number(s.jtm_val || 0), 0);
+      const _st = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      _st('statTotalJadwal', totalJadwal);
+      _st('statTotalHari', uniqueDays);
+      _st('statTotalGuru', uniqueGuru);
+      _st('statTotalJTM', totalJTM);
+      const lbl = document.getElementById('labelJadwalCount');
+      if (lbl) {
+        if (totalJadwal === totalAll) {
+          lbl.textContent = totalJadwal + ' jadwal';
+        } else {
+          lbl.textContent = totalJadwal + ' / ' + totalAll + ' jadwal';
+        }
+      }
+      if (schedules.length === 0) {
+        const search = ((document.getElementById('filterSearch') || {}).value || '').trim();
+        const day = (document.getElementById('filterDay') || {}).value || '';
+        const cls = (document.getElementById('filterClass') || {}).value || '';
+        const tp = ((document.getElementById('filterTahunPelajaran') || {}).value || '').trim().toLowerCase();
+        const sem = (document.getElementById('filterSemester') || {}).value || '';
+        const activeTP = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.tahun_pelajaran) ? globalConfig.tahun_pelajaran.toLowerCase() : '';
+        const activeSem = (typeof globalConfig !== 'undefined' && globalConfig && globalConfig.semester) ? globalConfig.semester : '';
+        const hasFilter = !!(search || day || cls || (tp && tp !== activeTP) || (sem && sem !== activeSem));
+        if (hasFilter) {
+          tbody.innerHTML = `<tr><td colspan="8" class="py-2"><div class="error-state-container">
+          <div class="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-3 mx-auto border border-amber-100">
+            <svg class="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <p class="text-slate-600 font-bold text-sm">Tidak ada jadwal yang cocok</p>
+          <p class="text-slate-400 text-xs mt-1">Coba ubah atau bersihkan filter pencarian</p>
+          <button type="button" onclick="clearScheduleFilters()" class="mt-3 inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 active:scale-95 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            Reset Filter
+          </button>
+        </div></td></tr>`;
+        } else {
+          tbody.innerHTML = `<tr><td colspan="8" class="py-2"><div class="error-state-container">
+          <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-3 mx-auto border border-blue-100">
+            <svg class="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <p class="text-slate-600 font-bold text-sm">Belum ada jadwal pelajaran</p>
+          <p class="text-slate-400 text-xs mt-1">Tambahkan jadwal pertama untuk memulai</p>
+          <button type="button" onclick="openScheduleModal()" class="mt-3 inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            Tambah Jadwal
+          </button>
+        </div></td></tr>`;
+        }
+        return;
+      }
+      const DAY_CFG = {
+        'Senin': { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+        'Selasa': { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+        'Rabu': { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+        'Kamis': { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
+        'Jumat': { bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
+        'Sabtu': { bg: 'bg-teal-100', text: 'text-teal-700', dot: 'bg-teal-500' },
+      };
+      const AVATAR_COLORS = [
+        'from-blue-400 to-blue-600',
+        'from-emerald-400 to-teal-500',
+        'from-violet-400 to-purple-600',
+        'from-amber-400 to-orange-500',
+        'from-pink-400 to-rose-500',
+        'from-cyan-400 to-blue-500',
+        'from-indigo-400 to-violet-600',
+        'from-green-400 to-emerald-600',
+      ];
+      let html = '';
+      schedules.forEach((s, idx) => {
+        const tStart = formatTimeID(s.time_start);
+        const tEnd = formatTimeID(s.time_end);
+        const dayName = String(s.day_name || '');
+        const dcfg = DAY_CFG[dayName] || { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' };
+        const guruName = String(s.guru_name || '?');
+        const subject = String(s.subject || '-');
+        const className = String(s.class_name || '-');
+        const initials = guruName.split(' ').slice(0, 2).map(n => (n[0] || '').toUpperCase()).join('') || '?';
+        let avatarIdx = 0;
+        for (let i = 0; i < guruName.length; i++) avatarIdx = (avatarIdx * 31 + guruName.charCodeAt(i)) >>> 0;
+        const avatarGradient = AVATAR_COLORS[avatarIdx % AVATAR_COLORS.length];
+        const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40';
+        const argId = _escJsArg(s.id);
+        const argUserId = _escJsArg(s.user_id);
+        const argDayIdx = _escJsArg(s.day_index);
+        const argStart = _escJsArg(s.time_start);
+        const argEnd = _escJsArg(s.time_end);
+        const argClass = _escJsArg(className);
+        const argSubject = _escJsArg(subject);
+        const argJtm = _escJsArg(s.jtm_val);
+        const argTP = _escJsArg(s.tahun_pelajaran || '');
+        const argSem = _escJsArg(s.semester || '');
+        html += `
+        <tr data-sched-id="${escapeHtml(String(s.id || ''))}" class="${rowBg} hover:bg-blue-50/50 transition-colors duration-100 border-b border-slate-100 last:border-0">
+          <td class="px-5 py-3.5 text-center">
+            <input type="checkbox" class="schedule-checkbox w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer" value="${escapeHtml(String(s.id || ''))}" onclick="updateScheduleCheckboxes()">
+          </td>
+          <td class="px-5 py-3.5">
+            <span class="inline-flex items-center gap-1.5 ${dcfg.bg} ${dcfg.text} px-2.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wide">
+              <span class="w-1.5 h-1.5 rounded-full ${dcfg.dot} flex-shrink-0"></span>
+              ${escapeHtml(dayName)}
+            </span>
+          </td>
+          <td class="px-5 py-3.5">
+            <div class="font-mono text-xs font-bold text-slate-700 leading-tight">${escapeHtml(tStart)}</div>
+            <div class="font-mono text-[10px] text-slate-400 mt-0.5">${escapeHtml(tEnd)}</div>
+          </td>
+          <td class="px-5 py-3.5">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-[10px] font-extrabold flex-shrink-0 shadow-sm">
+                ${escapeHtml(initials)}
+              </div>
+              <span class="font-semibold text-slate-800 text-sm">${escapeHtml(guruName)}</span>
+            </div>
+          </td>
+          <td class="px-5 py-3.5">
+            <span class="bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-bold">
+              ${escapeHtml(className)}
+            </span>
+          </td>
+          <td class="px-5 py-3.5 text-slate-600 text-sm">${escapeHtml(subject)}</td>
+          <td class="px-5 py-3.5 text-center">
+            <span class="inline-flex items-center justify-center w-8 h-7 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-extrabold">
+              ${escapeHtml(String(s.jtm_val || ''))}
+            </span>
+          </td>
+          <td class="px-5 py-3.5">
+            <div class="flex items-center justify-center gap-1.5">
+              ${actionBtn('edit', `editScheduleAction('${argId}', '${argUserId}', '${argDayIdx}', '${argStart}', '${argEnd}', '${argClass}', '${argSubject}', '${argJtm}', '${argTP}', '${argSem}')`, 'Edit Jadwal')}
+              ${actionBtn('delete', `deleteScheduleAction('${argId}', this)`, 'Hapus Jadwal')}
+            </div>
+          </td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+      if (typeof updateScheduleCheckboxes === 'function') updateScheduleCheckboxes();
+    }
+    function _escJsArg(v) {
+      return String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+    }
+    function openScheduleModal() {
+      document.getElementById('scheduleModal').classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      var form = document.getElementById('formSchedule');
+      if (form) form.reset();
+      document.getElementById('inpSchedId').value = '';
+      document.getElementById('titleScheduleModal').textContent = 'Tambah Jadwal';
+      populateGlobalClassSelects();
+      _schedUpdateDuration();
+      _schedClearConflict();
+      setTimeout(function () {
+        var el = document.getElementById('inpSchedDay');
+        if (el) try { el.focus(); } catch (_) { }
+      }, 200);
+      var tpInput = document.getElementById('inpSchedTP');
+      var semInput = document.getElementById('inpSchedSem');
+      if (tpInput) {
+        tpInput.value = (document.getElementById('filterTahunPelajaran') || {}).value || (globalConfig ? globalConfig.tahun_pelajaran : '') || '';
+      }
+      if (semInput) {
+        semInput.value = (document.getElementById('filterSemester') || {}).value || (globalConfig ? globalConfig.semester : '') || 'Ganjil';
+      }
+    }
+    function closeScheduleModal() {
+      document.getElementById('scheduleModal').classList.add('hidden');
+      if (typeof _maybeReleaseBodyLock === 'function') _maybeReleaseBodyLock();
+      else document.body.classList.remove('overflow-hidden');
+      _schedClearConflict();
+    }
+    function _schedAutoCalcEnd() {
+      var s = (document.getElementById('inpSchedStart') || {}).value;
+      var jtm = (document.getElementById('inpSchedJTM') || {}).value;
+      var rest = (document.getElementById('inpSchedRestTime') || {}).value;
+      if (!s || !jtm) return;
+      var jtmMin = (globalConfig && globalConfig.waktu_per_jtm) ? parseInt(globalConfig.waktu_per_jtm) : 40;
+      var totalMin = (parseInt(jtm) * jtmMin) + (parseInt(rest) || 0);
+      var sm = s.split(':');
+      if (sm.length < 2) return;
+      var startMin = (+sm[0]) * 60 + (+sm[1]);
+      var endMin = startMin + totalMin;
+      var h = Math.floor(endMin / 60) % 24;
+      var m = endMin % 60;
+      var hh = (h < 10 ? '0' : '') + h;
+      var mm = (m < 10 ? '0' : '') + m;
+      var endInput = document.getElementById('inpSchedEnd');
+      if (endInput) endInput.value = hh + ':' + mm;
+    }
+    function _schedUpdateDuration() {
+      var s = (document.getElementById('inpSchedStart') || {}).value;
+      var e = (document.getElementById('inpSchedEnd') || {}).value;
+      var box = document.getElementById('schedDurationPreview');
+      var lbl = document.getElementById('schedDurationLabel');
+      if (!box || !lbl) return;
+      if (!s || !e) { box.classList.add('hidden'); return; }
+      var sm = s.split(':'), em = e.split(':');
+      if (sm.length < 2 || em.length < 2) { box.classList.add('hidden'); return; }
+      var startMin = (+sm[0]) * 60 + (+sm[1]);
+      var endMin = (+em[0]) * 60 + (+em[1]);
+      var diff = endMin - startMin;
+      if (diff <= 0) {
+        box.classList.remove('hidden');
+        box.classList.remove('bg-emerald-50', 'border-emerald-200', 'text-emerald-700');
+        box.classList.add('bg-rose-50', 'border-rose-200', 'text-rose-700');
+        lbl.textContent = 'Jam selesai harus lebih dari jam mulai';
+        return;
+      }
+      box.classList.remove('hidden');
+      box.classList.remove('bg-rose-50', 'border-rose-200', 'text-rose-700');
+      box.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-700');
+      var hh = Math.floor(diff / 60);
+      var mm = diff % 60;
+      var label = (hh ? (hh + ' jam ') : '') + (mm ? (mm + ' menit') : '');
+      lbl.textContent = 'Durasi: ' + label.trim();
+    }
+    function _schedClearConflict() {
+      var w = document.getElementById('schedConflictWarning');
+      if (w) w.classList.add('hidden');
+    }
+    function _schedCheckLocalConflict() {
+      var idCur = (document.getElementById('inpSchedId') || {}).value || '';
+      var teacherId = (document.getElementById('inpSchedTeacher') || {}).value || '';
+      var dayIdx = (document.getElementById('inpSchedDay') || {}).value || '';
+      var s = (document.getElementById('inpSchedStart') || {}).value || '';
+      var e = (document.getElementById('inpSchedEnd') || {}).value || '';
+      var cls = (document.getElementById('inpSchedClass') || {}).value || '';
+      var inputTP = ((document.getElementById('inpSchedTP') || {}).value || '').trim().toLowerCase();
+      var inputSem = (document.getElementById('inpSchedSem') || {}).value || '';
+      var activeTP = (globalConfig && globalConfig.tahun_pelajaran) ? globalConfig.tahun_pelajaran.toLowerCase() : '';
+      var activeSem = (globalConfig && globalConfig.semester) ? globalConfig.semester : '';
+      var checkTP = inputTP || activeTP;
+      var checkSem = inputSem || activeSem;
+      var box = document.getElementById('schedConflictWarning');
+      var msg = document.getElementById('schedConflictMessage');
+      if (!box || !msg) return false;
+      if (!teacherId || !dayIdx || !s || !e) { box.classList.add('hidden'); return false; }
+      if (!Array.isArray(cachedSchedules)) { box.classList.add('hidden'); return false; }
+      var sMin = (+s.split(':')[0]) * 60 + (+s.split(':')[1]);
+      var eMin = (+e.split(':')[0]) * 60 + (+e.split(':')[1]);
+      if (eMin <= sMin) { box.classList.add('hidden'); return false; }
+      var conflicts = [];
+      cachedSchedules.forEach(function (item) {
+        if (String(item.id) === String(idCur)) return;
+        if (String(item.day_index) !== String(dayIdx)) return;
+        var itemTP = item.tahun_pelajaran ? String(item.tahun_pelajaran).toLowerCase() : activeTP;
+        var itemSem = item.semester ? String(item.semester) : activeSem;
+        if (checkTP && itemTP && itemTP !== checkTP) return;
+        if (checkSem && itemSem && itemSem !== checkSem) return;
+        var iS = String(item.time_start || ''); var iE = String(item.time_end || '');
+        if (!iS || !iE) return;
+        var iSMin = (+iS.split(':')[0]) * 60 + (+iS.split(':')[1]);
+        var iEMin = (+iE.split(':')[0]) * 60 + (+iE.split(':')[1]);
+        if (iEMin <= iSMin) return;
+        var overlap = (sMin < iEMin) && (eMin > iSMin);
+        if (!overlap) return;
+        var sameTeacher = String(item.user_id) === String(teacherId);
+        var sameClass = cls && String(item.class_name) === String(cls);
+        if (sameTeacher) conflicts.push('Guru sudah mengajar (' + (item.subject || '-') + ' di kelas ' + (item.class_name || '-') + ' pukul ' + (iS.slice(0,5)) + ' - ' + (iE.slice(0,5)) + ')');
+        else if (sameClass) conflicts.push('Kelas ' + cls + ' sudah ada jadwal (' + (item.subject || '-') + ' oleh ' + (item.guru_name || '-') + ' pukul ' + (iS.slice(0,5)) + ' - ' + (iE.slice(0,5)) + ')');
+      });
+      if (conflicts.length === 0) { box.classList.add('hidden'); return false; }
+      box.classList.remove('hidden');
+      msg.innerHTML = '<strong>Bentrok jadwal:</strong> ' + escapeHtml(conflicts[0]) + (conflicts.length > 1 ? ' (+' + (conflicts.length - 1) + ' lainnya)' : '');
+      return true;
+    }
+    function editScheduleAction(id, userId, dayIdx, start, end, classNm, subject, jtm, tp, sem) {
+      openScheduleModal();
+      var deadline = Date.now() + 2500;
+      var setIfReady = function () {
+        var teacherSel = document.getElementById('inpSchedTeacher');
+        var subjectSel = document.getElementById('inpSchedSubject');
+        var classSel = document.getElementById('inpSchedClass');
+        var ready = teacherSel && teacherSel.options.length > 1 &&
+          subjectSel && subjectSel.options.length > 1 &&
+          classSel && classSel.options.length > 0;
+        if (!ready && Date.now() < deadline) {
+          return setTimeout(setIfReady, 80);
+        }
+        document.getElementById('inpSchedId').value = id || '';
+        if (teacherSel) teacherSel.value = userId || '';
+        document.getElementById('inpSchedDay').value = dayIdx || '1';
+        document.getElementById('inpSchedStart').value = start || '';
+        document.getElementById('inpSchedEnd').value = end || '';
+        if (classSel) classSel.value = classNm || '';
+        if (subjectSel) subjectSel.value = subject || '';
+        document.getElementById('inpSchedJTM').value = jtm || '';
+        if (document.getElementById('inpSchedRestTime')) document.getElementById('inpSchedRestTime').value = '';
+        if (document.getElementById('inpSchedTP')) {
+          var tEl = document.getElementById('inpSchedTP');
+          tEl.value = tp || tEl.value;
+        }
+        if (document.getElementById('inpSchedSem')) {
+          var sEl = document.getElementById('inpSchedSem');
+          sEl.value = sem || sEl.value;
+        }
+        document.getElementById('titleScheduleModal').textContent = 'Edit Jadwal Pelajaran';
+        _schedUpdateDuration();
+        _schedCheckLocalConflict();
+      };
+      setIfReady();
+    }
+    function submitSchedule() {
+      const data = {
+        id: document.getElementById('inpSchedId').value,
+        user_id: document.getElementById('inpSchedTeacher').value,
+        day_index: document.getElementById('inpSchedDay').value,
+        time_start: document.getElementById('inpSchedStart').value,
+        time_end: document.getElementById('inpSchedEnd').value,
+        class_name: document.getElementById('inpSchedClass').value,
+        subject: document.getElementById('inpSchedSubject').value,
+        jtm_val: document.getElementById('inpSchedJTM').value,
+        tahun_pelajaran: (document.getElementById('inpSchedTP') || {}).value || '',
+        semester: (document.getElementById('inpSchedSem') || {}).value || ''
+      };
+      if (!data.user_id) return showToast('Pilih guru pengampu terlebih dahulu', 'error');
+      if (!data.time_start || !data.time_end) return showToast('Lengkapi jam mulai dan jam selesai', 'error');
+      if (data.time_end <= data.time_start) return showToast('Jam selesai harus lebih dari jam mulai', 'error');
+      if (!data.class_name) return showToast('Pilih kelas terlebih dahulu', 'error');
+      if (!data.subject) return showToast('Pilih mata pelajaran terlebih dahulu', 'error');
+      var jtmNum = Number(data.jtm_val);
+      if (!jtmNum || jtmNum < 1 || jtmNum > 10) return showToast('JTM harus antara 1 - 10', 'error');
+      if (_schedCheckLocalConflict()) {
+        showToast('Jadwal bentrok dengan jadwal yang sudah ada. Periksa peringatan di form.', 'error');
+        return;
+      }
+      const btn = document.getElementById('btnSaveSchedule');
+      var restore = (typeof _busyButton === 'function') ? _busyButton(btn, 'Menyimpan...') : function () { };
+      const token = localStorage.getItem('auth_token');
+      google.script.run.withSuccessHandler((res) => {
+        restore();
+        if (res && res.status === 'success') {
+          showToast(data.id ? 'Jadwal berhasil diperbarui' : 'Jadwal baru berhasil ditambahkan', 'success');
+          closeScheduleModal();
+          reloadScheduleWithFilters();
+        } else {
+          showToast((res && res.message) || 'Gagal menyimpan jadwal', 'error');
+        }
+      }).withFailureHandler((err) => {
+        restore();
+        showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+      }).saveScheduleAdmin(token, data);
+    }
+    function deleteScheduleAction(id, btnEl) {
+      showConfirm(
+        'Hapus Jadwal',
+        'Apakah Anda yakin ingin menghapus jadwal ini?',
+        () => {
+          var restoreBtn = (typeof _busyButton === 'function') ? _busyButton(btnEl, '') : function () { };
+          var restoreRow = (typeof _setRowLoading === 'function') ? _setRowLoading(btnEl) : function () { };
+          const token = localStorage.getItem('auth_token');
+          google.script.run.withSuccessHandler((res) => {
+            if (res && res.status === 'success') {
+              showToast('Jadwal telah dihapus', 'success');
+              reloadScheduleWithFilters();
+            } else {
+              restoreBtn(); restoreRow();
+              showToast((res && res.message) || 'Gagal menghapus jadwal', 'error');
+            }
+          }).withFailureHandler((err) => {
+            restoreBtn(); restoreRow();
+            showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+          }).deleteScheduleAdmin(token, id);
+        }
+      );
+    }
+    function toggleAllScheduleCheckboxes(source) {
+      const checkboxes = document.querySelectorAll('.schedule-checkbox');
+      checkboxes.forEach(cb => cb.checked = source.checked);
+      updateDeleteSelectedButton();
+    }
+    function updateScheduleCheckboxes() {
+      const checkboxes = document.querySelectorAll('.schedule-checkbox');
+      const allChecked = Array.from(checkboxes).length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+      const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+      const checkAll = document.getElementById('checkAllSchedules');
+      if (checkAll) {
+        checkAll.checked = allChecked;
+        checkAll.indeterminate = anyChecked && !allChecked;
+      }
+      updateDeleteSelectedButton();
+    }
+    function updateDeleteSelectedButton() {
+      const checkboxes = document.querySelectorAll('.schedule-checkbox:checked');
+      const btn = document.getElementById('btnDeleteSelectedSchedules');
+      if (btn) {
+        if (checkboxes.length > 0) {
+          btn.classList.remove('hidden');
+          document.getElementById('countSelectedSchedules').textContent = checkboxes.length;
+        } else {
+          btn.classList.add('hidden');
+        }
+      }
+    }
+    function deleteSelectedSchedules() {
+      const checkboxes = document.querySelectorAll('.schedule-checkbox:checked');
+      const ids = Array.from(checkboxes).map(cb => cb.value);
+      if (ids.length === 0) return;
+      showConfirm(
+        'Hapus Jadwal Terpilih?',
+        `Anda akan menghapus ${ids.length} jadwal pelajaran. Tindakan ini tidak dapat dibatalkan!`,
+        () => {
+          const btn = document.getElementById('btnDeleteSelectedSchedules');
+          var restoreBtn = (typeof _busyButton === 'function') ? _busyButton(btn, 'Menghapus...') : function () { };
+          google.script.run.withSuccessHandler((res) => {
+            restoreBtn();
+            if (res && res.status === 'success') {
+              showToast(res.message || `${ids.length} jadwal berhasil dihapus`, 'success');
+              const checkAll = document.getElementById('checkAllSchedules');
+              if (checkAll) {
+                checkAll.checked = false;
+                checkAll.indeterminate = false;
+              }
+              document.querySelectorAll('.schedule-checkbox').forEach(cb => cb.checked = false);
+              updateDeleteSelectedButton();
+              reloadScheduleWithFilters();
+            } else {
+              showToast((res && res.message) || 'Gagal menghapus jadwal', 'error');
+            }
+          }).withFailureHandler((err) => {
+            restoreBtn();
+            showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+          }).deleteMultipleSchedulesAdmin(localStorage.getItem('auth_token'), ids);
+        }
+      );
+    }
+    function openSubjectModal(id = '', name = '') {
+      document.getElementById('subjectModal').classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      document.getElementById('inpSubjectId').value = id;
+      document.getElementById('inpSubjectName').value = name;
+      document.getElementById('subjectModalTitle').innerText = id ? 'Edit Mata Pelajaran' : 'Tambah Mata Pelajaran';
+      if (typeof _settingsUpdateSubjectCounter === 'function') _settingsUpdateSubjectCounter();
+      setTimeout(function () {
+        var inp = document.getElementById('inpSubjectName');
+        if (inp) {
+          try { inp.focus(); inp.select(); } catch (_) { }
+        }
+      }, 200);
+    }
+    function closeSubjectModal() {
+      document.getElementById('subjectModal').classList.add('hidden');
+      _maybeReleaseBodyLock();
+    }
+    function submitSubject() {
+      const id = document.getElementById('inpSubjectId').value;
+      const name = (document.getElementById('inpSubjectName').value || '').trim();
+      const token = localStorage.getItem('auth_token');
+      if (!name) {
+        showToast('Nama mata pelajaran tidak boleh kosong', 'error');
+        var inp = document.getElementById('inpSubjectName');
+        if (inp) try { inp.focus(); } catch (_) { }
+        return;
+      }
+      if (name.length < 2) {
+        showToast('Nama mata pelajaran minimal 2 karakter', 'error');
+        return;
+      }
+      var btn = document.getElementById('btnSubmitSubject');
+      if (btn && btn.dataset.busy === 'true') return;
+      var restore = _busyButton(btn, 'Menyimpan...');
+      google.script.run.withSuccessHandler((res) => {
+        restore();
+        if (res && res.status === 'success') {
+          showToast('Data Mapel disimpan', 'success');
+          closeSubjectModal();
+          initSettings();
+        } else {
+          showToast((res && res.message) || 'Gagal menyimpan mapel.', 'error');
+        }
+      }).withFailureHandler((err) => {
+        restore();
+        showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+      }).saveSubject(token, { id: id, name: name });
+    }
+    function openForgotModal() {
+      document.getElementById('forgotModal').classList.remove('hidden');
+      document.getElementById('inpForgotUsername').value = '';
+      if (document.getElementById('inpSecurityAnswerForgot')) document.getElementById('inpSecurityAnswerForgot').value = '';
+      if (document.getElementById('inpForgotOtp')) document.getElementById('inpForgotOtp').value = '';
+      window._forgotState = {
+        username: '',
+        methods: null,
+        method: '',
+        otpCooldownTimer: null,
+        otpExpiresAt: 0
+      };
+      _showForgotStep(1);
+      setTimeout(() => document.getElementById('inpForgotUsername').focus(), 100);
+    }
+    function closeForgotModal() {
+      document.getElementById('forgotModal').classList.add('hidden');
+      if (window._forgotState && window._forgotState.otpCooldownTimer) {
+        clearInterval(window._forgotState.otpCooldownTimer);
+        window._forgotState.otpCooldownTimer = null;
+      }
+    }
+    function _checkForgotLockout(username) {
+      const rlKey = 'reset_rl_' + username;
+      const rlRaw = localStorage.getItem(rlKey);
+      if (!rlRaw) return false;
+      const rlData = JSON.parse(rlRaw);
+      if (rlData.lockedUntil && Date.now() < rlData.lockedUntil) {
+        const btn = document.getElementById('btnSubmitForgot');
+        if (btn) {
+          btn.disabled = true;
+          _startForgotCountdown(username, rlData.lockedUntil);
+        }
+        return true;
+      }
+      return false;
+    }
+    function _showForgotStep(step) {
+      const s1 = document.getElementById('forgotStep1');
+      const sM = document.getElementById('forgotStepMethod');
+      const s2 = document.getElementById('forgotStep2');
+      const s3 = document.getElementById('forgotStep3Otp');
+      const sF = document.getElementById('forgotStepFinal');
+      const bar = document.getElementById('forgotProgressBar');
+      if (s1) s1.classList.toggle('hidden', step !== 1);
+      if (sM) sM.classList.toggle('hidden', step !== 'method');
+      if (s2) s2.classList.toggle('hidden', step !== 'secq');
+      if (s3) s3.classList.toggle('hidden', step !== 'otp');
+      if (sF) sF.classList.toggle('hidden', step !== 'final');
+      if (bar) {
+        let w = '33%';
+        if (step === 'method') w = '50%';
+        else if (step === 'secq' || step === 'otp') w = '75%';
+        else if (step === 'final') w = '100%';
+        bar.style.width = w;
+      }
+    }
+    function forgotNextStep() {
+      const username = (document.getElementById('inpForgotUsername').value || '').trim();
+      if (!username) return showToast('Silakan masukkan username Anda.', 'error');
+      const btn = document.getElementById('btnForgotNext');
+      btn.disabled = true;
+      btn.innerText = 'Memverifikasi...';
+      google.script.run
+        .withSuccessHandler((res) => {
+          btn.disabled = false;
+          btn.innerText = 'Lanjutkan →';
+          if (res && res.status === 'success') {
+            window._forgotState = window._forgotState || {};
+            window._forgotState.username = username;
+            window._forgotState.methods = {
+              has_security_question: !!res.has_security_question,
+              has_email_verified: !!res.has_email_verified,
+              masked_email: res.masked_email || ''
+            };
+            if (!res.has_security_question && !res.has_email_verified) {
+              showToast('Akun ini belum mempunyai pertanyaan keamanan & email terverifikasi. Hubungi Admin.', 'error');
+              return;
+            }
+            _renderForgotMethodStep();
+            _showForgotStep('method');
+          } else {
+            showToast((res && res.message) || 'Username tidak ditemukan.', 'error');
+          }
+        })
+        .withFailureHandler(() => {
+          btn.disabled = false;
+          btn.innerText = 'Lanjutkan →';
+          showToast('Gagal terhubung ke server.', 'error');
+        })
+        .getForgotMethods(username);
+    }
+    function _renderForgotMethodStep() {
+      const st = window._forgotState || {};
+      const m = st.methods || {};
+      const txtUser = document.getElementById('txtForgotUsernameMethod');
+      if (txtUser) txtUser.innerText = st.username || '';
+      const btnSecQ = document.getElementById('btnMethodSecQ');
+      const btnOtp = document.getElementById('btnMethodOtp');
+      const descSecQ = document.getElementById('txtMethodSecQDesc');
+      const descOtp = document.getElementById('txtMethodOtpDesc');
+      if (btnSecQ) btnSecQ.disabled = !m.has_security_question;
+      if (descSecQ) {
+        descSecQ.innerText = m.has_security_question
+          ? 'Jawab pertanyaan keamanan Anda.'
+          : 'Belum ada pertanyaan keamanan untuk akun ini.';
+      }
+      if (btnOtp) btnOtp.disabled = !m.has_email_verified;
+      if (descOtp) {
+        descOtp.innerText = m.has_email_verified
+          ? ('Kode 6 digit dikirim ke ' + (m.masked_email || 'email terverifikasi') + '.')
+          : 'Akun ini belum memiliki email terverifikasi.';
+      }
+    }
+</script>

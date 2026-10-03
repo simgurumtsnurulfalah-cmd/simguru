@@ -1,0 +1,930 @@
+<script>
+            .deleteTeachingLog(token, logId);
+        }
+      );
+    }
+    let _journalEditLogId = null;
+    let _journalExpectedStd = null;
+    let _journalExpectedFetchToken = null;
+    let _journalUserConfirmedMismatch = false;
+    function openJournalModal(id, mapel, kelas, jam, dateStr, jtmVal) {
+      _journalEditLogId = null;
+      _journalExpectedStd = null;
+      _journalUserConfirmedMismatch = false;
+      _resetJournalForm();
+      document.getElementById('inpScheduleId').value = id || '';
+      document.getElementById('inpJournalLogId').value = '';
+      setText('txtMapel', mapel || '-');
+      setText('txtKelas', kelas || '-');
+      setText('txtJam', jam || '00:00');
+      const titleEl = document.getElementById('journalModalTitle');
+      if (titleEl) titleEl.innerText = 'Laporan Jurnal Mengajar';
+      const lblBtn = document.getElementById('lblSubmitJournal');
+      if (lblBtn) lblBtn.innerText = 'Kirim Laporan';
+      const editNotice = document.getElementById('journalEditNotice');
+      if (editNotice) editNotice.style.display = 'none';
+      const jtmEl = document.getElementById('txtJournalJTM');
+      if (jtmEl) jtmEl.innerText = jtmVal || '0';
+      _renderJournalDurationFromRange(jam);
+      const targetDate = dateStr || new Date().toISOString().split('T')[0];
+      document.getElementById('inpJournalDateHidden').value = targetDate;
+      document.getElementById('journalModal').classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      _fetchExpectedStudents(id);
+      setTimeout(() => {
+        const m = document.getElementById('inpMateri');
+        if (m) m.focus();
+      }, 200);
+      _attachJournalNumberListeners();
+    }
+    function openJournalEditModal(data) {
+      if (!data || !data.log_id) return;
+      _journalEditLogId = data.log_id;
+      _journalExpectedStd = null;
+      _journalUserConfirmedMismatch = false;
+      _resetJournalForm();
+      document.getElementById('inpScheduleId').value = '';
+      document.getElementById('inpJournalLogId').value = data.log_id;
+      setText('txtMapel', data.subject || '-');
+      setText('txtKelas', data.class_name || '-');
+      setText('txtJam', data.time || '-');
+      const titleEl = document.getElementById('journalModalTitle');
+      if (titleEl) titleEl.innerText = 'Edit Jurnal Mengajar';
+      const lblBtn = document.getElementById('lblSubmitJournal');
+      if (lblBtn) lblBtn.innerText = 'Simpan Perubahan';
+      const editNotice = document.getElementById('journalEditNotice');
+      if (editNotice) editNotice.style.display = 'block';
+      const jtmEl = document.getElementById('txtJournalJTM');
+      if (jtmEl) jtmEl.innerText = (data.jtm_val !== undefined ? data.jtm_val : 0);
+      document.getElementById('inpJournalDateHidden').value = data.date_iso || '';
+      document.getElementById('inpMateri').value = data.materi || '';
+      const present = (data.students !== undefined ? data.students : (data.students_present || 0)) || 0;
+      const absent = data.students_absent || 0;
+      document.getElementById('inpHadir').value = String(present);
+      document.getElementById('inpSakit').value = String(absent);
+      document.getElementById('inpCatatan').value = data.notes || data.clean_notes || '';
+      document.getElementById('journalModal').classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      if (typeof updateMateriCounter === 'function') updateMateriCounter();
+      if (typeof updateCatatanCounter === 'function') updateCatatanCounter();
+      updateStudentTotalIndicator();
+      _renderJournalDurationFromRange(data.time);
+      setTimeout(() => {
+        const m = document.getElementById('inpMateri');
+        if (m) m.focus();
+      }, 200);
+      _attachJournalNumberListeners();
+    }
+    function _resetJournalForm() {
+      const form = document.getElementById('formJournal');
+      if (form) form.reset();
+      document.getElementById('inpHadir').value = '0';
+      document.getElementById('inpSakit').value = '0';
+      const inp = document.getElementById('inpMateri');
+      if (inp) {
+        inp.style.borderColor = '';
+        inp.style.boxShadow = '';
+      }
+      const hint = document.getElementById('materiHint');
+      if (hint) hint.style.display = 'none';
+      const totalIndicator = document.getElementById('studentTotalIndicator');
+      if (totalIndicator) totalIndicator.style.display = 'none';
+      const expectedHint = document.getElementById('studentExpectedHint');
+      if (expectedHint) expectedHint.style.display = 'none';
+      const mismatchBox = document.getElementById('mismatchAlertBox');
+      if (mismatchBox) mismatchBox.style.display = 'none';
+      const btn = document.getElementById('btnSubmitJournal');
+      const loader = document.getElementById('modalLoading');
+      if (btn) {
+        btn.dataset.submitting = 'false';
+        btn.disabled = false;
+        btn.classList.remove('hidden');
+        btn.style.opacity = '';
+      }
+      if (loader) loader.classList.add('hidden');
+      const counter = document.getElementById('materiCounter');
+      if (counter) { counter.innerText = '0/500'; counter.style.color = '#94A3B8'; }
+      const cCounter = document.getElementById('catatanCounter');
+      if (cCounter) { cCounter.innerText = '0/200'; cCounter.style.color = '#94A3B8'; }
+      const durBadge = document.getElementById('journalDurationBadge');
+      if (durBadge) durBadge.style.display = 'none';
+    }
+    function _renderJournalDurationFromRange(rangeStr) {
+      const badge = document.getElementById('journalDurationBadge');
+      const lbl = document.getElementById('txtJournalDuration');
+      if (!badge || !lbl || !rangeStr) { if (badge) badge.style.display = 'none'; return; }
+      const m = String(rangeStr).match(/(\d{1,2}):(\d{2})\s*[-–~]\s*(\d{1,2}):(\d{2})/);
+      if (!m) { badge.style.display = 'none'; return; }
+      const startMin = (parseInt(m[1], 10) || 0) * 60 + (parseInt(m[2], 10) || 0);
+      const endMin = (parseInt(m[3], 10) || 0) * 60 + (parseInt(m[4], 10) || 0);
+      const dur = endMin - startMin;
+      if (dur <= 0) { badge.style.display = 'none'; return; }
+      badge.style.display = 'inline-flex';
+      if (dur < 60) {
+        lbl.innerText = dur + ' mnt';
+      } else {
+        const h = Math.floor(dur / 60);
+        const mm = dur % 60;
+        lbl.innerText = mm === 0 ? (h + ' jam') : (h + 'j ' + mm + 'm');
+      }
+    }
+    function _fetchExpectedStudents(scheduleId) {
+      if (!scheduleId) return;
+      const myToken = Date.now();
+      _journalExpectedFetchToken = myToken;
+      const sessionToken = localStorage.getItem('auth_token');
+      if (!sessionToken) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (myToken !== _journalExpectedFetchToken) return;
+          if (res && res.status === 'success' && res.expected) {
+            _journalExpectedStd = Number(res.expected);
+            const wrap = document.getElementById('studentExpectedHint');
+            const num = document.getElementById('studentExpected');
+            if (wrap && num) {
+              num.innerText = _journalExpectedStd;
+              wrap.style.display = 'block';
+              updateStudentTotalIndicator();
+            }
+          }
+        })
+        .withFailureHandler(() => { })
+        .getClassExpectedStudents(sessionToken, scheduleId);
+    }
+    function _attachJournalNumberListeners() {
+      const inpHadir = document.getElementById('inpHadir');
+      const inpSakit = document.getElementById('inpSakit');
+      [inpHadir, inpSakit].forEach(el => {
+        if (!el) return;
+        el.oninput = updateStudentTotalIndicator;
+        el.onfocus = function () { try { this.select(); } catch (e) { } };
+      });
+    }
+    function adjustNumberInput(id, delta) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let v = parseInt(el.value || '0', 10) || 0;
+      v = Math.max(0, Math.min(200, v + delta));
+      el.value = v;
+      if (id === 'inpHadir' || id === 'inpSakit') {
+        if (typeof updateStudentTotalIndicator === 'function') updateStudentTotalIndicator();
+      } else if (id === 'inpBapHadir' || id === 'inpBapAbsen') {
+        if (typeof updateBapTotalIndicator === 'function') updateBapTotalIndicator();
+      }
+      try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { }
+    }
+    function updateMateriCounter() {
+      const el = document.getElementById('inpMateri');
+      const counter = document.getElementById('materiCounter');
+      if (!el || !counter) return;
+      const len = (el.value || '').length;
+      counter.innerText = `${len}/500`;
+      counter.style.color = len > 450 ? '#DC2626' : (len > 350 ? '#D97706' : '#94A3B8');
+      const hint = document.getElementById('materiHint');
+      if (hint && len > 0) hint.style.display = 'none';
+      if (len > 0) {
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+      }
+    }
+    function updateCatatanCounter() {
+      const el = document.getElementById('inpCatatan');
+      const counter = document.getElementById('catatanCounter');
+      if (!el || !counter) return;
+      const len = (el.value || '').length;
+      counter.innerText = `${len}/200`;
+      counter.style.color = len > 180 ? '#DC2626' : (len > 150 ? '#D97706' : '#94A3B8');
+    }
+    function updateStudentTotalIndicator() {
+      const inpHadir = document.getElementById('inpHadir');
+      const inpSakit = document.getElementById('inpSakit');
+      const indicator = document.getElementById('studentTotalIndicator');
+      const totalEl = document.getElementById('totalStudents');
+      if (!inpHadir || !inpSakit || !indicator || !totalEl) return;
+      const h = parseInt(inpHadir.value || '0', 10) || 0;
+      const s = parseInt(inpSakit.value || '0', 10) || 0;
+      const total = h + s;
+
+      // --- Update studentTotalIndicator (progress bar hadir/absen) ---
+      if (total > 0) {
+        indicator.style.display = 'block';
+        totalEl.innerText = total;
+        const rate = Math.round((h * 100) / total);
+        const rateEl = document.getElementById('totalAttendanceRate');
+        if (rateEl) rateEl.innerText = rate + '%';
+        const hbar = document.getElementById('totalAttHadirBar');
+        const abar = document.getElementById('totalAttAbsenBar');
+        if (hbar) hbar.style.width = rate + '%';
+        if (abar) abar.style.width = (100 - rate) + '%';
+      } else {
+        indicator.style.display = 'none';
+      }
+
+      // --- Update studentExpectedHint dan mismatchAlertBox ---
+      const expectedHint = document.getElementById('studentExpectedHint');
+      const deltaEl = document.getElementById('studentExpectedDelta');
+      const deltaWrap = document.getElementById('studentExpectedDeltaWrap');
+      const iconEl = document.getElementById('studentExpectedIcon');
+      const labelEl = document.getElementById('studentExpectedLabel');
+      const progressWrap = document.getElementById('studentExpectedProgressWrap');
+      const progressBar = document.getElementById('studentExpectedProgressBar');
+      const filledCount = document.getElementById('studentExpectedFilledCount');
+      const slotLabel = document.getElementById('studentExpectedSlotLabel');
+      const mismatchBox = document.getElementById('mismatchAlertBox');
+      const mismatchMsg = document.getElementById('mismatchAlertMsg');
+
+      if (!_journalExpectedStd || !expectedHint) {
+        if (mismatchBox) mismatchBox.style.display = 'none';
+        return;
+      }
+
+      expectedHint.style.display = 'block';
+      const diff = total - _journalExpectedStd;
+      const std = _journalExpectedStd;
+
+      // Progress bar vs standar
+      if (progressWrap && progressBar && filledCount && slotLabel) {
+        progressWrap.style.display = total > 0 ? 'block' : 'none';
+        const pct = total > 0 ? Math.min(100, Math.round((total / std) * 100)) : 0;
+        if (filledCount) filledCount.innerText = total;
+        if (progressBar) {
+          progressBar.style.width = pct + '%';
+        }
+        if (slotLabel) {
+          const sisa = std - total;
+          if (diff === 0) {
+            slotLabel.innerText = '✓ Lengkap';
+            slotLabel.style.color = '#047857';
+          } else if (diff > 0) {
+            slotLabel.innerText = 'Kelebihan ' + diff;
+            slotLabel.style.color = '#DC2626';
+          } else {
+            slotLabel.innerText = 'Sisa ' + Math.abs(sisa);
+            slotLabel.style.color = '#D97706';
+          }
+        }
+      }
+
+      if (total === 0) {
+        // Belum ada input — tampilkan info netral
+        expectedHint.style.background = '#F0F9FF';
+        expectedHint.style.borderColor = '#BAE6FD';
+        if (iconEl) { iconEl.style.background = '#DBEAFE'; iconEl.querySelector('svg').setAttribute('stroke', '#2563EB'); }
+        if (labelEl) { labelEl.style.color = '#1D4ED8'; }
+        if (deltaEl) { deltaEl.innerText = ''; deltaEl.style.background = ''; deltaEl.style.color = ''; }
+        if (mismatchBox) mismatchBox.style.display = 'none';
+        _journalUserConfirmedMismatch = false;
+      } else if (diff === 0) {
+        // Sesuai standar — hijau
+        expectedHint.style.background = 'linear-gradient(135deg,#ECFDF5,#D1FAE5)';
+        expectedHint.style.borderColor = '#6EE7B7';
+        if (iconEl) { iconEl.style.background = '#A7F3D0'; iconEl.querySelector('svg').setAttribute('stroke', '#065F46'); }
+        if (labelEl) { labelEl.style.color = '#065F46'; }
+        if (deltaEl) {
+          deltaEl.innerText = '✓ Sesuai';
+          deltaEl.style.background = '#D1FAE5';
+          deltaEl.style.color = '#047857';
+          deltaEl.style.padding = '2px 10px';
+          deltaEl.style.borderRadius = '20px';
+        }
+        if (progressBar) progressBar.style.background = '#10B981';
+        if (mismatchBox) mismatchBox.style.display = 'none';
+        _journalUserConfirmedMismatch = false;
+      } else {
+        // Tidak sesuai — merah/kuning
+        const isOver = diff > 0;
+        expectedHint.style.background = isOver
+          ? 'linear-gradient(135deg,#FFF1F2,#FFE4E6)'
+          : 'linear-gradient(135deg,#FFFBEB,#FEF3C7)';
+        expectedHint.style.borderColor = isOver ? '#FDA4AF' : '#FDE68A';
+        if (iconEl) {
+          iconEl.style.background = isOver ? '#FECDD3' : '#FDE68A';
+          iconEl.querySelector('svg').setAttribute('stroke', isOver ? '#9F1239' : '#713F12');
+        }
+        if (labelEl) { labelEl.style.color = isOver ? '#9F1239' : '#92400E'; }
+        if (deltaEl) {
+          deltaEl.innerText = isOver ? '⚠ Lebih ' + diff + ' siswa' : '⚠ Kurang ' + Math.abs(diff) + ' siswa';
+          deltaEl.style.background = isOver ? '#FFE4E6' : '#FEF3C7';
+          deltaEl.style.color = isOver ? '#BE123C' : '#92400E';
+          deltaEl.style.padding = '2px 10px';
+          deltaEl.style.borderRadius = '20px';
+        }
+        if (progressBar) progressBar.style.background = isOver ? '#EF4444' : '#F59E0B';
+
+        // Tampilkan mismatchAlertBox sebagai penolakan inline (menggantikan confirm())
+        if (mismatchBox && mismatchMsg) {
+          mismatchMsg.innerHTML =
+            'Total yang diisi: <strong style="font-family:\'JetBrains Mono\',monospace;">' + total + '</strong> siswa, ' +
+            'standar kelas: <strong style="font-family:\'JetBrains Mono\',monospace;">' + std + '</strong> siswa. ' +
+            (isOver
+              ? 'Harap kurangi <strong>' + diff + '</strong> siswa dari input hadir atau absen.'
+              : 'Harap tambahkan <strong>' + Math.abs(diff) + '</strong> siswa lagi ke hadir atau absen.');
+          mismatchBox.style.display = 'block';
+        }
+        _journalUserConfirmedMismatch = false;
+      }
+    }
+    function closeJournalModal() {
+      const btn = document.getElementById('btnSubmitJournal');
+      if (btn && btn.dataset.submitting === 'true') {
+        showToast('Sedang menyimpan, mohon tunggu...', 'info');
+        return;
+      }
+      const modal = document.getElementById('journalModal');
+      if (modal) modal.classList.add('hidden');
+      if (typeof _maybeReleaseBodyLock === 'function') _maybeReleaseBodyLock();
+      else document.body.classList.remove('overflow-hidden');
+      _journalEditLogId = null;
+      _journalExpectedStd = null;
+      _journalExpectedFetchToken = null;
+      _journalUserConfirmedMismatch = false;
+    }
+    function submitJournal() {
+      const btn = document.getElementById('btnSubmitJournal');
+      const loader = document.getElementById('modalLoading');
+      const isEdit = !!_journalEditLogId;
+      const scheduleId = document.getElementById('inpScheduleId').value;
+      const journalDate = document.getElementById('inpJournalDateHidden').value;
+      const materi = document.getElementById('inpMateri').value.trim();
+      const catatan = document.getElementById('inpCatatan').value;
+      const hadir = parseInt(document.getElementById('inpHadir').value || '0', 10) || 0;
+      const sakit = parseInt(document.getElementById('inpSakit').value || '0', 10) || 0;
+      if (!materi) {
+        const inp = document.getElementById('inpMateri');
+        const hint = document.getElementById('materiHint');
+        if (inp) {
+          inp.style.borderColor = '#F43F5E';
+          inp.style.boxShadow = '0 0 0 3px rgba(244,63,94,0.10)';
+          inp.focus();
+        }
+        if (hint) hint.style.display = 'block';
+        return showToast("Materi pembelajaran wajib diisi", "error");
+      }
+      if ((hadir + sakit) === 0) {
+        return showToast("Mohon isi jumlah siswa hadir dan/atau absen.", "error");
+      }
+      // Validasi ketat: tolak langsung jika total tidak sesuai standar
+      if (_journalExpectedStd && (hadir + sakit) !== _journalExpectedStd) {
+        const diff = (hadir + sakit) - _journalExpectedStd;
+        const msg = diff > 0
+          ? 'Total siswa (' + (hadir + sakit) + ') melebihi standar kelas (' + _journalExpectedStd + '). Harap kurangi ' + diff + ' siswa.'
+          : 'Total siswa (' + (hadir + sakit) + ') kurang dari standar kelas (' + _journalExpectedStd + '). Harap tambah ' + Math.abs(diff) + ' siswa lagi.';
+        showToast(msg, 'error', 5000);
+        // Pastikan mismatchAlertBox terlihat
+        const mismatchBox = document.getElementById('mismatchAlertBox');
+        const mismatchMsg = document.getElementById('mismatchAlertMsg');
+        if (mismatchBox && mismatchMsg) {
+          const isOver = diff > 0;
+          mismatchMsg.innerHTML =
+            'Total yang diisi: <strong style="font-family:\'JetBrains Mono\',monospace;">' + (hadir + sakit) + '</strong> siswa, ' +
+            'standar kelas: <strong style="font-family:\'JetBrains Mono\',monospace;">' + _journalExpectedStd + '</strong> siswa. ' +
+            (isOver
+              ? 'Harap kurangi <strong>' + diff + '</strong> siswa dari input hadir atau absen.'
+              : 'Harap tambahkan <strong>' + Math.abs(diff) + '</strong> siswa lagi ke hadir atau absen.');
+          mismatchBox.style.display = 'block';
+          mismatchBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        return;
+      }
+      // Sembunyikan mismatchAlertBox jika lolos validasi
+      const mismatchBoxOk = document.getElementById('mismatchAlertBox');
+      if (mismatchBoxOk) mismatchBoxOk.style.display = 'none';
+      if (btn && btn.dataset.submitting === "true") {
+        showToast("Sedang memproses, mohon tunggu...", "info");
+        return;
+      }
+      if (btn) btn.dataset.submitting = "true";
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('hidden');
+      }
+      if (loader) loader.classList.remove('hidden');
+      const token = localStorage.getItem('auth_token');
+      const onDone = () => {
+        if (btn) {
+          btn.dataset.submitting = "false";
+          btn.disabled = false;
+          btn.classList.remove('hidden');
+        }
+        if (loader) loader.classList.add('hidden');
+      };
+      const handleSuccess = (res) => {
+        onDone();
+        if (res && res.status === 'success') {
+          if (typeof refreshGuruDashboardCards === 'function') refreshGuruDashboardCards();
+          if (!isEdit && typeof _markScheduleItemDone === 'function') _markScheduleItemDone(scheduleId);
+          showToast(isEdit ? "Perubahan jurnal disimpan." : "Laporan berhasil disimpan", "success");
+          const modal = document.getElementById('journalModal');
+          if (modal) modal.classList.add('hidden');
+          _journalEditLogId = null;
+          if (typeof initDashboard === 'function') {
+            const dashGuru = document.getElementById('viewGuruDashboard');
+            const dashAdmin = document.getElementById('viewAdminDashboard');
+            if ((dashGuru && !dashGuru.classList.contains('hidden')) || (dashAdmin && !dashAdmin.classList.contains('hidden'))) {
+              initDashboard();
+            }
+          }
+          if (typeof initMySchedule === 'function') {
+            const viewMySchedule = document.getElementById('Page_MySchedule');
+            if (viewMySchedule && !viewMySchedule.classList.contains('hidden')) {
+              initMySchedule();
+            }
+          }
+          const role = String(localStorage.getItem('user_role') || '').toLowerCase();
+          const vGuru = document.getElementById('viewGuruJournal');
+          const vAdmin = document.getElementById('viewAdminJournal');
+          if (vAdmin && !vAdmin.classList.contains('hidden') && role === 'admin') {
+            loadAdminJournalData(token, currentJournalPage);
+          } else if (vGuru && !vGuru.classList.contains('hidden')) {
+            loadGuruJournalDataPaginated(token, currentGuruJournalPage, currentGuruJournalLimit);
+          }
+        } else {
+          const msg = res && res.message ? res.message : 'Gagal menyimpan jurnal.';
+          const code = res && res.code;
+          if (code === 'STUDENT_COUNT_MISMATCH' && res.expected) {
+            _journalExpectedStd = Number(res.expected);
+            const wrap = document.getElementById('studentExpectedHint');
+            const num = document.getElementById('studentExpected');
+            if (wrap && num) { num.innerText = _journalExpectedStd; wrap.style.display = 'block'; }
+            updateStudentTotalIndicator();
+            // Tampilkan mismatchAlertBox juga
+            const mismatchBox = document.getElementById('mismatchAlertBox');
+            const mismatchMsg = document.getElementById('mismatchAlertMsg');
+            if (mismatchBox && mismatchMsg) {
+              mismatchMsg.innerHTML = res.message || msg;
+              mismatchBox.style.display = 'block';
+            }
+            showToast(msg, 'error', 6000);
+          } else if (code === 'STUDENT_ATTENDANCE_MISMATCH') {
+            var expHadir = res.expected_hadir !== undefined ? res.expected_hadir : '?';
+            var expAbsen = res.expected_absen !== undefined ? res.expected_absen : '?';
+            var actHadir = res.actual_hadir   !== undefined ? res.actual_hadir   : '?';
+            var actAbsen = res.actual_absen   !== undefined ? res.actual_absen   : '?';
+            var saKelas  = escapeHtml(res.class_name || '');
+            var saDetail = res.rekap_detail || {};
+            var isHadirOk = (actHadir === expHadir);
+            var isAbsenOk = (actAbsen === expAbsen);
+            var alertHtml =
+              'Data tidak sesuai rekap guru piket untuk <strong>Kelas ' + saKelas + '</strong>.<br>' +
+              '<div style="margin-top:8px;line-height:1.9;font-size:12px;">' +
+              '<div><span style="display:inline-block;min-width:115px;color:#64748B;font-size:11px;">Rekap Piket:</span>' +
+              'Hadir <strong>' + expHadir + '</strong>&nbsp;&nbsp;' +
+              'Sakit <strong>' + (saDetail.sakit||0) + '</strong>&nbsp;' +
+              'Izin <strong>' + (saDetail.izin||0) + '</strong>&nbsp;' +
+              'Alpa <strong>' + (saDetail.alpa||0) + '</strong></div>' +
+              '<div style="margin-top:3px;"><span style="display:inline-block;min-width:115px;color:#64748B;font-size:11px;">Anda Mengisi:</span>' +
+              'Hadir <strong style="color:' + (isHadirOk?'#047857':'#DC2626') + '">' + actHadir + '</strong>' +
+              (isHadirOk ? ' \u2713' : ' \u2717') +
+              '&nbsp;&nbsp;Absen <strong style="color:' + (isAbsenOk?'#047857':'#DC2626') + '">' + actAbsen + '</strong>' +
+              (isAbsenOk ? ' \u2713' : ' \u2717') + '</div>' +
+              '</div>';
+            var mismatchBox = document.getElementById('mismatchAlertBox');
+            var mismatchMsg = document.getElementById('mismatchAlertMsg');
+            if (mismatchBox && mismatchMsg) {
+              mismatchMsg.innerHTML = alertHtml;
+              mismatchBox.style.display = 'block';
+              mismatchBox.style.background = 'linear-gradient(135deg,#FFF7ED,#FFEDD5)';
+              mismatchBox.style.borderColor = '#FED7AA';
+              mismatchBox.style.borderWidth = '1px';
+              mismatchBox.style.borderStyle = 'solid';
+              setTimeout(function() { mismatchBox.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 50);
+            }
+            showToast(
+              'Kelas ' + (res.class_name||'') + ': Hadir harus ' + expHadir + ', Absen harus ' + expAbsen + '.',
+              'error', 7000
+            );
+          } else if (code === 'DUPLICATE') {
+            showToast(msg, 'error', 6000);
+            setTimeout(() => {
+              const modal = document.getElementById('journalModal');
+              if (modal) modal.classList.add('hidden');
+              _journalEditLogId = null;
+            }, 1500);
+          } else {
+            showToast(msg, 'error');
+          }
+        }
+      };
+      const handleFailure = (err) => {
+        onDone();
+        showToast("Koneksi gagal: " + err, "error");
+      };
+      if (isEdit) {
+        const editPayload = {
+          log_id: _journalEditLogId,
+          material: materi,
+          notes: catatan,
+          siswa_hadir: hadir,
+          siswa_absen: sakit,
+          force_submit: false
+        };
+        google.script.run
+          .withSuccessHandler(handleSuccess)
+          .withFailureHandler(handleFailure)
+          .updateTeachingLog(token, editPayload);
+      } else {
+        const payload = {
+          schedule_id: scheduleId,
+          material: materi,
+          notes: catatan,
+          siswa_hadir: hadir,
+          siswa_absen: sakit,
+          date: journalDate || null,
+          force_submit: false
+        };
+        google.script.run
+          .withSuccessHandler(handleSuccess)
+          .withFailureHandler(handleFailure)
+          .saveTeachingJournal(token, payload);
+      }
+    }
+    var _allUsersCache = [];
+    var _activeRoleFilter = '';
+    function initUsers() {
+      const token = localStorage.getItem('auth_token');
+      const tbody = document.getElementById('tbodyUsers');
+      if (!tbody) return;
+      tbody.innerHTML = skeletonTableRows(4, 5);
+      google.script.run.withSuccessHandler(function (users) {
+        _allUsersCache = users || [];
+        const totalAdmins = _allUsersCache.filter(u => u.role === 'admin').length;
+        const totalGurus = _allUsersCache.filter(u => u.role === 'guru').length;
+        var elTotal = document.getElementById('statTotalUsers');
+        var elAdmins = document.getElementById('statTotalAdmins');
+        var elGurus = document.getElementById('statTotalGurus');
+        if (elTotal) elTotal.textContent = _allUsersCache.length;
+        if (elAdmins) elAdmins.textContent = totalAdmins;
+        if (elGurus) elGurus.textContent = totalGurus;
+        _renderUsersTable();
+      }).withFailureHandler(function (err) {
+        tbody.innerHTML = errorTableRows(5, 'Gagal memuat data pengguna: ' + err, 'initUsers()');
+      }).getAllUsers(token);
+    }
+    function _renderUsersTable() {
+      const tbody = document.getElementById('tbodyUsers');
+      if (!tbody) return;
+      const search = (document.getElementById('searchUsers') ? document.getElementById('searchUsers').value : '').toLowerCase().trim();
+      const roleFilter = _activeRoleFilter;
+      let filtered = _allUsersCache.filter(function (u) {
+        const matchRole = !roleFilter || u.role === roleFilter;
+        const matchSearch = !search ||
+          (u.full_name || '').toLowerCase().includes(search) ||
+          (u.username || '').toLowerCase().includes(search);
+        return matchRole && matchSearch;
+      });
+      var lbl = document.getElementById('lblUserCount');
+      if (lbl) lbl.textContent = filtered.length + ' dari ' + _allUsersCache.length + ' pengguna';
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-2">' + errorStateHTML('Tidak ada pengguna yang cocok.') + '</td></tr>';
+        return;
+      }
+      const AVATAR_COLORS = [
+        ['#dbeafe', '#1d4ed8'],
+        ['#ede9fe', '#6d28d9'],
+        ['#d1fae5', '#065f46'],
+        ['#fef3c7', '#92400e'],
+        ['#fce7f3', '#9d174d'],
+        ['#e0f2fe', '#0369a1'],
+      ];
+      let html = '';
+      filtered.forEach(function (u, idx) {
+        const nameParts = (u.full_name || 'U').split(' ');
+        const initials = nameParts.length >= 2
+          ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+          : (u.full_name || 'U').substring(0, 2).toUpperCase();
+        const colors = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+        const avatarStyle = 'background-color:' + colors[0] + ';color:' + colors[1];
+        const isAdmin = u.role === 'admin';
+        const roleBadge = isAdmin
+          ? '<span class="inline-flex items-center gap-1.5 bg-violet-50 text-violet-700 border border-violet-200 text-[11px] font-bold px-2.5 py-1 rounded-full">' +
+          '<span class="w-1.5 h-1.5 rounded-full bg-violet-500 inline-block"></span>Admin</span>'
+          : '<span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2.5 py-1 rounded-full">' +
+          '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>Guru</span>';
+        const nip = (u.nip && String(u.nip).trim()) ? escapeHtml(String(u.nip)) : '<span class="text-slate-300 italic">—</span>';
+        const safeId = String(u.id || '').replace(/'/g, "\\'");
+        const safeName = String(u.full_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeUser = String(u.username || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeRole = String(u.role || 'guru');
+        const safeNip = String(u.nip && String(u.nip).trim() && String(u.nip).trim() !== '-' ? u.nip : '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeKm = String(u.km_distance !== undefined && u.km_distance !== null ? u.km_distance : '').replace(/'/g, "\\'");
+        html += '<tr class="hover:bg-slate-50 transition-colors group">' +
+          '<td class="px-5 py-3.5">' +
+          '<div class="flex items-center gap-3">' +
+          '<div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0" style="' + avatarStyle + '">' + initials + '</div>' +
+          '<div>' +
+          '<p class="font-semibold text-slate-800 text-sm leading-snug">' + escapeHtml(u.full_name || '-') + '</p>' +
+          '</div>' +
+          '</div>' +
+          '</td>' +
+          '<td class="px-5 py-3.5">' +
+          '<span class="font-mono text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg">' + escapeHtml(u.username || '-') + '</span>' +
+          '</td>' +
+          '<td class="px-5 py-3.5 text-xs text-slate-500 font-mono">' + nip + '</td>' +
+          '<td class="px-5 py-3.5 text-center">' + roleBadge + '</td>' +
+          '<td class="px-5 py-3.5">' +
+          '<div class="flex items-center justify-center gap-1.5">' +
+          actionBtn('edit', "editUser('" + safeId + "','" + safeName + "','" + safeUser + "','" + safeRole + "','" + safeKm + "','" + safeNip + "')", 'Edit Pengguna') +
+          actionBtn('resetKey', "resetPassAction('" + safeId + "','" + safeName + "')", 'Reset Password') +
+          actionBtn('delete', "deleteUserAction('" + safeId + "','" + safeName + "')", 'Hapus Pengguna') +
+          '</div>' +
+          '</td>' +
+          '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+    function filterUsersTable() { _renderUsersTable(); }
+    function filterUsersByRole(role) {
+      _activeRoleFilter = role;
+      var pills = document.querySelectorAll('.user-role-filter');
+      pills.forEach(function (btn) {
+        btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+        btn.classList.add('bg-white', 'text-slate-500', 'border-slate-200', 'hover:bg-slate-50');
+      });
+      var activeIds = { '': 'filterAll', 'admin': 'filterAdmin', 'guru': 'filterGuru' };
+      var activeBtn = document.getElementById(activeIds[role]);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-white', 'text-slate-500', 'border-slate-200', 'hover:bg-slate-50');
+        activeBtn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+      }
+      _renderUsersTable();
+    }
+    function openUserModal(id, name, username, role, km_distance, nip) {
+      document.getElementById('userModal').classList.remove('hidden');
+      document.getElementById('formUser').reset();
+      document.getElementById('inpUserId').value = id || "";
+      document.getElementById('inpNamaLengkap').value = name || "";
+      document.getElementById('inpNip').value = (nip !== undefined && nip !== null) ? nip : '';
+      document.getElementById('inpUsernameUser').value = username || "";
+      document.getElementById('inpRole').value = role || "guru";
+      document.getElementById('inpKmDistance').value = (km_distance !== undefined && km_distance !== null && km_distance !== '') ? km_distance : '';
+      var errEl = document.getElementById('errKmDistance');
+      if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+      document.getElementById('titleUserModal').innerText = id ? "Edit Data Pengguna" : "Tambah Pengguna Baru";
+      if (id) document.getElementById('divUserPassword').classList.add('hidden');
+      else document.getElementById('divUserPassword').classList.remove('hidden');
+    }
+    function editUser(id, name, username, role, km_distance, nip) { openUserModal(id, name, username, role, km_distance, nip); }
+    function closeUserModal() {
+      document.getElementById('userModal').classList.add('hidden');
+    }
+    function submitUser() {
+      const data = {
+        id: document.getElementById('inpUserId').value,
+        full_name: document.getElementById('inpNamaLengkap').value,
+        nip: (document.getElementById('inpNip').value || '').trim(),
+        username: document.getElementById('inpUsernameUser').value,
+        role: document.getElementById('inpRole').value,
+        password: document.getElementById('inpPasswordUser').value
+      };
+      if (!data.full_name || !data.username) return showToast("Nama dan Username wajib diisi", "error");
+      var kmRaw = (document.getElementById('inpKmDistance').value || '').trim();
+      var errEl = document.getElementById('errKmDistance');
+      if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
+      if (kmRaw !== '') {
+        var kmVal = parseFloat(kmRaw);
+        var isValid = true;
+        var errMsg = '';
+        if (isNaN(kmVal) || !/^\d+(\.\d{1,2})?$/.test(kmRaw)) {
+          isValid = false;
+          errMsg = 'Jarak harus berupa angka antara 0 dan 999,99 dengan maksimal 2 angka di belakang koma.';
+        } else if (kmVal < 0 || kmVal > 999.99) {
+          isValid = false;
+          errMsg = 'Jarak harus berupa angka antara 0 dan 999,99 dengan maksimal 2 angka di belakang koma.';
+        }
+        if (!isValid) {
+          if (errEl) { errEl.textContent = errMsg; errEl.classList.remove('hidden'); }
+          showToast(errMsg, 'error');
+          return;
+        }
+        data.km_distance = kmRaw;
+      } else {
+        data.km_distance = '';
+      }
+      const btn = document.getElementById('btnSubmitUser');
+      btn.disabled = true;
+      btn.innerText = "Menyimpan...";
+      const token = localStorage.getItem('auth_token');
+      google.script.run.withSuccessHandler((res) => {
+        btn.disabled = false;
+        btn.innerText = "Simpan Data";
+        if (res && res.status === 'success') { showToast("Data pengguna berhasil diperbarui"); closeUserModal(); initUsers(); }
+        else showToast(res.message, "error");
+      }).saveUser(token, data);
+    }
+    function deleteUserAction(id, name) {
+      showConfirm(
+        'Hapus Pengguna',
+        `Apakah Anda yakin ingin menghapus pengguna ${name}? Data yang sudah dihapus tidak dapat dikembalikan.`,
+        () => {
+          const token = localStorage.getItem('auth_token');
+          google.script.run.withSuccessHandler((res) => {
+            if (res && res.status === 'success') { showToast("Pengguna berhasil dihapus"); initUsers(); }
+            else showToast(res.message, "error");
+          }).deleteUser(token, id);
+        }
+      );
+    }
+    function resetPassAction(id, name) {
+      showConfirm(
+        'Reset Password',
+        `Apakah Anda yakin ingin mereset password pengguna ${name} menjadi '123456'?`,
+        () => {
+          const token = localStorage.getItem('auth_token');
+          google.script.run.withSuccessHandler((res) => {
+            if (res.status === 'success') showToast("Password berhasil direset");
+            else showToast(res.message, "error");
+          }).resetUserPassword(token, id);
+        }
+      );
+    }
+    function openAllowanceModal() {
+      document.getElementById('allowanceModal').classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      document.getElementById('formAllowance').reset();
+      document.getElementById('inpAllowanceId').value = '';
+      var titleEl = document.getElementById('allowanceModalTitle');
+      if (titleEl) titleEl.innerText = 'Tambah Tunjangan';
+      var preview = document.getElementById('allowanceAmountPreview');
+      if (preview) preview.classList.add('hidden');
+      var sel = document.getElementById('inpDutyTeacher');
+      if (sel) sel.innerHTML = '<option value="">Memuat daftar guru...</option>';
+      var fillSelect = function (users) {
+        if (!sel) return;
+        let html = '<option value="">Pilih Guru...</option>';
+        (users || []).filter(u => String(u.role).toLowerCase() === 'guru').forEach(u => {
+          html += '<option value="' + escapeHtml(String(u.id)) + '">' + escapeHtml(u.full_name || '-') + '</option>';
+        });
+        sel.innerHTML = html;
+      };
+      if (Array.isArray(_allUsersCache) && _allUsersCache.length > 0) {
+        fillSelect(_allUsersCache);
+      } else {
+        const token = localStorage.getItem('auth_token');
+        google.script.run
+          .withSuccessHandler((users) => {
+            _allUsersCache = users || [];
+            fillSelect(users);
+          })
+          .withFailureHandler((err) => {
+            if (sel) sel.innerHTML = '<option value="">Gagal memuat guru</option>';
+            showToast('Gagal memuat daftar guru', 'error');
+          })
+          .getAllUsers(token);
+      }
+      setTimeout(function () {
+        var inp = document.getElementById('inpDutyName');
+        if (inp) try { inp.focus(); } catch (_) { }
+      }, 200);
+    }
+    function editAllowanceAction(id, duty, userId, amount) {
+      openAllowanceModal();
+      setTimeout(() => {
+        document.getElementById('inpAllowanceId').value = id;
+        document.getElementById('inpDutyName').value = duty;
+        var sel = document.getElementById('inpDutyTeacher');
+        var trySetUser = function (retry) {
+          if (sel && sel.querySelector('option[value="' + userId + '"]')) {
+            sel.value = userId;
+          } else if (retry > 0) {
+            setTimeout(function () { trySetUser(retry - 1); }, 100);
+          }
+        };
+        trySetUser(50);
+        document.getElementById('inpDutyAmount').value = amount;
+        if (typeof _settingsPreviewAllowance === 'function') _settingsPreviewAllowance();
+        var titleEl = document.getElementById('allowanceModalTitle');
+        if (titleEl) titleEl.innerText = 'Edit Data Tunjangan';
+      }, 200);
+    }
+    function closeAllowanceModal() {
+      document.getElementById('allowanceModal').classList.add('hidden');
+      _maybeReleaseBodyLock();
+    }
+    function _maybeReleaseBodyLock() {
+      var openModalIds = [
+        'subjectModal', 'allowanceModal', 'userModal', 'journalModal', 'viewJournalModal',
+        'examPeriodModal', 'examSessionModal', 'examRoomModal', 'examSupModal', 'examComModal', 'examSubstModal',
+        'slipModal', 'examBapModal', 'msDetailModal', 'scheduleModal', 'subModal', 'rekapKelasModal',
+        'rekapGuruModal', 'rekapHariModal', 'rekapKelasHariModal'
+      ];
+      var anyOpen = openModalIds.some(function (id) {
+        var el = document.getElementById(id);
+        return el && !el.classList.contains('hidden');
+      });
+      if (!anyOpen) document.body.classList.remove('overflow-hidden');
+    }
+    function _settingsPreviewAllowance() {
+      var inp = document.getElementById('inpDutyAmount');
+      var preview = document.getElementById('allowanceAmountPreview');
+      if (!inp || !preview) return;
+      var v = Number(inp.value);
+      if (!inp.value || isNaN(v)) {
+        preview.classList.add('hidden');
+        return;
+      }
+      if (v < 0) {
+        preview.textContent = '⚠️ Nominal tidak boleh negatif';
+        preview.classList.remove('hidden', 'text-emerald-700');
+        preview.classList.add('text-rose-600');
+        return;
+      }
+      preview.textContent = '= Rp ' + v.toLocaleString('id-ID') + ' /bulan';
+      preview.classList.remove('hidden', 'text-rose-600');
+      preview.classList.add('text-emerald-700');
+    }
+    function _settingsUpdateSubjectCounter() {
+      var inp = document.getElementById('inpSubjectName');
+      var counter = document.getElementById('subjectCharCounter');
+      if (!inp || !counter) return;
+      var len = (inp.value || '').length;
+      counter.textContent = len + '/50';
+      if (len >= 45) counter.classList.add('text-amber-600', 'font-bold');
+      else counter.classList.remove('text-amber-600', 'font-bold');
+    }
+    function submitAllowance() {
+      const token = localStorage.getItem('auth_token');
+      const dutyName = (document.getElementById('inpDutyName').value || '').trim();
+      const userId = document.getElementById('inpDutyTeacher').value;
+      const amount = document.getElementById('inpDutyAmount').value;
+      if (!dutyName) {
+        showToast('Nama tugas/tunjangan wajib diisi.', 'error');
+        var dn = document.getElementById('inpDutyName');
+        if (dn) try { dn.focus(); } catch (_) { }
+        return;
+      }
+      if (!userId) {
+        showToast('Pilih guru penerima terlebih dahulu.', 'error');
+        var sel = document.getElementById('inpDutyTeacher');
+        if (sel) try { sel.focus(); } catch (_) { }
+        return;
+      }
+      if (amount === '' || isNaN(Number(amount)) || Number(amount) < 0) {
+        showToast('Nominal tunjangan harus angka ≥ 0.', 'error');
+        var amt = document.getElementById('inpDutyAmount');
+        if (amt) try { amt.focus(); } catch (_) { }
+        return;
+      }
+      const data = {
+        id: document.getElementById('inpAllowanceId').value,
+        duty_name: dutyName,
+        user_id: userId,
+        amount: amount
+      };
+      var btn = document.getElementById('btnSubmitAllowance');
+      if (btn && btn.dataset.busy === 'true') return;
+      var restore = _busyButton(btn, 'Menyimpan...');
+      google.script.run.withSuccessHandler((res) => {
+        restore();
+        if (res && res.status === 'success') {
+          showToast('Tunjangan disimpan', 'success');
+          closeAllowanceModal();
+          initSettings();
+        } else {
+          showToast((res && res.message) || 'Gagal menyimpan tunjangan.', 'error');
+        }
+      }).withFailureHandler((err) => {
+        restore();
+        showToast('Koneksi gagal: ' + (err && err.message ? err.message : err), 'error');
+      }).saveAllowance(token, data);
+    }
+    function initHonorarium() {
+      const token = localStorage.getItem('auth_token');
+      const role = localStorage.getItem('user_role');
+      document.getElementById('viewGuru').classList.add('hidden');
+      document.getElementById('viewAdmin').classList.add('hidden');
+      if (!globalConfig || Object.keys(globalConfig).length === 0) {
+        google.script.run.withSuccessHandler((cfg) => {
+          if (cfg && cfg.status !== 'error') {
+            globalConfig = cfg.config || cfg;
+          }
+          continueInitHonorarium(token, role);
+        }).getSettingsMasterData(token);
+      } else {
+        continueInitHonorarium(token, role);
+      }
+    }
+    var _adminHonorReqToken = 0;
+    function loadAdminHonorByFilter() {
+      const token = localStorage.getItem('auth_token');
+      const monthSel = document.getElementById('selAdminHonorMonth');
+      const yearSel = document.getElementById('selAdminHonorYear');
+      const month = monthSel ? monthSel.value : '';
+      const year = yearSel ? yearSel.value : '';
+      const myReq = ++_adminHonorReqToken;
+      const lbl = document.getElementById('lblAdminPeriode');
+      if (lbl) lbl.innerHTML = '<div class="skeleton h-4 w-24 rounded inline-block"></div>';
+      const tbody = document.getElementById('tbodyAdminRecap');
+      if (tbody) tbody.innerHTML = skeletonTableRows(6, 5);
+      const finalizeBtn = document.getElementById('btnFinalizeHonor');
+      const bannerFinalized = document.getElementById('bannerFinalizedAdmin');
+      google.script.run.withSuccessHandler((data) => {
+        if (myReq !== _adminHonorReqToken) return;
+        if (data && data.status === 'success') {
+          if (lbl) lbl.innerText = data.periode;
+          var grandTotalEl = document.getElementById('lblGrandTotalPayout');
+          if (grandTotalEl) {
+            if (typeof animateRupiah === 'function') animateRupiah(grandTotalEl, data.grand_total, 700);
+            else grandTotalEl.innerText = data.grand_total;
+          }
+          if (finalizeBtn) {
+</script>

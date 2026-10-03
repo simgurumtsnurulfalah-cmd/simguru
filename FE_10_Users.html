@@ -1,0 +1,349 @@
+<script>
+    }
+    function finalizeHonorarium() {
+      const monthSel = document.getElementById('selAdminHonorMonth');
+      const yearSel = document.getElementById('selAdminHonorYear');
+      const month = monthSel ? monthSel.value : '';
+      const year = yearSel ? yearSel.value : '';
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const periodLabel = (month !== '' && year !== '') ? `${months[parseInt(month)]} ${year}` : 'periode ini';
+      showConfirm(
+        'Finalisasi Honorarium',
+        `Apakah Anda yakin ingin menyimpan rekapitulasi <strong>${periodLabel}</strong> ke database? Tindakan ini akan mencatat riwayat pembayaran secara permanen dan tidak dapat diubah.`,
+        () => {
+          showLoadingOverlay('Menyimpan data honorarium ' + periodLabel + '…\nMohon tunggu, jangan tutup halaman ini.');
+          const btn = document.getElementById('btnFinalizeHonor');
+          if (btn) { btn.disabled = true; }
+          const token = localStorage.getItem('auth_token');
+          function _restoreBtn() {
+            hideLoadingOverlay();
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Finalisasi Periode Ini';
+              btn.className = 'flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-sm hover:shadow-md whitespace-nowrap';
+            }
+          }
+          google.script.run
+            .withSuccessHandler(function (res) {
+              if (res && res.status === 'success') {
+                hideLoadingOverlay();
+                showToast(res.message || 'Rekapitulasi berhasil disimpan ke riwayat', 'success');
+                loadAdminHonorByFilter();
+              } else {
+                _restoreBtn();
+                showToast((res && res.message) ? res.message : 'Finalisasi gagal. Silakan coba lagi.', 'error');
+              }
+            })
+            .withFailureHandler(function (err) {
+              _restoreBtn();
+              showToast('Terjadi kesalahan saat finalisasi: ' + String(err), 'error');
+            })
+            .saveMonthlyHonorarium(token, month, year);
+        }
+      );
+    }
+    let allAdminHistoryData = [];
+    let adminHonorFilteredData = [];
+    let adminHonorCurrentPage = 1;
+    let adminHonorItemsPerPage = 10;
+    var allGuruHistoryData = [];
+    var guruHonorSelectedYear = 'all';
+    var guruHonorSelectedMonth = 'all';
+    var _guruHonorYearMap = {};
+    var _MONTH_NAMES_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var _MONTH_SHORT_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    var _admHistorySearchDebounce = null;
+    function _formatTanggalFinal(str) {
+      if (!str) return '';
+      try {
+        var d = new Date(str);
+        if (isNaN(d.getTime())) return str;
+        var day = String(d.getDate()).padStart(2, '0');
+        var month = _MONTH_NAMES_ID[d.getMonth()];
+        var year = d.getFullYear();
+        var hour = String(d.getHours()).padStart(2, '0');
+        var min = String(d.getMinutes()).padStart(2, '0');
+        return day + ' ' + month + ' ' + year + ' ' + hour + ':' + min;
+      } catch (e) { return str; }
+    }
+    function filterAdminHistoryByPeriod() {
+      const selFilter = document.getElementById('selAdminHistoryFilter');
+      const searchEl = document.getElementById('admHistorySearch');
+      const filterVal = selFilter ? selFilter.value : '';
+      const searchVal = searchEl ? searchEl.value.toLowerCase().trim() : '';
+      let filtered = filterVal
+        ? allAdminHistoryData.filter(h => h.periode === filterVal)
+        : allAdminHistoryData;
+      if (searchVal) {
+        filtered = filtered.filter(h =>
+          (h.guru_name || '').toLowerCase().includes(searchVal)
+        );
+      }
+      adminHonorCurrentPage = 1;
+      adminHonorFilteredData = filtered;
+      _renderAdminFilterMeta(filtered.length, filterVal, searchVal);
+      renderAdminHonorHistoryTable(filtered);
+    }
+    function filterAdminHistorySearchDebounced() {
+      if (_admHistorySearchDebounce) clearTimeout(_admHistorySearchDebounce);
+      var inp = document.getElementById('admHistorySearch');
+      var clearBtn = document.getElementById('admSearchClearBtn');
+      if (clearBtn) clearBtn.style.display = (inp && inp.value) ? 'inline-flex' : 'none';
+      _admHistorySearchDebounce = setTimeout(filterAdminHistoryByPeriod, 180);
+    }
+    function clearAdminHistorySearch() {
+      var inp = document.getElementById('admHistorySearch');
+      if (inp) inp.value = '';
+      var clearBtn = document.getElementById('admSearchClearBtn');
+      if (clearBtn) clearBtn.style.display = 'none';
+      filterAdminHistoryByPeriod();
+    }
+    function clearAdminHistoryFilter() {
+      var sel = document.getElementById('selAdminHistoryFilter');
+      var inp = document.getElementById('admHistorySearch');
+      if (sel) sel.value = '';
+      if (inp) inp.value = '';
+      var clearBtn = document.getElementById('admSearchClearBtn');
+      if (clearBtn) clearBtn.style.display = 'none';
+      filterAdminHistoryByPeriod();
+    }
+    function exportAdminHonorHistoryExcel() {
+      var data = adminHonorFilteredData || [];
+      if (!data.length) {
+        showToast('Tidak ada data untuk diekspor', 'warning');
+        return;
+      }
+      var headers = ['Periode', 'Nama Guru', 'Total JTM', 'Nominal', 'ID Transaksi', 'Tanggal Finalisasi'];
+      var rows = [headers];
+      data.forEach(function (h) {
+        rows.push([
+          String(h.periode || ''),
+          String(h.guru_name || ''),
+          Number(h.total_jtm || 0),
+          String(h.nominal || 'Rp 0'),
+          String(h.trx_id || '-'),
+          String(h.tanggal_simpan || '-')
+        ]);
+      });
+      var ws = XLSX.utils.aoa_to_sheet(rows);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Arsip Honorarium");
+      var nowStr = new Date().toISOString().slice(0, 10);
+      var filename = 'Arsip_Honorarium_' + nowStr + '.xlsx';
+      XLSX.writeFile(wb, filename);
+      showToast('Excel arsip honorarium diunduh.', 'success');
+    }
+    function _renderAdminFilterMeta(total, filterVal, searchVal) {
+      var resetBtn = document.getElementById('admFilterResetBtn');
+      var hasFilter = !!(filterVal || searchVal);
+      if (resetBtn) resetBtn.style.display = hasFilter ? 'inline-flex' : 'none';
+    }
+    function _getInitials(fullName) {
+      var name = String(fullName || '').trim();
+      if (!name) return '?';
+      var parts = name.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      }
+      return name.substring(0, 2).toUpperCase();
+    }
+    function renderAdminHonorHistoryTable(data) {
+      const tbody = document.getElementById('tbodyAdminHonorHistory');
+      const countBadge = document.getElementById('admFilterCount');
+      const wrapEl = document.getElementById('adminHonorPaginationWrap');
+      if (!tbody) return;
+      adminHonorFilteredData = data || [];
+      const total = adminHonorFilteredData.length;
+      if (countBadge) countBadge.textContent = total + ' Data';
+      if (!data || data.length === 0) {
+        const selFilter = document.getElementById('selAdminHistoryFilter');
+        const searchEl = document.getElementById('admHistorySearch');
+        const isFiltering = !!((selFilter && selFilter.value) || (searchEl && searchEl.value));
+        const msg = isFiltering ? 'Tidak ada hasil yang cocok' : 'Belum ada riwayat honorarium';
+        const sub = isFiltering ? 'Coba ubah kata kunci atau pilih periode lain' : 'Data akan muncul setelah finalisasi bulanan';
+        const actionBtn = isFiltering
+          ? '<button onclick="clearAdminHistoryFilter()" style="margin-top:1rem;display:inline-flex;align-items:center;gap:6px;padding:.45rem 1rem;border-radius:8px;font-size:.78rem;font-weight:700;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;cursor:pointer;"><svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>Reset Filter</button>'
+          : '';
+        tbody.innerHTML = `<tr><td colspan="7">
+        <div class="ah-empty">
+          <div class="ah-empty-icon">
+            <svg style="width:24px;height:24px;color:#CBD5E1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586"/>
+            </svg>
+          </div>
+          <p style="font-size:.875rem;font-weight:700;color:#475569;">${msg}</p>
+          <span style="font-size:.75rem;color:#94A3B8;margin-top:.25rem;">${sub}</span>
+          ${actionBtn}
+        </div>
+      </td></tr>`;
+        _renderAdminHonorPagination(0);
+        if (wrapEl) wrapEl.style.display = 'none';
+        return;
+      }
+      if (wrapEl) wrapEl.style.display = '';
+      const itemsPerPage = adminHonorItemsPerPage;
+      const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
+      if (adminHonorCurrentPage > totalPages) adminHonorCurrentPage = totalPages;
+      if (adminHonorCurrentPage < 1) adminHonorCurrentPage = 1;
+      const startIdx = (adminHonorCurrentPage - 1) * itemsPerPage;
+      const endIdx = Math.min(startIdx + itemsPerPage, total);
+      const pageData = data.slice(startIdx, endIdx);
+      var avatarGrads = [
+        'linear-gradient(135deg,#3B82F6,#6366F1)',
+        'linear-gradient(135deg,#8B5CF6,#A855F7)',
+        'linear-gradient(135deg,#10B981,#14B8A6)',
+        'linear-gradient(135deg,#F59E0B,#F97316)',
+        'linear-gradient(135deg,#EC4899,#F43F5E)',
+        'linear-gradient(135deg,#06B6D4,#3B82F6)'
+      ];
+      let html = '';
+      pageData.forEach(h => {
+        const safePeriode = escapeHtml(h.periode || '-');
+        const safeGuru = escapeHtml(h.guru_name || '-');
+        const safePeriodeJs = String(h.periode || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const safeUserIdJs = String(h.user_id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const initials = _getInitials(h.guru_name);
+        var hash = 0;
+        var nm = String(h.guru_name || '');
+        for (var k = 0; k < nm.length; k++) hash = (hash * 31 + nm.charCodeAt(k)) >>> 0;
+        var grad = avatarGrads[hash % avatarGrads.length];
+        const safeJtm = Number(h.total_jtm || 0);
+        const safeTugasTambahan = escapeHtml(h.nominal_tugas_tambahan || 'Rp 0');
+        const safeTransport = escapeHtml(h.nominal_transport || 'Rp 0');
+        const safeNominal = escapeHtml(h.nominal || 'Rp 0');
+        html += `<tr>
+        <td><span class="ah-periode-badge">${safePeriode}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <div style="width:32px;height:32px;border-radius:50%;background:${grad};display:flex;align-items:center;justify-content:center;color:white;font-size:.7rem;font-weight:800;flex-shrink:0;letter-spacing:-.02em;">
+              ${initials}
+            </div>
+            <span style="font-weight:600;color:#1E293B;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeGuru}</span>
+          </div>
+        </td>
+        <td style="text-align:center;"><span class="ah-jtm-badge">${safeJtm} JTM</span></td>
+        <td style="text-align:right;"><span style="font-size:0.875rem; color:#475569; font-weight:600;">${safeTugasTambahan}</span></td>
+        <td style="text-align:right;"><span style="font-size:0.875rem; color:#475569; font-weight:600;">${safeTransport}</span></td>
+        <td style="text-align:right;"><span class="ah-nominal">${safeNominal}</span></td>
+        <td style="text-align:center;">
+          <button type="button" onclick="showHonorSlip('${safePeriodeJs}','${safeUserIdJs}')" class="ah-btn-slip" aria-label="Lihat slip ${safePeriode} ${safeGuru}">
+            <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Lihat Slip
+          </button>
+        </td>
+      </tr>`;
+      });
+      tbody.innerHTML = html;
+      _renderAdminHonorPagination(total);
+    }
+    function _renderAdminHonorPagination(total) {
+      const infoEl = document.getElementById('admPaginationInfo');
+      const controlsEl = document.getElementById('admPaginationControls');
+      const wrapEl = document.getElementById('adminHonorPaginationWrap');
+      const itemsPP = adminHonorItemsPerPage;
+      const curPage = adminHonorCurrentPage;
+      const totalPages = Math.max(1, Math.ceil(total / itemsPP));
+      if (infoEl) {
+        if (total === 0) {
+          infoEl.innerHTML = 'Tidak ada data';
+        } else {
+          const from = (curPage - 1) * itemsPP + 1;
+          const to = Math.min(curPage * itemsPP, total);
+          infoEl.innerHTML =
+            'Menampilkan <strong>' + from + '&ndash;' + to + '</strong> dari <strong>' + total + '</strong> data';
+        }
+      }
+      if (!controlsEl) return;
+      if (total <= itemsPP) {
+        controlsEl.innerHTML = '';
+        return;
+      }
+      const pages = _getAdminHonorPageNums(curPage, totalPages);
+      let html = '';
+      html += `<button class="ah-pg-btn ah-pg-nav" title="Halaman sebelumnya"
+      onclick="changeAdminHonorPage(${curPage - 1})"
+      ${curPage <= 1 ? 'disabled' : ''}>
+      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </button>`;
+      pages.forEach(function (p) {
+        if (p === '...') {
+          html += '<span class="ah-pg-dots">&hellip;</span>';
+        } else {
+          html += '<button class="ah-pg-btn' + (p === curPage ? ' ah-pg-active' : '') +
+            '" onclick="changeAdminHonorPage(' + p + ')">' + p + '</button>';
+        }
+      });
+      html += `<button class="ah-pg-btn ah-pg-nav" title="Halaman berikutnya"
+      onclick="changeAdminHonorPage(${curPage + 1})"
+      ${curPage >= totalPages ? 'disabled' : ''}>
+      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+      </svg>
+    </button>`;
+      controlsEl.innerHTML = html;
+    }
+    function _getAdminHonorPageNums(current, total) {
+      if (total <= 7) {
+        var arr = [];
+        for (var i = 1; i <= total; i++) arr.push(i);
+        return arr;
+      }
+      var pages = [];
+      if (current <= 4) {
+        for (var i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(total);
+      } else if (current >= total - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (var i = total - 4; i <= total; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (var i = current - 1; i <= current + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(total);
+      }
+      return pages;
+    }
+    function changeAdminHonorPage(page) {
+      var total = adminHonorFilteredData.length;
+      var totalPages = Math.max(1, Math.ceil(total / adminHonorItemsPerPage));
+      if (page < 1 || page > totalPages) return;
+      adminHonorCurrentPage = page;
+      renderAdminHonorHistoryTable(adminHonorFilteredData);
+      var wrap = document.getElementById('adminHonorPaginationWrap');
+      if (wrap) {
+        var panel = wrap.closest('.ah-panel');
+        if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+    function changeAdminHonorItemsPerPage() {
+      var sel = document.getElementById('admItemsPerPage');
+      if (sel) adminHonorItemsPerPage = parseInt(sel.value) || 10;
+      adminHonorCurrentPage = 1;
+      renderAdminHonorHistoryTable(adminHonorFilteredData);
+    }
+    let currentSlipData = null;
+    function showHonorSlip(periode, userId) {
+      const modal = document.getElementById('slipModal');
+      const slipContent = document.getElementById('slipContent');
+      const exportBtn = document.getElementById('btnExportSlipPDF');
+      const modalTitle = document.getElementById('slipModalTitle');
+      const modalSubtitle = document.getElementById('slipModalSubtitle');
+      if (!modal) return;
+      currentSlipData = null;
+      modal.classList.remove('hidden');
+      document.body.classList.add('overflow-hidden');
+      if (modalTitle) modalTitle.textContent = 'Memuat Slip...';
+      if (modalSubtitle) modalSubtitle.textContent = 'Periode: ' + (periode || '-');
+      if (slipContent) {
+        slipContent.innerHTML =
+          '<div class="flex flex-col items-center justify-center gap-3 py-16">' +
+          '<div class="animate-spin rounded-full h-10 w-10 border-2 border-blue-100 border-t-blue-600"></div>' +
+          '<span class="text-slate-500 font-medium text-sm">Memuat slip honorarium...</span>' +
+</script>
